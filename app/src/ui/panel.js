@@ -8,142 +8,197 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Redstone</title>
 <style>
+  /*
+   * グレースケールのダークテーマ。色は意味のあるところだけ（接続ランプ・止めるボタン・失敗）。
+   * 強調は白抜き（白い面に黒い文字）で表す。
+   */
   :root {
-    --bg: #14161a;
-    --panel: #1d2026;
-    --line: #2c3038;
-    --text: #e8eaed;
-    --muted: #9aa0a8;
-    --ok: #3ccf7a;
-    --warn: #f0b429;
-    --bad: #ef5350;
-    --accent: #e0483e;
-    --gift: #c792ea;
+    --bg: #1b1b1d;
+    --surface: #232326;
+    --raised: #2b2b2f;
+    --hover: #333338;
+    --line: #38383d;
+    --line-soft: #2e2e32;
+    --text: #ededed;
+    --muted: #8d8d93;
+    --faint: #5e5e64;
+    --invert-bg: #ededed;
+    --invert-text: #1b1b1d;
+    --ok: #6fbf8e;
+    --warn: #d4b062;
+    --bad: #d9665f;
+    --stop: #8f2f2a;
+    --radius: 10px;
+    --radius-sm: 7px;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
+  html { color-scheme: dark; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 15px/1.5 "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    font: 14px/1.6 "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    font-feature-settings: "palt";
+    -webkit-font-smoothing: antialiased;
   }
+  ::selection { background: var(--invert-bg); color: var(--invert-text); }
+  :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+  /* ---- 上の帯 ---- */
   header {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
-    padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+    padding: 12px 24px; background: rgba(27, 27, 29, .92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line-soft);
   }
-  header h1 { font-size: 18px; margin: 0 auto 0 0; letter-spacing: .02em; }
-  header h1 span { color: var(--accent); }
-  .chip {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg);
-    font-size: 14px; white-space: nowrap;
-  }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
-  .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  header h1 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: .01em; white-space: nowrap; }
+  header h1 small { color: var(--faint); font-size: 11px; font-weight: 400; margin-left: 6px; }
+  nav { display: flex; gap: 2px; margin-right: auto; padding: 3px; background: var(--surface); border-radius: var(--radius); }
+  nav button { background: transparent; border-color: transparent; color: var(--muted); padding: 5px 14px; }
+  nav button:hover { background: var(--raised); color: var(--text); }
+  nav button.active { background: var(--raised); color: var(--text); border-color: var(--line); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .chip span:last-child { color: var(--text); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.ok { background: var(--ok); }
   .dot.warn { background: var(--warn); }
   .dot.bad { background: var(--bad); }
+
+  /* ---- 並べ方 ---- */
   main {
-    display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px;
-    padding: 16px 20px; max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px;
+    padding: 24px; max-width: 1240px; margin: 0 auto;
   }
-  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
-  .card h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0 0 12px; }
-  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding: 16px; } header { padding: 10px 16px; } }
+  main.single { display: block; max-width: 1100px; }
+  main.single .card + .card { margin-top: 20px; }
+  .side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 20px; }
+  .card h2 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 0 0 14px; letter-spacing: .02em; }
+
+  /* ---- 入力とボタン ---- */
   button {
-    font: inherit; color: var(--text); background: #2a2e36; border: 1px solid var(--line);
-    border-radius: 8px; padding: 8px 14px; cursor: pointer; white-space: nowrap;
+    font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 7px 14px; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    transition: background-color .12s, border-color .12s;
   }
-  button:hover { filter: brightness(1.15); }
-  button:disabled { opacity: .5; cursor: default; }
-  .big { font-size: clamp(16px, 4.5vw, 20px); font-weight: 700; padding: 18px 8px; }
-  #toggle.paused { background: #24533a; border-color: #2f6b4b; }
-  #stop { background: #5a1f1d; border-color: #7a2a27; }
-  .banner {
-    margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-weight: 600;
-    background: #4a3a10; color: #ffd76a; display: none;
+  #testForm .row { flex-wrap: wrap; }
+  #giftName { flex: 1 1 140px; }
+  button:hover { background: var(--hover); }
+  button:disabled { opacity: .4; cursor: default; }
+  .primary, .next {
+    background: var(--invert-bg); color: var(--invert-text); border-color: var(--invert-bg); font-weight: 700;
   }
-  .banner.show { display: block; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
-  .stat { background: var(--bg); border-radius: 8px; padding: 10px; text-align: center; }
-  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
-  .stat small { color: var(--muted); }
-  #log {
-    list-style: none; margin: 0; padding: 0; height: 420px; overflow-y: auto;
-    font-size: 14px; font-variant-numeric: tabular-nums;
-  }
-  #log li { padding: 3px 0; border-bottom: 1px solid #22252b; display: flex; gap: 10px; }
-  #log time { color: var(--muted); flex: none; }
-  #log .ok { color: var(--ok); }
-  #log .warn { color: var(--warn); }
-  #log .error { color: var(--bad); }
-  #log .gift { color: var(--gift); }
-  .side { display: flex; flex-direction: column; gap: 16px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  input {
+  .primary:hover, .next:hover { background: #ffffff; }
+  .primary { width: 100%; padding: 12px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input, select {
     font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
-    border-radius: 8px; padding: 8px 10px; width: 100%;
+    border-radius: var(--radius-sm); padding: 7px 10px; max-width: 100%;
   }
+  input { width: 100%; }
+  input:hover, select:hover { border-color: var(--faint); }
+  input:focus, select:focus { outline: none; border-color: var(--text); }
+  input[type="number"] { font-variant-numeric: tabular-nums; }
   .row { display: flex; gap: 8px; }
   .row > * { min-width: 0; }
   .row > button { flex: none; }
-  .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
-  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .quick button { padding: 4px 10px; font-size: 13px; }
-  code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 13px; word-break: break-all; }
-  .checks { list-style: none; margin: 0 0 12px; padding: 0; }
-  .checks li { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; }
-  .checks .mark { width: 18px; flex: none; text-align: center; font-weight: 700; }
-  .checks .yes .mark { color: var(--ok); }
+  .hint { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 10px 0 0; max-width: 70ch; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .quick button { padding: 5px 11px; font-size: 13px; }
+  code { background: var(--bg); padding: 3px 7px; border-radius: 5px; font-size: 12px; word-break: break-all; color: var(--muted); }
+
+  /* ---- 一時停止・全妨害ストップ ---- */
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .big { font-size: clamp(15px, 4vw, 17px); font-weight: 700; padding: 16px 8px; }
+  #toggle.paused { background: var(--invert-bg); color: var(--invert-text); border-color: var(--invert-bg); }
+  #stop { background: var(--stop); border-color: var(--stop); color: #fff; }
+  #stop:hover { background: #a3352f; }
+  .banner {
+    display: none; margin-top: 12px; padding: 10px 14px; border-radius: var(--radius-sm);
+    border: 1px solid var(--warn); color: var(--warn); font-weight: 600; font-size: 13px;
+  }
+  .banner.show { display: block; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 16px; border-top: 1px solid var(--line-soft); }
+  .stat { padding: 14px 4px 0; text-align: center; }
+  .stat + .stat { border-left: 1px solid var(--line-soft); }
+  .stat b { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .stat small { color: var(--muted); font-size: 12px; }
+
+  /* ---- 埋め立て（この画面でいちばん大きく見せるところ） ---- */
+  .fill-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .fill-round small, .fill-pct small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+  .fill-round b, .fill-pct b {
+    display: block; font-family: "Segoe UI Variable Display", "Segoe UI", "Yu Gothic UI", sans-serif;
+    font-weight: 600; font-size: 56px; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+  }
+  .fill-round b span { color: var(--faint); font-size: 28px; letter-spacing: 0; margin-left: 4px; }
+  .fill-pct { text-align: right; }
+  .fill-phase { margin-top: 14px; font-weight: 600; }
+  .fill-phase.countdown, .fill-phase.cleared { color: var(--ok); }
+  .fill-progress { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin: 10px 0 8px; }
+  .fill-progress div { height: 100%; width: 0; background: var(--text); transition: width .4s ease-out; }
+  .fill-progress.countdown div, .fill-progress.cleared div { background: var(--ok); }
+  .fill-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px 12px; margin-bottom: 16px; }
+  .fill-form select { width: 100%; }
+  .fill-form .wide { grid-column: 1 / -1; }
+  .fill-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+
+  /* ---- ログ ---- */
+  #log {
+    list-style: none; margin: 0; padding: 0; height: 420px; overflow-y: auto;
+    font-size: 13px; font-variant-numeric: tabular-nums;
+  }
+  #log li { padding: 5px 0; border-bottom: 1px solid var(--line-soft); display: flex; gap: 14px; }
+  #log time { color: var(--faint); flex: none; }
+  #log span { display: inline-flex; align-items: center; flex-wrap: wrap; }
+  #log .ok { color: var(--text); }
+  #log .info, #log .gift { color: var(--muted); }
+  #log .warn { color: var(--warn); }
+  #log .error { color: var(--bad); }
+
+  /* ---- マイクラの準備 ---- */
+  .checks { list-style: none; margin: 0 0 14px; padding: 0; }
+  .checks li { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; }
+  .checks .mark { width: 14px; flex: none; text-align: center; font-weight: 700; }
+  .checks .yes .mark { color: var(--muted); }
   .checks .no .mark { color: var(--bad); }
-  .checks small { color: var(--muted); display: block; font-size: 12px; word-break: break-all; }
-  .primary { width: 100%; font-weight: 700; padding: 12px; background: #24533a; border-color: #2f6b4b; }
-  .ready { padding: 10px 12px; border-radius: 8px; background: #17321f; color: #9be7b4; font-weight: 600; }
-  nav { display: flex; gap: 4px; margin-right: auto; }
-  nav button { background: transparent; border-color: transparent; color: var(--muted); }
-  nav button.active { background: var(--bg); border-color: var(--line); color: var(--text); }
-  header h1 { margin-right: 12px; }
-  main.single { display: block; max-width: 1100px; }
-  main.single .card + .card { margin-top: 16px; }
+  .checks small { color: var(--faint); display: block; font-size: 11px; word-break: break-all; }
+  .ready { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); color: var(--text); font-size: 13px; }
+
+  /* ---- 妨害の設定 ---- */
   .table-wrap { overflow-x: auto; }
-  table.rules { width: 100%; border-collapse: collapse; font-size: 14px; }
-  table.rules th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  table.rules td { padding: 6px 4px; border-bottom: 1px solid #22252b; vertical-align: middle; }
+  table.rules { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.rules th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.rules td { padding: 8px 6px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  table.rules tr:hover td { background: rgba(255, 255, 255, .02); }
   table.rules select, table.rules input { padding: 6px 8px; }
   table.rules .num { width: 72px; }
   table.rules .order { white-space: nowrap; }
-  table.rules .order button, table.rules .del { padding: 4px 8px; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  table.rules .order button, table.rules .del { padding: 4px 9px; background: transparent; border-color: transparent; color: var(--muted); }
+  table.rules .order button:hover, table.rules .del:hover { background: var(--raised); color: var(--text); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
   .toolbar .grow { flex: 1; }
-  .dirty { color: var(--warn); font-weight: 600; }
+  .dirty { color: var(--warn); font-size: 13px; }
   .recent { display: flex; flex-wrap: wrap; gap: 6px; }
-  .recent button { font-size: 13px; padding: 4px 10px; }
-  select {
-    font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
-    border-radius: 8px; padding: 8px 10px; max-width: 100%;
-  }
+  .recent button { font-size: 13px; padding: 5px 11px; }
+
+  /* ---- ダイアログ ---- */
   dialog {
-    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px;
-    padding: 24px; width: min(560px, calc(100vw - 32px));
+    background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 14px;
+    padding: 28px; width: min(560px, calc(100vw - 32px));
   }
-  dialog::backdrop { background: rgba(0, 0, 0, .6); }
-  dialog h2 { margin: 0 0 4px; font-size: 20px; }
-  .steps { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-  .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; }
-  .wizard-actions .next { background: #24533a; border-color: #2f6b4b; font-weight: 700; }
-  .fill-progress { height: 22px; border-radius: 6px; background: var(--bg); overflow: hidden; margin: 8px 0; }
-  .fill-progress div { height: 100%; width: 0; background: var(--warn); transition: width .4s; }
-  .fill-progress.countdown div, .fill-progress.cleared div { background: var(--ok); }
-  .fill-text { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .fill-text b { font-size: 26px; font-variant-numeric: tabular-nums; }
-  .fill-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
-  .fill-form select { width: 100%; }
-  .fill-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  dialog::backdrop { background: rgba(0, 0, 0, .7); }
+  dialog h2 { margin: 0 0 6px; font-size: 19px; font-weight: 700; }
+  .steps { color: var(--faint); font-size: 12px; margin-bottom: 18px; }
+  .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 24px; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
-    background: var(--bad); color: #fff; font-weight: 600; display: none;
+    background: var(--stop); color: #fff; font-weight: 600; display: none;
   }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   /* マイクラのアイコン（mcIconScript.js）と TikTok 公式のギフトの絵 */
   ${MC_ICON_CSS}
   .gift-img { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; flex: none; }
@@ -153,28 +208,37 @@ export const PANEL_HTML = String.raw`<!doctype html>
   #log .gift-img { width: 20px; height: 20px; margin-right: 4px; }
   #log .mc { margin-right: 4px; }
   /* 絵で選ぶ（置くブロック・枠の素材） */
-  .tiles { display: flex; flex-wrap: wrap; gap: 6px; }
-  .tiles button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; min-width: 64px; font-size: 11px; }
-  .tiles button.selected { border-color: var(--ok); background: #1d3a28; }
-  .fill-form .wide { grid-column: 1 / -1; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+  .tiles button {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px;
+    font-size: 11px; color: var(--muted); background: var(--bg); border-color: var(--line-soft);
+  }
+  .tiles button:hover { background: var(--raised); color: var(--text); }
+  .tiles button.selected { border-color: var(--text); color: var(--text); background: var(--raised); }
   /* ギフトを絵で選ぶ */
-  #giftPicker { width: min(760px, calc(100vw - 32px)); }
-  .gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 60vh; overflow-y: auto; margin-top: 10px; }
-  .gift-grid button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; white-space: normal; font-size: 12px; line-height: 1.3; }
-  .gift-grid small { color: var(--muted); }
+  #giftPicker { width: min(780px, calc(100vw - 32px)); }
+  .gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; max-height: 60vh; overflow-y: auto; margin-top: 14px; padding-right: 4px; }
+  .gift-grid button {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px;
+    white-space: normal; font-size: 12px; line-height: 1.35; background: var(--bg); border-color: var(--line-soft);
+  }
+  .gift-grid button:hover { background: var(--raised); border-color: var(--line); }
+  .gift-grid small { color: var(--faint); font-variant-numeric: tabular-nums; }
+  /* スクロールバーも面の色に合わせる */
+  * { scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Project <span>Redstone</span> <small id="appVersion" style="color: var(--muted); font-size: 12px; font-weight: 400;"></small></h1>
+  <h1>Project Redstone<small id="appVersion"></small></h1>
   <nav>
     <button class="active" data-tab="tabLive">配信</button>
     <button data-tab="tabRules">妨害の設定</button>
     <button data-tab="tabDebug">テスト</button>
     <button id="openWizard">はじめの設定</button>
   </nav>
-  <span class="chip"><span class="dot" id="tiktokDot"></span>TikTok: <span id="tiktokText">—</span></span>
-  <span class="chip"><span class="dot" id="modDot"></span>マイクラ: <span id="modText">—</span></span>
+  <span class="chip"><span class="dot" id="tiktokDot"></span>TikTok<span id="tiktokText">—</span></span>
+  <span class="chip"><span class="dot" id="modDot"></span>マイクラ<span id="modText">—</span></span>
 </header>
 
 <main id="tabLive">
@@ -223,9 +287,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <p class="hint">押すと、マイクラのプレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは置いても減らず、届く距離・置く速さ・壊す速さが変わります（終えると元に戻ります）。枠より上にはブロックを置けません。枠から落ちると、自動で枠の上に戻ります。TNT とモブは枠の中に出て、TNT は枠を壊さず中のブロックだけを消します。埋めきって守りきると 1ラウンドクリアで、枠と中が最初に戻って次のラウンドが始まります。</p>
       </div>
       <div id="fillRunning" hidden>
-        <div class="fill-text"><span id="fillPhase"></span><b id="fillPercent"></b></div>
+        <div class="fill-hero">
+          <div class="fill-round"><small>ラウンド（クリアした数）</small><b id="fillRound"></b></div>
+          <div class="fill-pct"><small>埋まった割合</small><b id="fillPercent"></b></div>
+        </div>
         <div class="fill-progress" id="fillBar"><div></div></div>
-        <div class="hint" id="fillDetail" style="margin: 0;"></div>
+        <div class="fill-phase" id="fillPhase"></div>
+        <div class="hint" id="fillDetail" style="margin: 2px 0 0;"></div>
         <div class="fill-buttons">
           <button data-action="fill_expand" data-icon="fill_expand">枠 +1</button>
           <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
@@ -307,7 +375,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <span class="grow"></span>
       <span class="dirty" id="dirty" hidden>保存していない変更があります</span>
       <button id="revertRules">元に戻す</button>
-      <button id="saveRules" class="next" style="background: #24533a; border-color: #2f6b4b; font-weight: 700;">保存する</button>
+      <button id="saveRules" class="next">保存する</button>
     </div>
   </section>
 
@@ -786,7 +854,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
       countdown: '完成！ あと ' + fill.countdownSecondsLeft + ' 秒守りきればクリア',
       cleared: '全ラウンドクリア！',
     };
-    $('fillPhase').textContent = (fill.rounds ? 'ラウンド ' + fill.round + ' / ' + fill.rounds + '　' : '') + phases[fill.phase];
+    $('fillPhase').textContent = phases[fill.phase];
+    $('fillPhase').className = 'fill-phase ' + fill.phase;
+    const total = Object.assign(document.createElement('span'), { textContent: '/ ' + (fill.rounds ?? 1) });
+    $('fillRound').replaceChildren(String(fill.round ?? 0), total);
     $('fillPercent').textContent = fill.percent + '%';
     $('fillBar').className = 'fill-progress ' + fill.phase;
     $('fillBar').firstElementChild.style.width = (fill.total ? (fill.filled / fill.total) * 100 : 0) + '%';

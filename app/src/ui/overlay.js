@@ -8,36 +8,38 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
 <title>Project Redstone オーバーレイ</title>
 <style>
   html, body { margin: 0; background: transparent; overflow: hidden; }
+  /* 操作画面と同じグレースケール。ゲーム画面の上でも読めるよう、濃いグレーの面に白い文字 */
   body {
     font: 700 28px/1.3 "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
-    color: #fff;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, .6);
+    font-feature-settings: "palt";
+    color: #ededed;
   }
   #fill {
     position: fixed; left: 24px; right: 24px; top: 24px; display: none;
-    padding: 12px 18px; border-radius: 14px; background: rgba(20, 22, 26, .82); border: 3px solid #f0b429;
+    padding: 14px 20px 16px; border-radius: 12px; background: rgba(27, 27, 29, .86); border: 1px solid rgba(255, 255, 255, .12);
   }
-  #fill.countdown, #fill.cleared { border-color: #3ccf7a; }
   #fill .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  #fill .percent { font-size: 40px; font-variant-numeric: tabular-nums; }
-  #fill .bar { height: 18px; border-radius: 9px; background: rgba(255, 255, 255, .15); overflow: hidden; margin-top: 8px; }
-  #fill .bar div { height: 100%; width: 0; background: #f0b429; transition: width .4s; }
-  #fill.countdown .bar div, #fill.cleared .bar div { background: #3ccf7a; }
+  #fill .percent { font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif; font-weight: 600; font-size: 44px; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  #fill .bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .14); overflow: hidden; margin-top: 12px; }
+  #fill .bar div { height: 100%; width: 0; background: #ededed; transition: width .4s ease-out; }
+  #fill.countdown .bar div, #fill.cleared .bar div { background: #6fbf8e; }
+  #fill.countdown #fillText, #fill.cleared #fillText { color: #8fd3a8; }
   #stack {
-    position: fixed; left: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 12px;
+    position: fixed; left: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 10px;
     align-items: flex-start;
   }
   .alert {
     display: flex; align-items: center; gap: 14px;
-    padding: 14px 22px; border-radius: 14px;
-    background: rgba(20, 22, 26, .82); border: 3px solid #e0483e;
-    animation: pop .35s cubic-bezier(.2, 1.4, .4, 1) both;
+    padding: 12px 22px 12px 14px; border-radius: 12px;
+    background: rgba(27, 27, 29, .9); border: 1px solid rgba(255, 255, 255, .12);
+    animation: pop .3s cubic-bezier(.2, 1.2, .4, 1) both;
   }
-  .alert.leaving { animation: leave .4s ease-in forwards; }
-  .who { color: #ffd76a; }
+  .alert.leaving { animation: leave .35s ease-in forwards; }
+  .who { color: #a5a5ab; font-size: 24px; }
   .gift { width: 56px; height: 56px; object-fit: contain; }
   ${MC_ICON_CSS}
-  .what { color: #ff8a80; font-size: 34px; }
+  .what { color: #ffffff; font-size: 34px; }
+  @media (prefers-reduced-motion: reduce) { .alert, .alert.leaving { animation: none; } }
   @keyframes pop { from { transform: translateX(-40px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes leave { to { transform: translateX(-40px); opacity: 0; } }
 </style>

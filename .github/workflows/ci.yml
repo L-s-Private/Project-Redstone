@@ -15,32 +15,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - run: npm test
-
-  exe:
-    needs: mod
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: app
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - uses: actions/download-artifact@v4
-        with:
-          name: project-redstone-mod
-          path: mod/build/libs
-      - run: npm install
-      - name: 本物の Fabric・Modrinth から導入できるか確認
-        run: node scripts/check-setup.mjs
-      - run: npm run build:exe
+      - name: デスクトップ版を起動して画面を撮る
+        run: |
+          mkdir -p "$RUNNER_TEMP/mc"
+          REDSTONE_MINECRAFT_DIR="$RUNNER_TEMP/mc" REDSTONE_SMOKE_SCREENSHOT="$GITHUB_WORKSPACE/app/electron-window.png" \
+            xvfb-run --auto-servernum npx electron . --mock --no-sandbox
+          test -s electron-window.png
       - uses: actions/upload-artifact@v4
         with:
-          name: project-redstone-app-windows
-          path: app/dist/ProjectRedstone.exe
+          name: electron-window
+          path: app/electron-window.png
 
   mod:
     runs-on: ubuntu-latest
@@ -58,3 +44,27 @@ jobs:
         with:
           name: project-redstone-mod
           path: mod/build/libs/*.jar
+
+  exe:
+    needs: mod
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: project-redstone-mod
+          path: mod/build/libs
+      - run: npm ci
+      - name: 本物の Fabric・Modrinth から導入できるか確認
+        run: node scripts/check-setup.mjs
+      - run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project-redstone-app-windows
+          path: app/dist/*.exe

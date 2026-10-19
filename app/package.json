@@ -1,26 +1,57 @@
 {
   "name": "project-redstone-app",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "private": true,
   "description": "TikTok LIVE のギフトを受け取り、マイクラのMODに妨害を送るアプリ",
   "type": "module",
-  "main": "src/index.js",
+  "main": "electron/main.js",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
+    "app": "electron .",
+    "app:mock": "electron . --mock",
+    "dist": "electron-builder --win portable --publish never",
     "start": "node src/index.js",
     "mock": "node src/index.js --mock",
     "gui": "node src/gui.js",
     "gui:mock": "node src/gui.js --mock",
-    "build:exe": "node scripts/build-exe.mjs",
     "test": "node --test"
   },
   "dependencies": {
     "tiktok-live-connector": "^2.5.0"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2",
-    "postject": "^1.0.0-alpha.6"
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "productName": "Project Redstone",
+  "build": {
+    "appId": "com.projectredstone.app",
+    "productName": "Project Redstone",
+    "files": [
+      "src/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../mod/build/libs",
+        "to": "mod",
+        "filter": [
+          "project-redstone-*.jar",
+          "!*-sources.jar"
+        ]
+      }
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "ProjectRedstone-${version}.exe"
+    },
+    "directories": {
+      "output": "dist"
+    }
   }
 }

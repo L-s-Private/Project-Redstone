@@ -26,7 +26,24 @@ export async function loadUserConfig(dir = configDir()) {
   } catch (e) {
     throw new ConfigError(`設定ファイルの書き方が正しくありません（${path}）: ${e.message}`);
   }
-  return { config: parseConfig(raw), path, created: false };
+  const removed = dropRemovedRules(raw);
+  const config = parseConfig(raw);
+  if (removed > 0) await saveUserConfig(path, config);
+  return { config, path, created: false, removed };
+}
+
+// v0.4 まであった妨害。根拠がなかったため v0.5 で削除した
+const REMOVED_ACTIONS = new Set(['bury', 'lightning', 'launch', 'heal']);
+
+/** 削除した妨害のルールを取り除く。全部なくなったら設定例のルールに戻す。@returns 取り除いた数 */
+function dropRemovedRules(raw) {
+  if (!Array.isArray(raw?.rules)) return 0;
+  const kept = raw.rules
+    .filter((rule) => !REMOVED_ACTIONS.has(rule?.action))
+    .map((rule) => (rule && typeof rule === 'object' ? (({ block, ...rest }) => rest)(rule) : rule));
+  const removed = raw.rules.length - kept.length;
+  raw.rules = kept.length > 0 ? kept : example.rules;
+  return removed;
 }
 
 export async function saveUserConfig(path, config) {

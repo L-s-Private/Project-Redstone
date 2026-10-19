@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { normalizeGift, normalizeSocial } from '../src/gifts.js';
+import { normalizeGift, normalizeLike, normalizeSocial } from '../src/gifts.js';
 
 test('v3形式の単発ギフトを読める', () => {
   const event = normalizeGift({
@@ -36,4 +36,9 @@ test('旧形式（giftDetails）も読める', () => {
 test('フォローの送り主を読める', () => {
   assert.deepEqual(normalizeSocial('follow', { user: { nickname: 'はなこ' } }), { kind: 'follow', from: 'はなこ' });
   assert.deepEqual(normalizeSocial('share', {}), { kind: 'share', from: '' });
+});
+
+test('いいねはまとめて届いた回数を読む', () => {
+  assert.deepEqual(normalizeLike({ likeCount: 15, totalLikeCount: 3000, user: { nickname: 'はなこ' } }), { kind: 'like', count: 15, from: 'はなこ' });
+  assert.equal(normalizeLike({}).count, 0);
 });

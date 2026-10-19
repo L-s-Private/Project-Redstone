@@ -11,7 +11,35 @@ export class Dispatcher {
     this.now = now;
     this.paused = false;
     this.lastFiredAt = new Map();
+    // いいねのルールごとの、たまっている回数
+    this.likeProgress = new Map();
     this.stats = { received: 0, sent: 0, skipped: 0, failed: 0 };
+  }
+
+  /** ルールを入れ替える。クールダウンといいねのたまり具合も戻す。 */
+  setRules(rules) {
+    this.rules = rules;
+    this.lastFiredAt.clear();
+    this.likeProgress.clear();
+  }
+
+  /**
+   * いいねを足し、回数に届いたルールの妨害を出す。
+   * @returns {Promise<Array<{status: string, likes: number, action?: object, error?: string}>>} 届いたルールの分だけ
+   */
+  async handleLikes(event) {
+    const results = [];
+    for (const [index, rule] of this.rules.entries()) {
+      if (rule.likes === undefined) continue;
+      const total = (this.likeProgress.get(index) ?? 0) + event.count;
+      const times = Math.floor(total / rule.likes);
+      this.likeProgress.set(index, total % rule.likes);
+      if (times === 0) continue;
+      this.stats.received++;
+      const likes = times * rule.likes;
+      results.push({ likes, ...(await this.fire(index, { kind: 'like', count: times, likes, from: event.from })) });
+    }
+    return results;
   }
 
   /**
@@ -23,18 +51,28 @@ export class Dispatcher {
     if (index === -1) {
       return this.skip('no_rule');
     }
+    return this.fire(index, event);
+  }
+
+  /**
+   * rules[index] の妨害を出す。action を渡したときはルールを使わずそれを送る（画面のボタンから）。
+   * 一時停止中はどちらも出さない。
+   */
+  async fire(index, event, action) {
     if (this.paused) {
       return this.skip('paused');
     }
-    const rule = this.rules[index];
-    const cooldownMs = (rule.cooldownSec ?? 0) * 1000;
-    const last = this.lastFiredAt.get(index);
-    if (cooldownMs > 0 && last !== undefined && this.now() - last < cooldownMs) {
-      return this.skip('cooldown');
+    if (!action) {
+      const rule = this.rules[index];
+      const cooldownMs = (rule.cooldownSec ?? 0) * 1000;
+      const last = this.lastFiredAt.get(index);
+      if (cooldownMs > 0 && last !== undefined && this.now() - last < cooldownMs) {
+        return this.skip('cooldown');
+      }
+      this.lastFiredAt.set(index, this.now());
+      action = buildAction(rule, event);
     }
-    this.lastFiredAt.set(index, this.now());
 
-    const action = buildAction(rule, event);
     try {
       const response = await this.client.send(action);
       if (response.ok) {

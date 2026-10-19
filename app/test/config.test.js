@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { ConfigError, parseConfig } from '../src/config.js';
-import { PRESETS } from '../src/presets.js';
 
 const valid = { tiktokUsername: '@taro', rules: [{ gift: 'Rose', action: 'tnt' }] };
 
@@ -26,20 +25,24 @@ test('間違った設定は日本語で理由を返す', () => {
   assert.throws(bad([{ gift: 'Rose', action: 'nuke' }]), /action は/);
   assert.throws(bad([{ gift: 'Rose', action: 'message' }]), /label/);
   assert.throws(bad([{ gift: 'Rose', action: 'mob', mob: 'ghast' }]), /mob は/);
-  assert.throws(bad([{ gift: 'Rose', action: 'bury', block: 'lava' }]), /block は/);
+  assert.throws(bad([{ gift: 'Rose', action: 'bury' }]), /action は/);
+  assert.throws(bad([{ likes: 0, action: 'tnt' }]), /いいねの回数/);
+  assert.throws(bad([{ likes: 100, gift: 'Rose', action: 'tnt' }]), /どれか1つだけ/);
   assert.throws(bad([{ gift: 'Rose', action: 'tnt', count: 0 }]), /count/);
   assert.throws(bad([{ gift: 'Rose', action: 'tnt', cooldownSec: -1 }]), /cooldownSec/);
   assert.throws(bad(valid.rules, { mod: { port: 70000 } }), /mod.port/);
   assert.throws(() => parseConfig([]), ConfigError);
 });
 
-test('プリセットはどれも正しい設定になっている', () => {
-  for (const preset of PRESETS) {
-    const { rules } = parseConfig({ rules: preset.rules });
-    assert.equal(rules.length, preset.rules.length, preset.name);
-    // ダイヤ数のルールは大きい順（上から順に判定するため）
-    const tiers = rules.filter((r) => r.minDiamonds !== undefined).map((r) => r.minDiamonds);
-    assert.deepEqual(tiers, [...tiers].sort((a, b) => b - a), preset.name);
-  }
-  assert.equal(new Set(PRESETS.map((p) => p.id)).size, PRESETS.length);
+test('いいねのルールと、埋め立ての妨害を受け付け、知らない項目は捨てる', () => {
+  const { rules } = parseConfig({ rules: [
+    { likes: 1000, action: 'fill_help', count: 10, block: 'sand' },
+    { gift: ' GG ', action: 'fill_expand', count: 2 },
+    { gift: 'バラ', action: 'mob', mob: 'pig' },
+  ] });
+  assert.deepEqual(rules, [
+    { likes: 1000, action: 'fill_help', count: 10 },
+    { gift: 'GG', action: 'fill_expand', count: 2 },
+    { gift: 'バラ', action: 'mob', mob: 'pig' },
+  ]);
 });

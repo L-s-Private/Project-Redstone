@@ -7,7 +7,7 @@ const gift = (giftName, extra = {}) => ({ kind: 'gift', giftId: '1', giftName, d
 const rules = [
   { gift: 'rose', action: 'tnt', count: 2 },
   { giftId: 99, action: 'mob', mob: 'creeper' },
-  { minDiamonds: 100, action: 'bury', count: 1 },
+  { minDiamonds: 100, action: 'tnt', count: 1 },
   { event: 'follow', action: 'message', label: 'ありがとう' },
 ];
 
@@ -24,7 +24,8 @@ test('連打の個数ぶん回数を増やし、上限で止める', () => {
   assert.deepEqual(buildAction(rules[0], gift('Rose', { count: 3 })), { type: 'tnt', count: 6, from: 'たろう' });
   assert.equal(buildAction(rules[0], gift('Rose', { count: 100 })).count, 20);
   assert.equal(buildAction({ ...rules[0], maxCount: 5 }, gift('Rose', { count: 100 })).count, 5);
-  assert.equal(buildAction({ ...rules[2], count: 2 }, gift('Galaxy', { count: 9 })).count, 5);
+  assert.equal(buildAction({ minDiamonds: 1, action: 'fill_expand', count: 2 }, gift('Galaxy', { count: 9 })).count, 5);
+  assert.equal(buildAction({ likes: 100, action: 'fill_help', count: 10 }, { kind: 'like', count: 3, from: '' }).count, 30);
 });
 
 test('モブ・ブロック・表示文をそのまま渡す', () => {

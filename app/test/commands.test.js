@@ -17,3 +17,11 @@ test('そのほかのコマンド', () => {
   assert.equal(parseCommand('follow').event.kind, 'follow');
   assert.equal(parseCommand('dance').command, 'unknown');
 });
+
+test('いいねと埋め立てのコマンド', () => {
+  assert.deepEqual(parseCommand('like 1000').event, { kind: 'like', count: 1000, from: 'テスト' });
+  assert.equal(parseCommand('like').command, 'unknown');
+  assert.equal(parseCommand('fill start').command, 'fill_start');
+  assert.equal(parseCommand('fill stop').command, 'fill_stop');
+  assert.equal(parseCommand('fill').command, 'unknown');
+});

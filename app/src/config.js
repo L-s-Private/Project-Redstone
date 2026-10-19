@@ -3,11 +3,10 @@ import { ACTION_TYPES, SOCIAL_EVENTS } from './rules.js';
 
 export const DEFAULT_MOD_PORT = 25599;
 
-const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'event'];
+const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event'];
 // MOD が出せるもの（docs/protocol.md）
-const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish'];
-const BURY_BLOCKS = ['sand', 'gravel'];
-const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'block', 'label', 'cooldownSec'];
+const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
+const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec'];
 const MAX_RULES = 50;
 const MAX_LABEL_LENGTH = 100;
 
@@ -59,7 +58,7 @@ function validateRule(rule, number) {
   }
   const triggers = TRIGGER_KEYS.filter((key) => rule[key] !== undefined);
   if (triggers.length !== 1) {
-    throw new ConfigError(`${where}: gift / giftId / minDiamonds / event のどれか1つだけを書いてください`);
+    throw new ConfigError(`${where}: gift / giftId / minDiamonds / likes / event のどれか1つだけを書いてください`);
   }
   if (rule.gift !== undefined && !(typeof rule.gift === 'string' && rule.gift.trim())) {
     throw new ConfigError(`${where}: ギフト名を入れてください`);
@@ -69,6 +68,9 @@ function validateRule(rule, number) {
   }
   if (rule.event !== undefined && !SOCIAL_EVENTS.includes(rule.event)) {
     throw new ConfigError(`${where}: event は ${SOCIAL_EVENTS.join(' / ')} のどれかにしてください`);
+  }
+  if (rule.likes !== undefined && !(Number.isInteger(rule.likes) && rule.likes >= 1)) {
+    throw new ConfigError(`${where}: いいねの回数は1以上の整数にしてください`);
   }
   if (rule.minDiamonds !== undefined && !(Number.isFinite(rule.minDiamonds) && rule.minDiamonds >= 0)) {
     throw new ConfigError(`${where}: minDiamonds は0以上の数にしてください`);
@@ -81,9 +83,6 @@ function validateRule(rule, number) {
   }
   if (rule.mob !== undefined && !MOBS.includes(rule.mob)) {
     throw new ConfigError(`${where}: mob は ${MOBS.join(' / ')} のどれかにしてください`);
-  }
-  if (rule.block !== undefined && !BURY_BLOCKS.includes(rule.block)) {
-    throw new ConfigError(`${where}: block は ${BURY_BLOCKS.join(' / ')} のどれかにしてください`);
   }
   for (const key of ['count', 'maxCount']) {
     if (rule[key] !== undefined && !(Number.isInteger(rule[key]) && rule[key] >= 1)) {

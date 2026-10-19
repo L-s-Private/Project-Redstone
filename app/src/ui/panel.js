@@ -104,11 +104,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
   header h1 { margin-right: 12px; }
   main.single { display: block; max-width: 1100px; }
   main.single .card + .card { margin-top: 16px; }
-  .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-  .preset { text-align: left; white-space: normal; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
-  .preset b { font-size: 15px; }
-  .preset span { color: var(--muted); font-size: 13px; }
-  .preset.selected { border-color: var(--ok); background: #17321f; }
   .table-wrap { overflow-x: auto; }
   table.rules { width: 100%; border-collapse: collapse; font-size: 14px; }
   table.rules th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -135,7 +130,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .steps { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
   .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; }
   .wizard-actions .next { background: #24533a; border-color: #2f6b4b; font-weight: 700; }
-  .wizard-presets { display: flex; flex-direction: column; gap: 8px; }
+  .fill-progress { height: 22px; border-radius: 6px; background: var(--bg); overflow: hidden; margin: 8px 0; }
+  .fill-progress div { height: 100%; width: 0; background: var(--warn); transition: width .4s; }
+  .fill-progress.countdown div, .fill-progress.cleared div { background: var(--ok); }
+  .fill-text { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .fill-text b { font-size: 26px; font-variant-numeric: tabular-nums; }
+  .fill-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .fill-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
     background: var(--bad); color: #fff; font-weight: 600; display: none;
@@ -169,6 +170,32 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <div class="stat"><b id="failed">0</b><small>失敗</small></div>
       </div>
     </section>
+    <section class="card">
+      <h2>埋め立てモード</h2>
+      <div id="fillIdle">
+        <div class="fill-form">
+          <div><label for="fillWidth">枠の幅（マス）</label><input id="fillWidth" type="number" min="3" max="41" step="2" value="11"></div>
+          <div><label for="fillHeight">高さ（マス）</label><input id="fillHeight" type="number" min="1" max="30" value="9"></div>
+          <div><label for="fillCountdown">埋めきってからクリアまで（秒）</label><input id="fillCountdown" type="number" min="0" max="600" value="10"></div>
+        </div>
+        <button class="primary" id="fillStart">埋め立てを始める</button>
+        <p class="hint">マイクラで、枠を作りたい場所に立ってから押してください。足元を中心に岩盤の枠ができ、中の地形は消えます。</p>
+      </div>
+      <div id="fillRunning" hidden>
+        <div class="fill-text"><span id="fillPhase"></span><b id="fillPercent"></b></div>
+        <div class="fill-progress" id="fillBar"><div></div></div>
+        <div class="hint" id="fillDetail" style="margin: 0;"></div>
+        <div class="fill-buttons">
+          <button data-action="fill_expand">枠 +1</button>
+          <button data-action="fill_shrink">枠 −1</button>
+          <button data-action="fill_help" data-count="10">お助け +10</button>
+          <button data-action="tnt">TNT</button>
+          <span style="flex: 1;"></span>
+          <button id="fillStop">終える</button>
+        </div>
+      </div>
+    </section>
+
     <section class="card">
       <h2>ログ</h2>
       <ul id="log"></ul>
@@ -225,14 +252,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
 <main id="tabRules" class="single" hidden>
   <section class="card">
-    <h2>企画を選ぶ（プリセット）</h2>
-    <p class="hint" style="margin: 0 0 12px;">選ぶと、下のルールがその企画の内容に置き換わります。ギフトの大きさ（1個あたりのダイヤ数）で妨害が変わるので、どのギフトでも動きます。</p>
-    <div class="presets" id="presets"></div>
-  </section>
-
-  <section class="card">
     <h2>ルール</h2>
-    <p class="hint" style="margin: 0 0 12px;">上から順に見て、最初に合ったルールの妨害を出します。ギフトを連打すると、数も連打の回数だけ増えます。</p>
+    <p class="hint" style="margin: 0 0 12px;">上から順に見て、最初に合ったルールの妨害を出します。ギフトを連打すると、数も連打の回数だけ増えます。いいねのルールは、いいねが指定の回数たまるたびに出します。</p>
     <div class="table-wrap">
       <table class="rules">
         <thead><tr><th>順番</th><th>きっかけ</th><th></th><th>妨害</th><th>詳細</th><th>数</th><th>待ち時間（秒）</th><th></th></tr></thead>
@@ -270,18 +291,15 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <input id="wizUsername" autocomplete="off" spellcheck="false" placeholder="例: my_tiktok_id">
   </div>
   <div data-step="2" hidden>
-    <h2>企画を選ぶ</h2>
-    <p class="hint">あとから「妨害の設定」でいつでも変えられます。</p>
-    <div class="wizard-presets" id="wizPresets"></div>
-  </div>
-  <div data-step="3" hidden>
     <h2>準備ができました</h2>
     <ol class="hint" style="font-size: 15px; line-height: 1.9; color: var(--text);">
       <li>ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動</li>
       <li>ワールドを開く（上の「マイクラ」が緑になります）</li>
+      <li>枠を作りたい場所に立って「埋め立てを始める」</li>
       <li>「テスト送信」のボタンで妨害が出るか試す</li>
       <li>TikTok LIVE を始める</li>
     </ol>
+    <p class="hint">どのギフトで何が起きるかは「妨害の設定」で変えられます。</p>
   </div>
   <div class="wizard-actions">
     <button id="wizBack">戻る</button>
@@ -289,7 +307,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   </div>
 </dialog>
 
-<div id="offline">アプリと切断されました。アプリ（黒いウィンドウ）が開いているか確認してください。</div>
+<div id="offline">アプリとの接続が切れました。アプリを起動し直してください。</div>
 
 <script>
   const $ = (id) => document.getElementById(id);
@@ -337,6 +355,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       $('giftList').replaceChildren(...names.map((name) => Object.assign(document.createElement('option'), { value: name })));
     }
 
+    renderFill(state.fill);
     if (!rulesDirty) loadRules(state.rules);
     renderRecent();
     if (!wizardChecked) {
@@ -455,23 +474,22 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   // ---- ルールの表 ----
   const ACTIONS = [
-    ['tnt', 'TNT'], ['mob', 'モブ'], ['bury', '埋め立て'], ['lightning', '雷'],
-    ['launch', '打ち上げ'], ['heal', '全回復'], ['message', 'メッセージだけ'],
+    ['tnt', 'TNT'], ['mob', 'モブ'], ['fill_expand', '枠を広げる（マス）'], ['fill_shrink', '枠を縮める（マス）'],
+    ['fill_help', 'お助けブロック（個）'], ['message', 'メッセージだけ'],
   ];
-  const MOBS = [['zombie', 'ゾンビ'], ['skeleton', 'スケルトン'], ['creeper', 'クリーパー'], ['spider', 'クモ'], ['witch', 'ウィッチ'], ['silverfish', 'シルバーフィッシュ']];
-  const BLOCKS = [['sand', '砂'], ['gravel', '砂利']];
-  const TRIGGERS = [['gift', 'ギフト名'], ['minDiamonds', 'ダイヤ数が以上'], ['giftId', 'ギフトID'], ['follow', 'フォロー'], ['share', 'シェア']];
-  const NO_COUNT = new Set(['message', 'launch', 'heal']);
-  const MAX_COUNT = { tnt: 20, mob: 10, bury: 5, lightning: 5 };
+  const MOBS = [['zombie', 'ゾンビ'], ['skeleton', 'スケルトン'], ['creeper', 'クリーパー'], ['spider', 'クモ'], ['witch', 'ウィッチ'], ['silverfish', 'シルバーフィッシュ'], ['pig', 'ブタ']];
+  const TRIGGERS = [['gift', 'ギフト名'], ['likes', 'いいね（回数ごと）'], ['minDiamonds', 'ダイヤ数が以上'], ['giftId', 'ギフトID'], ['follow', 'フォロー'], ['share', 'シェア']];
+  const NO_COUNT = new Set(['message']);
+  const MAX_COUNT = { tnt: 20, mob: 10, fill_expand: 5, fill_shrink: 5, fill_help: 64 };
 
   let rows = [];
   let rulesDirty = false;
   let savedRulesKey = '';
 
   function toRow(rule) {
-    const trigger = rule.event ?? (rule.gift !== undefined ? 'gift' : rule.minDiamonds !== undefined ? 'minDiamonds' : 'giftId');
-    const value = rule.gift ?? rule.minDiamonds ?? rule.giftId ?? '';
-    return { trigger, value: String(value), action: rule.action, mob: rule.mob ?? 'zombie', block: rule.block ?? 'sand',
+    const trigger = rule.event ?? (rule.gift !== undefined ? 'gift' : rule.likes !== undefined ? 'likes' : rule.minDiamonds !== undefined ? 'minDiamonds' : 'giftId');
+    const value = rule.gift ?? rule.likes ?? rule.minDiamonds ?? rule.giftId ?? '';
+    return { trigger, value: String(value), action: rule.action, mob: rule.mob ?? 'zombie',
       label: rule.label ?? '', count: rule.count ?? 1, cooldownSec: rule.cooldownSec ?? 0, maxCount: rule.maxCount };
   }
 
@@ -479,11 +497,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const rule = {};
     if (row.trigger === 'follow' || row.trigger === 'share') rule.event = row.trigger;
     else if (row.trigger === 'minDiamonds') rule.minDiamonds = Number(row.value);
+    else if (row.trigger === 'likes') rule.likes = Number(row.value);
     else if (row.trigger === 'giftId') rule.giftId = row.value.trim();
     else rule.gift = row.value;
     rule.action = row.action;
     if (row.action === 'mob') rule.mob = row.mob;
-    if (row.action === 'bury' && row.block !== 'sand') rule.block = row.block; // 砂は既定なので書かない
     if (!NO_COUNT.has(row.action)) rule.count = Number(row.count);
     if (row.label) rule.label = row.label;
     if (Number(row.cooldownSec) > 0) rule.cooldownSec = Number(row.cooldownSec);
@@ -498,7 +516,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
     rows = rules.map(toRow);
     setDirty(false);
     renderRows();
-    renderPresets();
   }
 
   function setDirty(value) {
@@ -543,16 +560,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
       const order = cell(up, ' ', down);
       order.className = 'order';
 
-      const needsValue = row.trigger === 'gift' || row.trigger === 'minDiamonds' || row.trigger === 'giftId';
+      const needsValue = row.trigger === 'gift' || row.trigger === 'minDiamonds' || row.trigger === 'giftId' || row.trigger === 'likes';
+      const numeric = row.trigger === 'minDiamonds' || row.trigger === 'likes';
       const value = needsValue
-        ? input(row.value, change(row, 'value'), row.trigger === 'minDiamonds'
-          ? { type: 'number', min: 0, className: 'num', placeholder: '1' }
+        ? input(row.value, change(row, 'value'), numeric
+          ? { type: 'number', min: row.trigger === 'likes' ? 1 : 0, className: 'num', placeholder: row.trigger === 'likes' ? '1000' : '1' }
           : { placeholder: row.trigger === 'gift' ? '例: Rose' : 'ID', list: 'giftList' })
         : document.createTextNode('');
 
       let detail;
       if (row.action === 'mob') detail = select(MOBS, row.mob, change(row, 'mob'));
-      else if (row.action === 'bury') detail = select(BLOCKS, row.block, change(row, 'block'));
       else detail = input(row.label, change(row, 'label'), { placeholder: row.action === 'message' ? '表示する文（必須）' : '表示する文（任意）', maxLength: 100 });
 
       const count = NO_COUNT.has(row.action)
@@ -597,36 +614,31 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   $('saveRules').addEventListener('click', () => saveRules(rows.map(toRule)));
 
-  // ---- プリセット ----
-  let presets = [];
-  // 項目の並び順の違いは無視して比べる
-  const normalize = (rules) => JSON.stringify(rules.map((r) => Object.fromEntries(Object.entries(r).sort(([a], [b]) => (a < b ? -1 : 1)))));
-  const sameRules = (a, b) => normalize(a) === normalize(b);
-
-  function renderPresets() {
-    if (!presets.length || !state) return;
-    $('presets').replaceChildren(...presets.map((preset) => {
-      const b = document.createElement('button');
-      b.className = 'preset' + (sameRules(preset.rules, state.rules) ? ' selected' : '');
-      const name = document.createElement('b');
-      name.textContent = preset.name;
-      const description = document.createElement('span');
-      description.textContent = preset.description;
-      b.append(name, description);
-      b.addEventListener('click', () => {
-        if (rulesDirty && !confirm('保存していない変更は消えます。よろしいですか？')) return;
-        if (!confirm('「' + preset.name + '」にします。今のルールは置き換わります。')) return;
-        saveRules(preset.rules);
-      });
-      return b;
-    }));
+  // ---- 埋め立てモード ----
+  function renderFill(fill) {
+    $('fillIdle').hidden = !!fill;
+    $('fillRunning').hidden = !fill;
+    if (!fill) return;
+    const phases = {
+      filling: '埋めています',
+      countdown: '完成！ あと ' + fill.countdownSecondsLeft + ' 秒守りきればクリア',
+      cleared: 'クリア！',
+    };
+    $('fillPhase').textContent = phases[fill.phase];
+    $('fillPercent').textContent = fill.percent + '%';
+    $('fillBar').className = 'fill-progress ' + fill.phase;
+    $('fillBar').firstElementChild.style.width = (fill.total ? (fill.filled / fill.total) * 100 : 0) + '%';
+    $('fillDetail').textContent = fill.filled + ' / ' + fill.total + ' マス（幅' + fill.width + '・高さ' + fill.height + '）';
   }
 
-  fetch('/api/presets').then((r) => r.json()).then((data) => {
-    presets = data.presets;
-    renderPresets();
-    renderWizardPresets();
-  }).catch(() => {});
+  $('fillStart').addEventListener('click', () => post('/api/fill/start', {
+    width: Number($('fillWidth').value), height: Number($('fillHeight').value), countdown: Number($('fillCountdown').value),
+  }));
+  $('fillStop').addEventListener('click', () => {
+    if (confirm('埋め立てを終えますか？（置いたブロックはそのまま残ります）')) post('/api/fill/stop');
+  });
+  document.querySelectorAll('[data-action]').forEach((b) => b.addEventListener('click', () =>
+    post('/api/action', { type: b.dataset.action, count: Number(b.dataset.count ?? 1) })));
 
   // ---- 最近届いたギフト ----
   function renderRecent() {
@@ -648,24 +660,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
 
   // ---- 初回ウィザード ----
-  const STEP_NAMES = ['マイクラの準備', 'TikTok ID', '企画を選ぶ', '完了'];
+  const STEP_NAMES = ['マイクラの準備', 'TikTok ID', '完了'];
   let wizardStep = 0;
   let wizardChecked = false;
-  let wizardPreset = 'balance';
-
-  function renderWizardPresets() {
-    $('wizPresets').replaceChildren(...presets.map((preset) => {
-      const b = document.createElement('button');
-      b.className = 'preset' + (preset.id === wizardPreset ? ' selected' : '');
-      const name = document.createElement('b');
-      name.textContent = preset.name;
-      const description = document.createElement('span');
-      description.textContent = preset.description;
-      b.append(name, description);
-      b.addEventListener('click', () => { wizardPreset = preset.id; renderWizardPresets(); });
-      return b;
-    }));
-  }
 
   function showWizardStep(step) {
     wizardStep = step;
@@ -691,10 +688,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
         const data = await post('/api/tiktok', { username });
         if (!data?.ok) return;
       }
-    }
-    if (wizardStep === 2) {
-      const preset = presets.find((p) => p.id === wizardPreset);
-      if (preset && !(await saveRules(preset.rules))) return;
     }
     if (wizardStep === STEP_NAMES.length - 1) {
       storage('redstone.wizardDone', '1');

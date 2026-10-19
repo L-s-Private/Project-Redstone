@@ -2,7 +2,6 @@
 // 同じPCからしか開けないよう 127.0.0.1 にだけ待ち受け、ほかのサイトからの操作（CSRF・DNSリバインディング）も断る。
 import http from 'node:http';
 import { ConfigError, parseConfig } from './config.js';
-import { PRESETS } from './presets.js';
 import { OVERLAY_HTML } from './ui/overlay.js';
 import { PANEL_HTML } from './ui/panel.js';
 
@@ -54,6 +53,31 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
       engine.setRules(rules);
       await saveConfig(engine.config);
     },
+    'POST /api/fill/start': async (body) => {
+      const int = (value, fallback) => (Number.isFinite(Number(value)) ? Math.floor(Number(value)) : fallback);
+      try {
+        await engine.startFill({ width: int(body.width, 11), height: int(body.height, 9), countdown: int(body.countdown, 10) });
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+    },
+    'POST /api/action': async (body) => {
+      // 画面のボタンから出せるのは、埋め立ての操作と TNT だけ
+      const counts = { tnt: [1, 20], fill_expand: [1, 5], fill_shrink: [1, 5], fill_help: [1, 64] };
+      const range = counts[body.type];
+      if (!range) return { status: 400, error: 'この操作はできません' };
+      const count = Math.min(range[1], Math.max(range[0], Math.floor(Number(body.count)) || 1));
+      const result = await engine.manualAction({ type: body.type, count, from: '' });
+      if (result.status === 'failed') return { status: 400, error: result.error };
+      if (result.status === 'paused') return { status: 400, error: '一時停止中です' };
+    },
+    'POST /api/fill/stop': async () => {
+      try {
+        await engine.stopFill();
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+    },
     'POST /api/setup/install': async () => {
       if (!setup) return { status: 404, error: '見つかりません' };
       try {
@@ -86,7 +110,6 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
       res.writeHead(204);
       return res.end();
     }
-    if (route === 'GET /api/presets') return send(res, 200, { presets: PRESETS });
     if (route === 'GET /api/setup') {
       if (!setup) return send(res, 404, { error: '見つかりません' });
       return send(res, 200, { setup: await setup.status() });
@@ -152,6 +175,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
 function testEvent(body) {
   const from = 'テスト';
   if (body.kind === 'follow' || body.kind === 'share') return { kind: body.kind, from };
+  if (body.kind === 'like') return { kind: 'like', count: Math.min(100000, Math.max(1, Math.floor(Number(body.count)) || 1)), from };
   if (body.kind !== 'gift') return null;
   const giftName = String(body.giftName ?? '').trim().slice(0, 64);
   const count = Math.min(100, Math.max(1, Math.floor(Number(body.count)) || 1));

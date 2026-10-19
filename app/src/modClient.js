@@ -15,13 +15,14 @@ export class ModClient extends EventEmitter {
     maxQueue = 50,
     reconnectMinMs = 1000,
     reconnectMaxMs = 10000,
-    pingIntervalMs = 5000,
+    pingIntervalMs = 1000,
   }) {
     super();
     Object.assign(this, { host, port, requestTimeoutMs, maxQueue, reconnectMinMs, reconnectMaxMs, pingIntervalMs });
     this.socket = null;
     this.connected = false;
     this.players = null;
+    this.fill = null;
     this.nextId = 1;
     this.queue = [];
     this.inFlight = new Map();
@@ -44,7 +45,7 @@ export class ModClient extends EventEmitter {
   }
 
   get status() {
-    return { connected: this.connected, players: this.players };
+    return { connected: this.connected, players: this.players, fill: this.fill };
   }
 
   /** @returns {Promise<{ok: boolean, error?: string}>} */
@@ -107,6 +108,7 @@ export class ModClient extends EventEmitter {
       const wasConnected = this.connected;
       this.connected = false;
       this.players = null;
+      this.fill = null;
       for (const entry of this.inFlight.values()) {
         clearTimeout(entry.timer);
         entry.reject(new Error('MODとの接続が切れました'));
@@ -151,8 +153,10 @@ export class ModClient extends EventEmitter {
   async ping() {
     try {
       const response = await this.send({ type: 'ping' });
-      if (response.ok && this.players !== response.players) {
+      const fill = response.fill ?? null;
+      if (response.ok && (this.players !== response.players || JSON.stringify(this.fill) !== JSON.stringify(fill))) {
         this.players = response.players;
+        this.fill = fill;
         this.emitStatus();
       }
     } catch {

@@ -161,11 +161,8 @@ test('マイクラの準備状況を返し、導入ボタンで導入する', as
   }, { setup });
 });
 
-test('プリセットを返し、ルールを検査してから保存する', async () => {
+test('ルールを検査してから保存する', async () => {
   await withServer(async ({ engine, saved, port }) => {
-    const presets = (await request(port, { path: '/api/presets' })).json().presets;
-    assert.ok(presets.length >= 3);
-
     engine.setRules = (rules) => (engine.config.rules = rules);
     const ok = await json(port, '/api/rules', { rules: [{ minDiamonds: 1, action: 'tnt', count: 2, junk: 'x' }] });
     assert.equal(ok.status, 200);
@@ -183,5 +180,27 @@ test('テスト送信でダイヤ数も指定できる', async () => {
   await withServer(async ({ engine, port }) => {
     await json(port, '/api/test', { kind: 'gift', giftName: '100ダイヤのギフト', diamonds: 100 });
     assert.equal(engine.calls[0].diamonds, 100);
+  });
+});
+
+test('埋め立ての開始・終了を伝え、断られたら理由を返す', async () => {
+  await withServer(async ({ engine, port }) => {
+    const calls = [];
+    engine.startFill = async (opts) => calls.push(opts);
+    engine.stopFill = async () => {
+      throw new Error('埋め立てが始まっていません');
+    };
+    assert.equal((await json(port, '/api/fill/start', { width: '15', height: 5.7 })).status, 200);
+    assert.deepEqual(calls, [{ width: 15, height: 5, countdown: 10 }]);
+    const stop = await json(port, '/api/fill/stop', {});
+    assert.equal(stop.status, 400);
+    assert.equal(stop.json().error, '埋め立てが始まっていません');
+  });
+});
+
+test('テスト送信でいいねも送れる', async () => {
+  await withServer(async ({ engine, port }) => {
+    await json(port, '/api/test', { kind: 'like', count: 1000 });
+    assert.deepEqual(engine.calls, [{ kind: 'like', count: 1000, from: 'テスト' }]);
   });
 });

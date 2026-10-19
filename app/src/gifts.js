@@ -28,6 +28,11 @@ export function normalizeGift(msg) {
   };
 }
 
+/** いいね。likeCount はまとめて届く（1回のイベントで複数回分） */
+export function normalizeLike(msg) {
+  return { kind: 'like', count: Math.max(0, Number(msg.likeCount) || 0), from: displayName(msg.user) };
+}
+
 export function normalizeSocial(kind, msg) {
   return { kind, from: displayName(msg.user) };
 }

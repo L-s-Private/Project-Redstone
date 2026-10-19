@@ -52,6 +52,12 @@ async function main() {
       case 'stop':
         engine.stopAll();
         break;
+      case 'fill_start':
+        engine.startFill({ width: 11, height: 9, countdown: 10 }).catch((e) => log.error(e.message));
+        break;
+      case 'fill_stop':
+        engine.stopFill().catch((e) => log.error(e.message));
+        break;
       case 'status': {
         const { mod, paused, stats } = engine.state;
         log.info(`MOD: ${mod.connected ? `接続中（プレイヤー ${mod.players ?? '?'}人）` : '未接続'} / ${paused ? '一時停止中' : '受付中'}`);

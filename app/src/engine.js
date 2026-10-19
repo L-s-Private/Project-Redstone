@@ -14,15 +14,14 @@ const SKIP_MESSAGES = {
 
 const ACTION_NAMES = {
   tnt: 'TNT',
-  bury: '埋め立て',
   message: 'メッセージ',
-  lightning: '雷',
-  launch: '打ち上げ',
-  heal: '全回復',
+  fill_expand: '枠を広げる',
+  fill_shrink: '枠を縮める',
+  fill_help: 'お助けブロック',
 };
 
 // 回数を見せない妨害
-const SINGLE_ACTIONS = new Set(['message', 'launch', 'heal']);
+const SINGLE_ACTIONS = new Set(['message']);
 const MAX_RECENT_GIFTS = 20;
 
 /** ルールから、テスト送信のボタンを作る */
@@ -31,6 +30,8 @@ export function testButtons(rules) {
   for (const rule of rules) {
     if (rule.gift !== undefined) {
       buttons.set(String(rule.gift), { kind: 'gift', giftName: String(rule.gift), count: 1 });
+    } else if (rule.likes !== undefined) {
+      buttons.set(`いいね${rule.likes}`, { kind: 'like', count: rule.likes });
     } else if (rule.minDiamonds !== undefined) {
       buttons.set(`💎${rule.minDiamonds}`, { kind: 'gift', giftName: `${rule.minDiamonds}ダイヤのギフト`, diamonds: rule.minDiamonds, count: 1 });
     } else if (rule.event !== undefined) {
@@ -47,6 +48,7 @@ const MOB_NAMES = {
   spider: 'クモ',
   witch: 'ウィッチ',
   silverfish: 'シルバーフィッシュ',
+  pig: 'ブタ',
 };
 
 export function describeAction(action) {
@@ -60,7 +62,7 @@ export function describeAction(action) {
  * イベント:
  *   'log'   {time, level, text}   level = info | ok | warn | error | gift
  *   'state' Engine#state と同じ形
- *   'alert' {from, trigger, action}  妨害を出したとき（オーバーレイ用）
+ *   'alert' {who, action}  妨害を出したとき（オーバーレイ用）
  */
 export class Engine extends EventEmitter {
   constructor({ config, client, tiktok, now = Date.now }) {
@@ -75,13 +77,18 @@ export class Engine extends EventEmitter {
     // 実際に届いたギフト（設定画面で「最近届いたギフト」として出す）
     this.recentGifts = [];
 
+    // 埋め立ての進み具合でも status は届くので、接続の変化だけログに出す
+    let previous = { connected: false, players: null };
     this.client.on('status', ({ connected, players }) => {
-      if (!connected) {
-        this.log('warn', 'マイクラ（MOD）との接続が切れました。つなぎ直します…');
-      } else if (players === 0) {
-        this.log('warn', 'マイクラにつながりましたが、ワールドに入っていません');
-      } else if (players !== null) {
-        this.log('ok', 'マイクラ（MOD）につながりました。妨害を受け付けています');
+      if (connected !== previous.connected || players !== previous.players) {
+        if (!connected) {
+          this.log('warn', 'マイクラ（MOD）との接続が切れました。つなぎ直します…');
+        } else if (players === 0) {
+          this.log('warn', 'マイクラにつながりましたが、ワールドに入っていません');
+        } else if (players !== null) {
+          this.log('ok', 'マイクラ（MOD）につながりました。妨害を受け付けています');
+        }
+        previous = { connected, players };
       }
       this.emitState();
     });
@@ -100,6 +107,7 @@ export class Engine extends EventEmitter {
       tiktok: this.tiktok.status,
       tiktokUsername: this.config.tiktokUsername,
       mod: this.client.status,
+      fill: this.client.status.fill ?? null,
       stats: { ...this.dispatcher.stats },
       rules: this.config.rules,
       testButtons: testButtons(this.config.rules),
@@ -110,8 +118,7 @@ export class Engine extends EventEmitter {
   /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。 */
   setRules(rules) {
     this.config.rules = rules;
-    this.dispatcher.rules = rules;
-    this.dispatcher.lastFiredAt.clear();
+    this.dispatcher.setRules(rules);
     this.log('ok', `妨害の設定を保存しました（ルール ${rules.length}件）`);
     this.emitState();
   }
@@ -154,19 +161,58 @@ export class Engine extends EventEmitter {
     }
   }
 
+  /** 埋め立てを始める。枠はマイクラのプレイヤーの足元に作られる */
+  async startFill({ width, height, countdown }) {
+    const response = await this.client.send({ type: 'fill_start', width, height, countdown });
+    if (!response.ok) throw new Error(response.error);
+    this.log('ok', `埋め立てを始めました（幅${width}・高さ${height}・完成後${countdown}秒でクリア）`);
+  }
+
+  /** 配信者が画面のボタンで出す妨害（埋め立ての操作など）。ルールを通さない */
+  async manualAction(action) {
+    const result = await this.dispatcher.fire(-1, { kind: 'manual', from: '' }, action);
+    this.logResult({ kind: 'manual', from: '' }, result);
+    this.emitState();
+    return result;
+  }
+
+  async stopFill() {
+    const response = await this.client.send({ type: 'fill_stop' });
+    if (!response.ok) throw new Error(response.error);
+    this.log('info', '埋め立てを終えました');
+  }
+
   async handleEvent(event) {
+    if (event.kind === 'like') return this.handleLikes(event);
     this.log('gift', describeEvent(event));
     const result = await this.dispatcher.handle(event);
+    this.logResult(event, result);
+    this.emitState();
+    return result;
+  }
+
+  logResult(event, result) {
     if (result.status === 'sent') {
       this.log('ok', `  → ${describeAction(result.action)} を出しました`);
-      this.emit('alert', { from: event.from, trigger: describeEvent(event), action: describeAction(result.action) });
+      // オーバーレイに出す「誰が」
+      const who = event.kind === 'like' ? `いいね${result.likes}回` : event.kind === 'manual' ? '配信者' : `${event.from || '誰か'}さん`;
+      this.emit('alert', { who, action: describeAction(result.action) });
     } else if (result.status === 'failed') {
       this.log('error', `  → 出せませんでした: ${result.error}`);
     } else {
       this.log('info', `  → ${SKIP_MESSAGES[result.status]}`);
     }
-    this.emitState();
-    return result;
+  }
+
+  /** いいねは数が多いので、回数に届いたときだけログに出す */
+  async handleLikes(event) {
+    const results = await this.dispatcher.handleLikes(event);
+    for (const result of results) {
+      this.log('gift', `いいね ${result.likes}回`);
+      this.logResult(event, result);
+    }
+    if (results.length) this.emitState();
+    return results;
   }
 
   pause() {

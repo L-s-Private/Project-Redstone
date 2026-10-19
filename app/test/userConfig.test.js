@@ -31,3 +31,25 @@ test('壊れた設定ファイルは理由つきで断る', async () => {
   await writeFile(join(dir, 'config.json'), '{ broken');
   await assert.rejects(loadUserConfig(dir), ConfigError);
 });
+
+test('前の版で削除した妨害のルールは取り除いて保存し直す', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'redstone-'));
+  await writeFile(join(dir, 'config.json'), JSON.stringify({
+    tiktokUsername: 'taro',
+    rules: [
+      { minDiamonds: 100, action: 'launch', label: '空の彼方へ！' },
+      { minDiamonds: 30, action: 'bury', count: 3, block: 'sand' },
+      { gift: 'Rose', action: 'tnt', count: 3 },
+    ],
+  }));
+  const { config, removed } = await loadUserConfig(dir);
+  assert.equal(removed, 2);
+  assert.deepEqual(config.rules, [{ gift: 'Rose', action: 'tnt', count: 3 }]);
+  assert.equal(config.tiktokUsername, 'taro');
+  assert.deepEqual(JSON.parse(await readFile(join(dir, 'config.json'), 'utf8')).rules, config.rules);
+
+  // 全部消えたら設定例のルールに戻す
+  await writeFile(join(dir, 'config.json'), JSON.stringify({ rules: [{ minDiamonds: 1, action: 'lightning' }] }));
+  const reset = await loadUserConfig(dir);
+  assert.ok(reset.config.rules.some((r) => r.gift === 'GG'));
+});

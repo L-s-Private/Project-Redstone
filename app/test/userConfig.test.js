@@ -23,7 +23,7 @@ test('初回は設定例から作り、保存した内容を次回読める', as
   const second = await loadUserConfig(dir);
   assert.equal(second.created, false);
   assert.equal(second.config.tiktokUsername, 'taro');
-  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'rules']);
+  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'fill', 'rules']);
 });
 
 test('壊れた設定ファイルは理由つきで断る', async () => {

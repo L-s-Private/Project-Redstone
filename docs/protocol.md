@@ -18,6 +18,10 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | `mob` | 文字列 | `type: mob` のときのモブ。`zombie` `skeleton` `creeper` `spider` `witch` `silverfish` `pig` |
 | `width` / `height` | 数値 | `fill_start` の枠の幅（奇数、3〜41。既定11）と高さ（1〜30。既定9） |
 | `countdown` | 数値 | `fill_start` の、埋めきってからクリアまでの秒数（0〜600。既定10） |
+| `wall` | 文字列 | `fill_start` の枠の素材。`glass`（既定）`white_stained_glass` `light_blue_stained_glass` `bedrock` |
+| `block` | 文字列 | `fill_start` で配る・お助けで置くブロック。`amethyst_block`（既定）`diamond_block` `emerald_block` `gold_block` `iron_block` `lapis_block` `redstone_block` `quartz_block` |
+| `skyY` | 数値 | `fill_start` の枠の床の高さ（既定150。ワールドの高さに収まるよう丸める） |
+| `reach` | 数値 | `fill_start` で設定するブロックを置ける距離（1〜64。既定8。バニラは4.5） |
 
 ### 妨害の内容
 
@@ -27,12 +31,12 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 
 ### 埋め立てモード
 
-岩盤で囲った枠の中を、ブロックで埋めきるゲーム。埋めきるとカウントダウンが始まり、崩されずに 0 になればクリア。進み具合はボスバーに出る。壊れた枠は自動で直る。
+空中（天空）に作った枠の中を、ブロックで埋めきるゲーム。埋めきるとカウントダウンが始まり、崩されずに 0 になればクリア。進み具合はボスバーに出る。壊れた枠は自動で直り、枠から落ちたプレイヤーは枠の上に戻される。
 
-- `fill_start`: プレイヤーの足元を床の中心にして枠を作り、中を空にする（前のゲームは終わる）。
-- `fill_stop`: ゲームを終える（置いたブロックはそのまま）。
+- `fill_start`: プレイヤーの真上、高さ `skyY` に枠（`wall`）を作り、プレイヤーを中へ移す。`block` を64個配り、届く距離を `reach` にする（前のゲームは終わる）。
+- `fill_stop`: ゲームを終える（置いたブロックはそのまま。届く距離は元に戻す）。
 - `fill_expand` / `fill_shrink`: 枠を `count` マス広げる / 縮める。縮めて枠の外に出たブロックは消える。
-- `fill_help`: 空いているマスを下の段から `count` 個、土で埋める（お助け）。
+- `fill_help`: 空いているマスを下の段から `count` 個、`block` で埋める（お助け）。
 
 `fill_expand` などは、埋め立てが始まっていないと `"埋め立てが始まっていません"` で断る。
 

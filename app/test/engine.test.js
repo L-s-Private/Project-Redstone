@@ -154,8 +154,14 @@ test('いいねは回数がたまるたびに出し、端数は次に持ち越�
 
 test('埋め立ての開始・終了を MOD に送り、断られたら理由を返す', async () => {
   const { engine, client } = setup();
-  await engine.startFill({ width: 15, height: 5, countdown: 30 });
-  assert.deepEqual(client.sent.at(-1), { type: 'fill_start', width: 15, height: 5, countdown: 30 });
+  await engine.startFill({ width: 15, height: 5, countdown: 30, block: 'diamond_block' });
+  const sent = { width: 15, height: 5, countdown: 30, wall: 'glass', block: 'diamond_block', skyY: 150, reach: 8 };
+  assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent });
+  assert.deepEqual(engine.config.fill, sent, '使った設定を覚える');
+  assert.deepEqual(engine.state.fillSettings, sent);
+  // おかしな値は既定値・上限に直して送る
+  await engine.startFill({ wall: 'obsidian', reach: 999, width: 'x' });
+  assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent, wall: 'glass', reach: 64, width: 11 });
   client.send = async () => ({ ok: false, error: '埋め立てが始まっていません' });
   await assert.rejects(engine.stopFill(), /始まっていません/);
 });

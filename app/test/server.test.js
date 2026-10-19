@@ -184,14 +184,15 @@ test('テスト送信でダイヤ数も指定できる', async () => {
 });
 
 test('埋め立ての開始・終了を伝え、断られたら理由を返す', async () => {
-  await withServer(async ({ engine, port }) => {
+  await withServer(async ({ engine, saved, port }) => {
     const calls = [];
     engine.startFill = async (opts) => calls.push(opts);
     engine.stopFill = async () => {
       throw new Error('埋め立てが始まっていません');
     };
-    assert.equal((await json(port, '/api/fill/start', { width: '15', height: 5.7 })).status, 200);
-    assert.deepEqual(calls, [{ width: 15, height: 5, countdown: 10 }]);
+    assert.equal((await json(port, '/api/fill/start', { width: 15, block: 'diamond_block', junk: 1 })).status, 200);
+    assert.deepEqual(calls, [{ width: 15, height: undefined, countdown: undefined, wall: undefined, block: 'diamond_block', skyY: undefined, reach: undefined }]);
+    assert.equal(saved.length, 1, '始めたら設定を保存する');
     const stop = await json(port, '/api/fill/stop', {});
     assert.equal(stop.status, 400);
     assert.equal(stop.json().error, '埋め立てが始まっていません');

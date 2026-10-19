@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { ConfigError, parseConfig } from '../src/config.js';
+import { ConfigError, DEFAULT_FILL, parseConfig, parseFill } from '../src/config.js';
 
 const valid = { tiktokUsername: '@taro', rules: [{ gift: 'Rose', action: 'tnt' }] };
 
@@ -45,4 +45,13 @@ test('いいねのルールと、埋め立ての妨害を受け付け、知ら�
     { gift: 'GG', action: 'fill_expand', count: 2 },
     { gift: 'バラ', action: 'mob', mob: 'pig' },
   ]);
+});
+
+test('埋め立ての設定は、なければ既定値、おかしな値も既定値か範囲内にする', () => {
+  assert.deepEqual(parseConfig(valid).fill, DEFAULT_FILL);
+  assert.deepEqual(DEFAULT_FILL, { width: 11, height: 9, countdown: 10, wall: 'glass', block: 'amethyst_block', skyY: 150, reach: 8 });
+  assert.deepEqual(parseFill({ wall: 'bedrock', block: 'emerald_block', skyY: 999, reach: 0, width: 2 }), {
+    ...DEFAULT_FILL, wall: 'bedrock', block: 'emerald_block', skyY: 300, reach: 1, width: 3,
+  });
+  assert.deepEqual(parseFill('broken'), DEFAULT_FILL);
 });

@@ -3,8 +3,10 @@ package com.projectredstone.action;
 import com.projectredstone.bridge.ActionRequest;
 import com.projectredstone.game.FillGame;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
@@ -33,21 +35,8 @@ public final class FillGameManager {
     /** 0.5 秒（10 tick）ごとに数え直す */
     private static final int CHECK_INTERVAL_TICKS = 20 / FillGame.CHECKS_PER_SECOND;
 
-    private static final Map<String, Block> WALLS = Map.of(
-            "glass", Blocks.GLASS,
-            "white_stained_glass", Blocks.WHITE_STAINED_GLASS,
-            "light_blue_stained_glass", Blocks.LIGHT_BLUE_STAINED_GLASS,
-            "bedrock", Blocks.BEDROCK);
-
-    private static final Map<String, Block> FILL_BLOCKS = Map.of(
-            "amethyst_block", Blocks.AMETHYST_BLOCK,
-            "diamond_block", Blocks.DIAMOND_BLOCK,
-            "emerald_block", Blocks.EMERALD_BLOCK,
-            "gold_block", Blocks.GOLD_BLOCK,
-            "iron_block", Blocks.IRON_BLOCK,
-            "lapis_block", Blocks.LAPIS_BLOCK,
-            "redstone_block", Blocks.REDSTONE_BLOCK,
-            "quartz_block", Blocks.QUARTZ_BLOCK);
+    // ブロックは ID（minecraft:glass など）で探す。26.x では色付きブロックの定数名が変わっているため。
+    // 選べる ID は ActionRequest.ALLOWED_WALLS / ALLOWED_BLOCKS で確認済み
 
     private static final Random RANDOM = new Random();
 
@@ -75,8 +64,8 @@ public final class FillGameManager {
     public static void start(ServerPlayer player, ActionRequest request) {
         stop(player.level().getServer());
         ServerLevel level = (ServerLevel) player.level();
-        Block filler = FILL_BLOCKS.get(request.block());
-        world = new LevelWorld(level, WALLS.get(request.wall()), filler);
+        Block filler = blockById(request.block(), Blocks.AMETHYST_BLOCK);
+        world = new LevelWorld(level, blockById(request.wall(), Blocks.GLASS), filler);
 
         // 枠（床の下の1段と、高さぶん）がワールドの高さに収まるようにする
         int height = Math.max(FillGame.MIN_HEIGHT, Math.min(FillGame.MAX_HEIGHT, request.height()));
@@ -153,6 +142,11 @@ public final class FillGameManager {
             }
         }
         update();
+    }
+
+    private static Block blockById(String id, Block fallback) {
+        Block block = BuiltInRegistries.BLOCK.getValue(Identifier.fromNamespaceAndPath("minecraft", id));
+        return block == null || block == Blocks.AIR ? fallback : block;
     }
 
     /** 枠の真ん中の、いちばん上に立たせる（埋めたブロックの上に乗る） */

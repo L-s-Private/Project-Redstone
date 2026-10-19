@@ -54,12 +54,13 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
       await saveConfig(engine.config);
     },
     'POST /api/fill/start': async (body) => {
-      const int = (value, fallback) => (Number.isFinite(Number(value)) ? Math.floor(Number(value)) : fallback);
+      const { width, height, countdown, wall, block, skyY, reach } = body;
       try {
-        await engine.startFill({ width: int(body.width, 11), height: int(body.height, 9), countdown: int(body.countdown, 10) });
+        await engine.startFill({ width, height, countdown, wall, block, skyY, reach });
       } catch (e) {
         return { status: 400, error: e.message };
       }
+      await saveConfig(engine.config);
     },
     'POST /api/action': async (body) => {
       // 画面のボタンから出せるのは、埋め立ての操作と TNT だけ

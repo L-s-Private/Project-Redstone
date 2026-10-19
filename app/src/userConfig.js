@@ -48,6 +48,6 @@ function dropRemovedRules(raw) {
 
 export async function saveUserConfig(path, config) {
   await mkdir(join(path, '..'), { recursive: true });
-  const { tiktokUsername, mod, rules } = config;
-  await writeFile(path, `${JSON.stringify({ tiktokUsername, mod, rules }, null, 2)}\n`, 'utf8');
+  const { tiktokUsername, mod, rules, fill } = config;
+  await writeFile(path, `${JSON.stringify({ tiktokUsername, mod, fill, rules }, null, 2)}\n`, 'utf8');
 }

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { Dispatcher } from './dispatcher.js';
 import { ModClient } from './modClient.js';
+import { parseFill } from './config.js';
 import { describeEvent } from './rules.js';
 import { TikTokSource } from './tiktok.js';
 
@@ -108,6 +109,7 @@ export class Engine extends EventEmitter {
       tiktokUsername: this.config.tiktokUsername,
       mod: this.client.status,
       fill: this.client.status.fill ?? null,
+      fillSettings: this.config.fill ?? parseFill(),
       stats: { ...this.dispatcher.stats },
       rules: this.config.rules,
       testButtons: testButtons(this.config.rules),
@@ -161,11 +163,20 @@ export class Engine extends EventEmitter {
     }
   }
 
-  /** 埋め立てを始める。枠はマイクラのプレイヤーの足元に作られる */
-  async startFill({ width, height, countdown }) {
-    const response = await this.client.send({ type: 'fill_start', width, height, countdown });
+  /** 埋め立てを始める。枠はマイクラのプレイヤーの真上の空中に作られる。使った設定は覚えておく */
+  async startFill(options) {
+    const fill = parseFill({ ...this.config.fill, ...options });
+    const response = await this.client.send({ type: 'fill_start', ...fill });
     if (!response.ok) throw new Error(response.error);
-    this.log('ok', `埋め立てを始めました（幅${width}・高さ${height}・完成後${countdown}秒でクリア）`);
+    this.config.fill = fill;
+    this.log('ok', `埋め立てを始めました（幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}）`);
+    this.emitState();
+  }
+
+  async stopFill() {
+    const response = await this.client.send({ type: 'fill_stop' });
+    if (!response.ok) throw new Error(response.error);
+    this.log('info', '埋め立てを終えました');
   }
 
   /** 配信者が画面のボタンで出す妨害（埋め立ての操作など）。ルールを通さない */
@@ -174,12 +185,6 @@ export class Engine extends EventEmitter {
     this.logResult({ kind: 'manual', from: '' }, result);
     this.emitState();
     return result;
-  }
-
-  async stopFill() {
-    const response = await this.client.send({ type: 'fill_stop' });
-    if (!response.ok) throw new Error(response.error);
-    this.log('info', '埋め立てを終えました');
   }
 
   async handleEvent(event) {

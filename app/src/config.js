@@ -10,6 +10,29 @@ const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label
 const MAX_RULES = 50;
 const MAX_LABEL_LENGTH = 100;
 
+// 埋め立ての設定（MOD の docs/protocol.md と同じ値）
+export const FILL_WALLS = ['glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock'];
+export const FILL_BLOCKS = ['amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block', 'quartz_block'];
+export const DEFAULT_FILL = { width: 11, height: 9, countdown: 10, wall: 'glass', block: 'amethyst_block', skyY: 150, reach: 8 };
+
+/** 埋め立ての設定を読む。おかしな値は既定値にする（設定ファイルが壊れても起動できるように） */
+export function parseFill(raw = {}) {
+  const int = (value, fallback, min, max) => {
+    const n = Math.floor(Number(value));
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+  };
+  const fill = raw && typeof raw === 'object' ? raw : {};
+  return {
+    width: int(fill.width, DEFAULT_FILL.width, 3, 41),
+    height: int(fill.height, DEFAULT_FILL.height, 1, 30),
+    countdown: int(fill.countdown, DEFAULT_FILL.countdown, 0, 600),
+    wall: FILL_WALLS.includes(fill.wall) ? fill.wall : DEFAULT_FILL.wall,
+    block: FILL_BLOCKS.includes(fill.block) ? fill.block : DEFAULT_FILL.block,
+    skyY: int(fill.skyY, DEFAULT_FILL.skyY, -60, 300),
+    reach: int(fill.reach, DEFAULT_FILL.reach, 1, 64),
+  };
+}
+
 export class ConfigError extends Error {}
 
 export async function loadConfig(path) {
@@ -48,7 +71,7 @@ export function parseConfig(raw) {
   }
   const rules = raw.rules.map((rule, i) => validateRule(rule, i + 1));
 
-  return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules };
+  return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules, fill: parseFill(raw.fill) };
 }
 
 function validateRule(rule, number) {

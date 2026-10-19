@@ -135,7 +135,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .fill-progress.countdown div, .fill-progress.cleared div { background: var(--ok); }
   .fill-text { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .fill-text b { font-size: 26px; font-variant-numeric: tabular-nums; }
-  .fill-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .fill-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+  .fill-form select { width: 100%; }
   .fill-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
@@ -174,12 +175,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <h2>埋め立てモード</h2>
       <div id="fillIdle">
         <div class="fill-form">
-          <div><label for="fillWidth">枠の幅（マス）</label><input id="fillWidth" type="number" min="3" max="41" step="2" value="11"></div>
-          <div><label for="fillHeight">高さ（マス）</label><input id="fillHeight" type="number" min="1" max="30" value="9"></div>
-          <div><label for="fillCountdown">埋めきってからクリアまで（秒）</label><input id="fillCountdown" type="number" min="0" max="600" value="10"></div>
+          <div><label for="fillBlock">置くブロック</label><select id="fillBlock">
+            <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
+            <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
+            <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
+            <option value="redstone_block">レッドストーン</option><option value="quartz_block">クォーツ</option>
+          </select></div>
+          <div><label for="fillWall">枠の素材</label><select id="fillWall">
+            <option value="glass">ガラス</option><option value="white_stained_glass">白色のガラス</option>
+            <option value="light_blue_stained_glass">空色のガラス</option><option value="bedrock">岩盤</option>
+          </select></div>
+          <div><label for="fillReach">届く距離（マス）</label><input id="fillReach" type="number" min="1" max="64"></div>
+          <div><label for="fillWidth">枠の幅（マス）</label><input id="fillWidth" type="number" min="3" max="41" step="2"></div>
+          <div><label for="fillHeight">枠の高さ（マス）</label><input id="fillHeight" type="number" min="1" max="30"></div>
+          <div><label for="fillSkyY">枠を作る高さ（Y）</label><input id="fillSkyY" type="number" min="-60" max="300"></div>
+          <div><label for="fillCountdown">埋めきってからクリアまで（秒）</label><input id="fillCountdown" type="number" min="0" max="600"></div>
         </div>
         <button class="primary" id="fillStart">埋め立てを始める</button>
-        <p class="hint">マイクラで、枠を作りたい場所に立ってから押してください。足元を中心に岩盤の枠ができ、中の地形は消えます。</p>
+        <p class="hint">押すと、マイクラのプレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックが64個配られ、届く距離が伸びます（終えると元に戻ります）。枠から落ちると、自動で枠の上に戻ります。</p>
       </div>
       <div id="fillRunning" hidden>
         <div class="fill-text"><span id="fillPhase"></span><b id="fillPercent"></b></div>
@@ -356,6 +369,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     }
 
     renderFill(state.fill);
+    renderFillSettings(state.fillSettings);
     if (!rulesDirty) loadRules(state.rules);
     renderRecent();
     if (!wizardChecked) {
@@ -631,9 +645,23 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('fillDetail').textContent = fill.filled + ' / ' + fill.total + ' マス（幅' + fill.width + '・高さ' + fill.height + '）';
   }
 
-  $('fillStart').addEventListener('click', () => post('/api/fill/start', {
-    width: Number($('fillWidth').value), height: Number($('fillHeight').value), countdown: Number($('fillCountdown').value),
-  }));
+  // 前回の設定を入れる（入力中は上書きしない）
+  const FILL_FIELDS = { fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillWall: 'wall', fillBlock: 'block', fillSkyY: 'skyY', fillReach: 'reach' };
+  let fillFormDirty = false;
+  Object.keys(FILL_FIELDS).forEach((id) => $(id).addEventListener('input', () => (fillFormDirty = true)));
+  function renderFillSettings(settings) {
+    if (fillFormDirty || !settings) return;
+    for (const [id, key] of Object.entries(FILL_FIELDS)) $(id).value = settings[key];
+  }
+
+  $('fillStart').addEventListener('click', async () => {
+    const body = {};
+    for (const [id, key] of Object.entries(FILL_FIELDS)) {
+      body[key] = $(id).tagName === 'SELECT' ? $(id).value : Number($(id).value);
+    }
+    const data = await post('/api/fill/start', body);
+    if (data?.ok) fillFormDirty = false;
+  });
   $('fillStop').addEventListener('click', () => {
     if (confirm('埋め立てを終えますか？（置いたブロックはそのまま残ります）')) post('/api/fill/stop');
   });

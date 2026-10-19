@@ -94,5 +94,5 @@ jobs:
         with:
           name: project-redstone-app-windows
           path: app/dist/*.exe
-          # exe はほとんど圧縮できないので、zip 化の時間を省く
+          # exe は作るときに圧縮済みなので、zip 化の時間を省く
           compression-level: 0

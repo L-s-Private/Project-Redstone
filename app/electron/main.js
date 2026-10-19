@@ -59,13 +59,20 @@ if (!app.requestSingleInstanceLock()) {
     });
     await window.loadURL(running.url);
 
-    // CI での動作確認用: 画面を撮って終わる
-    const screenshot = process.env.REDSTONE_SMOKE_SCREENSHOT;
-    if (screenshot) {
+    // CI での動作確認用: 画面の中身を書き出し、撮れれば画面も撮って終わる
+    const smoke = process.env.REDSTONE_SMOKE_RESULT;
+    if (smoke) {
       setTimeout(async () => {
-        const image = await window.webContents.capturePage();
-        await writeFile(screenshot, image.toPNG());
-        app.quit();
+        const result = await window.webContents.executeJavaScript(
+          `({ title: document.title, hasControls: !!document.getElementById('toggle'), mod: document.getElementById('modText')?.textContent })`,
+        ).catch((e) => ({ error: String(e) }));
+        await writeFile(`${smoke}.json`, JSON.stringify(result));
+        try {
+          await writeFile(`${smoke}.png`, (await window.webContents.capturePage()).toPNG());
+        } catch {
+          // 仮想画面では撮れないことがある。中身は JSON で確かめる
+        }
+        app.exit(result.hasControls ? 0 : 1);
       }, 3000);
     }
   });

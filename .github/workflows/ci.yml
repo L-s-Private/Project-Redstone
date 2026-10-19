@@ -22,13 +22,15 @@ jobs:
         run: |
           mkdir -p ../mod/build/libs "$RUNNER_TEMP/mc"
           npx electron-builder --linux dir --publish never
-          REDSTONE_MINECRAFT_DIR="$RUNNER_TEMP/mc" REDSTONE_SMOKE_SCREENSHOT="$GITHUB_WORKSPACE/app/electron-window.png" \
-            timeout 60 xvfb-run --auto-servernum dist/linux-unpacked/project-redstone --mock --no-sandbox
-          test -s electron-window.png
+          REDSTONE_MINECRAFT_DIR="$RUNNER_TEMP/mc" REDSTONE_SMOKE_RESULT="$GITHUB_WORKSPACE/app/electron-window" \
+            timeout 60 xvfb-run --auto-servernum dist/linux-unpacked/project-redstone --mock --no-sandbox --disable-gpu
+          cat electron-window.json
+          grep -q '"hasControls":true' electron-window.json
       - uses: actions/upload-artifact@v4
         with:
           name: electron-window
-          path: app/electron-window.png
+          path: app/electron-window.*
+        if: always()
 
   mod:
     runs-on: ubuntu-latest

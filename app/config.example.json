@@ -1,0 +1,13 @@
+{
+  "tiktokUsername": "ここに自分のTikTok ID（@なし）",
+  "mod": { "host": "127.0.0.1", "port": 25599 },
+  "rules": [
+    { "gift": "Rose", "action": "tnt", "count": 1 },
+    { "gift": "TikTok", "action": "mob", "mob": "zombie", "count": 1 },
+    { "gift": "Finger Heart", "action": "mob", "mob": "creeper", "count": 1 },
+    { "gift": "Doughnut", "action": "bury", "count": 2 },
+    { "minDiamonds": 100, "action": "tnt", "count": 10, "label": "大爆発！" },
+    { "event": "follow", "action": "message", "label": "フォローありがとう！", "cooldownSec": 5 },
+    { "event": "share", "action": "mob", "mob": "silverfish", "count": 2, "cooldownSec": 30 }
+  ]
+}

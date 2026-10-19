@@ -12,19 +12,25 @@ import java.util.Set;
  * アプリから届いた1件の要求。Minecraft に依存しないので単体テストできる。
  * 値の検証と上限の丸めはここで済ませ、実行側は信頼して使ってよい。
  */
-public record ActionRequest(String id, Type type, int count, String from, String label, String mob, String block) {
+public record ActionRequest(String id, Type type, int count, String from, String label, String mob,
+                            int width, int height, int countdown) {
 
-    public enum Type { PING, TNT, MOB, BURY, MESSAGE, LIGHTNING, LAUNCH, HEAL }
+    public enum Type { PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP }
 
     /** 1回の要求で出せる数の上限。配信中の事故とサーバー負荷を防ぐ。 */
     public static final Map<Type, Integer> MAX_COUNT = Map.of(
             Type.TNT, 20,
             Type.MOB, 10,
-            Type.BURY, 5,
-            Type.LIGHTNING, 5);
+            Type.FILL_EXPAND, 5,
+            Type.FILL_SHRINK, 5,
+            Type.FILL_HELP, 64);
 
-    public static final Set<String> ALLOWED_MOBS = Set.of("zombie", "skeleton", "creeper", "spider", "witch", "silverfish");
-    public static final Set<String> ALLOWED_BURY_BLOCKS = Set.of("sand", "gravel");
+    public static final Set<String> ALLOWED_MOBS = Set.of("zombie", "skeleton", "creeper", "spider", "witch", "silverfish", "pig");
+
+    /** 埋め立ての枠の既定値（「/bedrock create 11 9」の例に合わせる） */
+    public static final int DEFAULT_WIDTH = 11;
+    public static final int DEFAULT_HEIGHT = 9;
+    public static final int DEFAULT_COUNTDOWN = 10;
 
     static final int MAX_FROM_LENGTH = 32;
     static final int MAX_LABEL_LENGTH = 100;
@@ -60,19 +66,16 @@ public record ActionRequest(String id, Type type, int count, String from, String
             }
         }
 
-        String block = null;
-        if (type == Type.BURY) {
-            block = optString(json, "block", "sand");
-            if (!ALLOWED_BURY_BLOCKS.contains(block)) {
-                throw new InvalidRequestException("未対応のブロックです: " + block);
-            }
-        }
-
         if (type == Type.MESSAGE && label.isEmpty()) {
             throw new InvalidRequestException("message には label が必要です");
         }
 
-        return new ActionRequest(id, type, count, from, label, mob, block);
+        // 枠の大きさの丸めは FillGame が行う
+        int width = optInt(json, "width", DEFAULT_WIDTH);
+        int height = optInt(json, "height", DEFAULT_HEIGHT);
+        int countdown = optInt(json, "countdown", DEFAULT_COUNTDOWN);
+
+        return new ActionRequest(id, type, count, from, label, mob, width, height, countdown);
     }
 
     private static Type parseType(String raw) throws InvalidRequestException {
@@ -83,11 +86,12 @@ public record ActionRequest(String id, Type type, int count, String from, String
             case "ping" -> Type.PING;
             case "tnt" -> Type.TNT;
             case "mob" -> Type.MOB;
-            case "bury" -> Type.BURY;
             case "message" -> Type.MESSAGE;
-            case "lightning" -> Type.LIGHTNING;
-            case "launch" -> Type.LAUNCH;
-            case "heal" -> Type.HEAL;
+            case "fill_start" -> Type.FILL_START;
+            case "fill_stop" -> Type.FILL_STOP;
+            case "fill_expand" -> Type.FILL_EXPAND;
+            case "fill_shrink" -> Type.FILL_SHRINK;
+            case "fill_help" -> Type.FILL_HELP;
             default -> throw new InvalidRequestException("未対応の type です: " + raw);
         };
     }

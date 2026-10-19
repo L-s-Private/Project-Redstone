@@ -22,28 +22,37 @@ class ActionRequestTest {
     void clampsCountToLimits() throws Exception {
         assertEquals(20, ActionRequest.parse("{\"type\":\"tnt\",\"count\":9999}").count());
         assertEquals(1, ActionRequest.parse("{\"type\":\"tnt\",\"count\":-5}").count());
-        assertEquals(5, ActionRequest.parse("{\"type\":\"bury\",\"count\":1e9}").count());
+        assertEquals(64, ActionRequest.parse("{\"type\":\"fill_help\",\"count\":1e9}").count());
         assertEquals(1, ActionRequest.parse("{\"type\":\"message\",\"label\":\"hi\",\"count\":50}").count());
     }
 
     @Test
-    void parsesNewActions() throws Exception {
-        assertEquals(ActionRequest.Type.LIGHTNING, ActionRequest.parse("{\"type\":\"lightning\",\"count\":3}").type());
-        assertEquals(5, ActionRequest.parse("{\"type\":\"lightning\",\"count\":99}").count());
-        assertEquals(1, ActionRequest.parse("{\"type\":\"launch\",\"count\":99}").count());
-        assertEquals(ActionRequest.Type.HEAL, ActionRequest.parse("{\"type\":\"heal\"}").type());
+    void parsesFillActions() throws Exception {
+        ActionRequest start = ActionRequest.parse("{\"type\":\"fill_start\",\"width\":15,\"height\":5,\"countdown\":30}");
+        assertEquals(ActionRequest.Type.FILL_START, start.type());
+        assertEquals(15, start.width());
+        assertEquals(5, start.height());
+        assertEquals(30, start.countdown());
+        ActionRequest defaults = ActionRequest.parse("{\"type\":\"fill_start\"}");
+        assertEquals(11, defaults.width());
+        assertEquals(9, defaults.height());
+        assertEquals(5, ActionRequest.parse("{\"type\":\"fill_expand\",\"count\":99}").count());
+        assertEquals(ActionRequest.Type.FILL_SHRINK, ActionRequest.parse("{\"type\":\"fill_shrink\"}").type());
+        assertEquals(ActionRequest.Type.FILL_STOP, ActionRequest.parse("{\"type\":\"fill_stop\"}").type());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"width\":\"big\"}"));
     }
 
     @Test
     void defaultsMobAndBlock() throws Exception {
         assertEquals("zombie", ActionRequest.parse("{\"type\":\"mob\"}").mob());
-        assertEquals("sand", ActionRequest.parse("{\"type\":\"bury\"}").block());
+        assertEquals("pig", ActionRequest.parse("{\"type\":\"mob\",\"mob\":\"pig\"}").mob());
     }
 
     @Test
     void rejectsUnknownValues() {
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mob\",\"mob\":\"wither\"}"));
-        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"bury\",\"block\":\"lava\"}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"bury\"}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"lightning\"}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"op\"}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"count\":1}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"message\"}"));

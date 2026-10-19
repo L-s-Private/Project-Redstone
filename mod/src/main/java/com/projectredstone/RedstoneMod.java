@@ -2,11 +2,14 @@ package com.projectredstone;
 
 import com.google.gson.JsonObject;
 import com.projectredstone.action.ActionExecutor;
+import com.projectredstone.action.FillGameManager;
+import com.projectredstone.game.FillGame;
 import com.projectredstone.bridge.ActionRequest;
 import com.projectredstone.bridge.BridgeServer;
 import com.projectredstone.bridge.InvalidRequestException;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +31,11 @@ public class RedstoneMod implements ModInitializer {
     @Override
     public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTED.register(this::startBridge);
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> stopBridge());
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            stopBridge();
+            FillGameManager.stop();
+        });
+        ServerTickEvents.END_SERVER_TICK.register(FillGameManager::onServerTick);
     }
 
     private void startBridge(MinecraftServer server) {
@@ -52,12 +59,37 @@ public class RedstoneMod implements ModInitializer {
         if (request.type() == ActionRequest.Type.PING) {
             JsonObject status = new JsonObject();
             status.addProperty("players", players);
+            status.add("fill", fillStatus());
             return status;
         }
         if (players == 0) {
             throw new InvalidRequestException("ワールドにプレイヤーがいません");
         }
+        boolean needsGame = switch (request.type()) {
+            case FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_STOP -> true;
+            default -> false;
+        };
+        if (needsGame && !FillGameManager.running()) {
+            throw new InvalidRequestException("埋め立てが始まっていません");
+        }
         server.execute(() -> ActionExecutor.execute(server, request));
         return null;
+    }
+
+    private static JsonObject fillStatus() {
+        FillGame.Status status = FillGameManager.status();
+        if (status == null) {
+            return null;
+        }
+        JsonObject json = new JsonObject();
+        json.addProperty("phase", status.phase().name().toLowerCase());
+        json.addProperty("filled", status.filled());
+        json.addProperty("total", status.total());
+        json.addProperty("percent", status.percent());
+        json.addProperty("width", status.width());
+        json.addProperty("height", status.height());
+        json.addProperty("countdownSecondsLeft", status.countdownSecondsLeft());
+        json.addProperty("countdownSeconds", status.countdownSeconds());
+        return json;
     }
 }

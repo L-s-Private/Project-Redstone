@@ -89,6 +89,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .quick button { padding: 4px 10px; font-size: 13px; }
   code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 13px; word-break: break-all; }
+  .checks { list-style: none; margin: 0 0 12px; padding: 0; }
+  .checks li { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; }
+  .checks .mark { width: 18px; flex: none; text-align: center; font-weight: 700; }
+  .checks .yes .mark { color: var(--ok); }
+  .checks .no .mark { color: var(--bad); }
+  .checks small { color: var(--muted); display: block; font-size: 12px; word-break: break-all; }
+  .primary { width: 100%; font-weight: 700; padding: 12px; background: #24533a; border-color: #2f6b4b; }
+  .ready { padding: 10px 12px; border-radius: 8px; background: #17321f; color: #9be7b4; font-weight: 600; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
     background: var(--bad); color: #fff; font-weight: 600; display: none;
@@ -124,6 +132,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
   </div>
 
   <div class="side">
+    <section class="card">
+      <h2>マイクラの準備（Java版 <span id="mcVersion">26.3</span>）</h2>
+      <ul class="checks" id="checks"></ul>
+      <div id="setupReady" class="ready" hidden>準備できています。ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動してください。</div>
+      <div id="setupTodo" hidden>
+        <button class="primary" id="install">まとめて導入する</button>
+        <p class="hint">マイクラを閉じた状態で押してください。足りないものだけ入れます。</p>
+      </div>
+    </section>
+
     <section class="card">
       <h2>TikTok</h2>
       <form id="tiktokForm">
@@ -253,6 +271,52 @@ export const PANEL_HTML = String.raw`<!doctype html>
   });
   document.querySelectorAll('[data-kind]').forEach((b) =>
     b.addEventListener('click', () => post('/api/test', { kind: b.dataset.kind })));
+
+  function renderSetup(setup) {
+    const items = [
+      [setup.launcherFound, 'マイクラのランチャー', setup.launcherFound ? setup.dir : '見つかりません。ランチャーを一度起動して閉じてください'],
+      [setup.fabric.installed, 'Fabric Loader', setup.fabric.versionId ?? '未導入'],
+      [setup.fabricApi.installed, 'Fabric API', setup.fabricApi.fileName ?? '未導入'],
+      [setup.mod.upToDate, 'Project Redstone MOD', setup.mod.upToDate ? setup.mod.fileName : setup.mod.installed ? '古いバージョン（' + setup.mod.fileName + '）' : '未導入'],
+    ];
+    $('checks').replaceChildren(...items.map(([ok, name, detail]) => {
+      const li = document.createElement('li');
+      li.className = ok ? 'yes' : 'no';
+      const mark = document.createElement('span');
+      mark.className = 'mark';
+      mark.textContent = ok ? '✓' : '✗';
+      const text = document.createElement('div');
+      text.textContent = name;
+      const small = document.createElement('small');
+      small.textContent = detail;
+      text.append(small);
+      li.append(mark, text);
+      return li;
+    }));
+    $('mcVersion').textContent = setup.minecraftVersion;
+    document.querySelectorAll('.mcv').forEach((el) => (el.textContent = setup.minecraftVersion));
+    $('setupReady').hidden = !setup.ready;
+    $('setupTodo').hidden = setup.ready;
+  }
+
+  async function loadSetup() {
+    try {
+      const res = await fetch('/api/setup');
+      if (res.ok) renderSetup((await res.json()).setup);
+    } catch {}
+  }
+
+  $('install').addEventListener('click', async () => {
+    $('install').disabled = true;
+    $('install').textContent = '導入中…';
+    const data = await post('/api/setup/install');
+    $('install').disabled = false;
+    $('install').textContent = 'まとめて導入する';
+    if (data?.setup) renderSetup(data.setup);
+    else loadSetup();
+  });
+  window.addEventListener('focus', loadSetup);
+  loadSetup();
 
   $('overlayUrl').textContent = location.origin + '/overlay';
   $('copyOverlay').addEventListener('click', async () => {

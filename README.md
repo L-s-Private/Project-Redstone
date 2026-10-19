@@ -26,6 +26,9 @@ TikTok LIVE ──ギフト──▶ PCアプリ（app/, Node.js） ──TCP 12
 
 対応: Minecraft Java版 **26.3** + Fabric Loader + Fabric API。ビルドには Java 25 が必要。
 
+画面版アプリ（下記）を使うなら、この手順は不要。操作画面の「まとめて導入する」で、
+Fabric Loader の起動構成・Fabric API・この MOD（アプリに同梱）がまとめて入る。手で入れる場合は以下。
+
 ```sh
 cd mod
 ./gradlew build        # Windows は gradlew.bat build

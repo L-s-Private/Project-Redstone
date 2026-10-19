@@ -31,10 +31,10 @@ class FakeEngine extends EventEmitter {
   }
 }
 
-async function withServer(fn) {
+async function withServer(fn, { setup } = {}) {
   const engine = new FakeEngine();
   const saved = [];
-  const ui = createUiServer({ engine, port: 0, saveConfig: async (c) => saved.push({ ...c }) });
+  const ui = createUiServer({ engine, port: 0, setup, saveConfig: async (c) => saved.push({ ...c }) });
   const port = await ui.listen();
   try {
     await fn({ engine, saved, port });
@@ -137,4 +137,26 @@ test('接続した画面に今の状態とログを送り、その後の変化�
     assert.match(received, /起動しました/);
     assert.match(received, /"action":"TNT ×1"/);
   });
+});
+
+test('マイクラの準備状況を返し、導入ボタンで導入する', async () => {
+  let installed = false;
+  const setup = {
+    status: async () => ({ ready: installed }),
+    install: async () => {
+      if (installed) throw new Error('すでに入っています');
+      installed = true;
+      return { ready: true };
+    },
+  };
+  await withServer(async ({ port }) => {
+    assert.deepEqual((await request(port, { path: '/api/setup' })).json().setup, { ready: false });
+    const first = await json(port, '/api/setup/install', {});
+    assert.equal(first.status, 200);
+    assert.deepEqual(first.json().setup, { ready: true });
+    const second = await json(port, '/api/setup/install', {});
+    assert.equal(second.status, 400);
+    assert.equal(second.json().error, 'すでに入っています');
+    assert.equal((await json(port, '/api/setup/install', {}, { Origin: 'http://evil.example' })).status, 403);
+  }, { setup });
 });

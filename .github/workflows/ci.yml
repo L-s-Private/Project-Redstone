@@ -19,6 +19,7 @@ jobs:
       - run: npm test
 
   exe:
+    needs: mod
     runs-on: windows-latest
     defaults:
       run:
@@ -28,7 +29,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: project-redstone-mod
+          path: mod/build/libs
       - run: npm install
+      - name: 本物の Fabric・Modrinth から導入できるか確認
+        run: node scripts/check-setup.mjs
       - run: npm run build:exe
       - uses: actions/upload-artifact@v4
         with:

@@ -12,8 +12,9 @@ const MAX_BODY_BYTES = 4096;
  * @param {object} options
  * @param {import('./engine.js').Engine} options.engine
  * @param {(config: object) => Promise<void>} [options.saveConfig] TikTok ID を変えたときに保存する
+ * @param {{status: () => Promise<object>, install: () => Promise<object>}} [options.setup] マイクラ側の準備（setup.js）
  */
-export function createUiServer({ engine, saveConfig = async () => {}, port = DEFAULT_UI_PORT }) {
+export function createUiServer({ engine, saveConfig = async () => {}, setup, port = DEFAULT_UI_PORT }) {
   const clients = new Set();
   const allowedHosts = () => {
     const actual = server.address()?.port ?? port;
@@ -40,6 +41,14 @@ export function createUiServer({ engine, saveConfig = async () => {}, port = DEF
       if (!event) return { status: 400, error: 'テスト内容が正しくありません' };
       engine.handleEvent(event);
     },
+    'POST /api/setup/install': async () => {
+      if (!setup) return { status: 404, error: '見つかりません' };
+      try {
+        return { setup: await setup.install() };
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+    },
     'POST /api/tiktok': async (body) => {
       const username = String(body.username ?? '').trim().replace(/^@/, '');
       if (username.length > 64 || /[\s/]/.test(username)) {
@@ -60,6 +69,10 @@ export function createUiServer({ engine, saveConfig = async () => {}, port = DEF
 
     if (route === 'GET /') return sendHtml(res, PANEL_HTML);
     if (route === 'GET /overlay') return sendHtml(res, OVERLAY_HTML);
+    if (route === 'GET /api/setup') {
+      if (!setup) return send(res, 404, { error: '見つかりません' });
+      return send(res, 200, { setup: await setup.status() });
+    }
     if (route === 'GET /events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       res.write(`event: snapshot\ndata: ${JSON.stringify({ state: engine.state, logs: engine.logs })}\n\n`);
@@ -89,7 +102,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, port = DEF
     try {
       const result = await action(body);
       if (result?.error) return send(res, result.status, { error: result.error });
-      return send(res, 200, { ok: true, state: engine.state });
+      return send(res, 200, { ok: true, state: engine.state, ...(result?.setup ? { setup: result.setup } : {}) });
     } catch (e) {
       return send(res, 500, { error: e.message });
     }

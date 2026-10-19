@@ -5,7 +5,9 @@ import { parseArgs } from 'node:util';
 import { ConfigError } from './config.js';
 import { Engine } from './engine.js';
 import { log } from './log.js';
+import { loadBundledMod } from './bundledMod.js';
 import { createUiServer, DEFAULT_UI_PORT } from './server.js';
+import { getSetupStatus, installAll, minecraftDir } from './setup.js';
 import { loadUserConfig, saveUserConfig } from './userConfig.js';
 
 function openBrowser(url) {
@@ -45,7 +47,19 @@ async function main() {
   const engine = new Engine({ config });
   engine.on('log', ({ level, text }) => log[level](text));
 
-  const ui = createUiServer({ engine, port, saveConfig: (c) => saveUserConfig(path, c) });
+  const bundledMod = await loadBundledMod();
+  const dir = process.env.REDSTONE_MINECRAFT_DIR ?? minecraftDir();
+  let installing = null;
+  const setup = {
+    status: () => getSetupStatus({ dir, bundledMod }),
+    install: () => {
+      // 2回押されても同時には走らせない
+      installing ??= installAll({ dir, bundledMod, log: (level, text) => engine.log(level, text) }).finally(() => (installing = null));
+      return installing;
+    },
+  };
+
+  const ui = createUiServer({ engine, port, setup, saveConfig: (c) => saveUserConfig(path, c) });
   try {
     await ui.listen();
   } catch (e) {

@@ -1,10 +1,10 @@
 // ギフトやフォローを、どの妨害にするか決める。config.json の rules を上から順に見て、最初に合ったものを使う。
 
-export const ACTION_TYPES = ['tnt', 'mob', 'bury', 'message'];
+export const ACTION_TYPES = ['tnt', 'mob', 'bury', 'message', 'lightning', 'launch', 'heal'];
 export const SOCIAL_EVENTS = ['follow', 'share'];
 
 // MOD 側の上限（docs/protocol.md）。ここでも丸めて、ログの数が実際に出る数と合うようにする
-const MAX_COUNT_BY_TYPE = { tnt: 20, mob: 10, bury: 5, message: 1 };
+const MAX_COUNT_BY_TYPE = { tnt: 20, mob: 10, bury: 5, message: 1, lightning: 5, launch: 1, heal: 1 };
 
 export function matches(rule, event) {
   if (rule.event !== undefined) {

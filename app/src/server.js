@@ -1,12 +1,14 @@
 // 画面版の Web サーバー。操作画面（/）と LIVE Studio 用オーバーレイ（/overlay）を出す。
 // 同じPCからしか開けないよう 127.0.0.1 にだけ待ち受け、ほかのサイトからの操作（CSRF・DNSリバインディング）も断る。
 import http from 'node:http';
+import { ConfigError, parseConfig } from './config.js';
+import { PRESETS } from './presets.js';
 import { OVERLAY_HTML } from './ui/overlay.js';
 import { PANEL_HTML } from './ui/panel.js';
 
 export const DEFAULT_UI_PORT = 25600;
 
-const MAX_BODY_BYTES = 4096;
+const MAX_BODY_BYTES = 32 * 1024;
 
 /**
  * @param {object} options
@@ -41,6 +43,17 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
       if (!event) return { status: 400, error: 'テスト内容が正しくありません' };
       engine.handleEvent(event);
     },
+    'POST /api/rules': async (body) => {
+      let rules;
+      try {
+        ({ rules } = parseConfig({ rules: body.rules }));
+      } catch (e) {
+        if (e instanceof ConfigError) return { status: 400, error: e.message };
+        throw e;
+      }
+      engine.setRules(rules);
+      await saveConfig(engine.config);
+    },
     'POST /api/setup/install': async () => {
       if (!setup) return { status: 404, error: '見つかりません' };
       try {
@@ -69,6 +82,11 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
 
     if (route === 'GET /') return sendHtml(res, PANEL_HTML);
     if (route === 'GET /overlay') return sendHtml(res, OVERLAY_HTML);
+    if (route === 'GET /favicon.ico') {
+      res.writeHead(204);
+      return res.end();
+    }
+    if (route === 'GET /api/presets') return send(res, 200, { presets: PRESETS });
     if (route === 'GET /api/setup') {
       if (!setup) return send(res, 404, { error: '見つかりません' });
       return send(res, 200, { setup: await setup.status() });
@@ -137,8 +155,9 @@ function testEvent(body) {
   if (body.kind !== 'gift') return null;
   const giftName = String(body.giftName ?? '').trim().slice(0, 64);
   const count = Math.min(100, Math.max(1, Math.floor(Number(body.count)) || 1));
+  const diamonds = Math.min(100000, Math.max(0, Math.floor(Number(body.diamonds)) || 0));
   if (!giftName) return null;
-  return { kind: 'gift', giftId: '', giftName, diamonds: 0, count, from };
+  return { kind: 'gift', giftId: '', giftName, diamonds, count, from };
 }
 
 function readJson(req) {

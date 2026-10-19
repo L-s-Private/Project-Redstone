@@ -160,3 +160,28 @@ test('マイクラの準備状況を返し、導入ボタンで導入する', as
     assert.equal((await json(port, '/api/setup/install', {}, { Origin: 'http://evil.example' })).status, 403);
   }, { setup });
 });
+
+test('プリセットを返し、ルールを検査してから保存する', async () => {
+  await withServer(async ({ engine, saved, port }) => {
+    const presets = (await request(port, { path: '/api/presets' })).json().presets;
+    assert.ok(presets.length >= 3);
+
+    engine.setRules = (rules) => (engine.config.rules = rules);
+    const ok = await json(port, '/api/rules', { rules: [{ minDiamonds: 1, action: 'tnt', count: 2, junk: 'x' }] });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(engine.config.rules, [{ minDiamonds: 1, action: 'tnt', count: 2 }]);
+    assert.deepEqual(saved.at(-1).rules, [{ minDiamonds: 1, action: 'tnt', count: 2 }]);
+
+    const bad = await json(port, '/api/rules', { rules: [{ gift: '', action: 'tnt' }] });
+    assert.equal(bad.status, 400);
+    assert.match(bad.json().error, /1番目のルール: ギフト名を入れてください/);
+    assert.equal((await json(port, '/api/rules', { rules: [] })).status, 400);
+  });
+});
+
+test('テスト送信でダイヤ数も指定できる', async () => {
+  await withServer(async ({ engine, port }) => {
+    await json(port, '/api/test', { kind: 'gift', giftName: '100ダイヤのギフト', diamonds: 100 });
+    assert.equal(engine.calls[0].diamonds, 100);
+  });
+});

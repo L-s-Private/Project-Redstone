@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { test } from 'node:test';
-import { describeAction, Engine } from '../src/engine.js';
+import { describeAction, Engine, testButtons } from '../src/engine.js';
 
 class FakeClient extends EventEmitter {
   constructor() {
@@ -95,13 +95,44 @@ test('ログは新しい200件だけ残す', () => {
   assert.equal(engine.logs[0].text, '50');
 });
 
-test('テスト送信の候補にルールのギフト名を出す', () => {
-  const { engine } = setup({ rules: [{ gift: 'Rose', action: 'tnt' }, { event: 'follow', action: 'tnt' }, { gift: 'Rose', action: 'mob' }] });
-  assert.deepEqual(engine.state.giftNames, ['Rose']);
+test('テスト送信のボタンをルールから作る', () => {
+  assert.deepEqual(testButtons([
+    { gift: 'Rose', action: 'tnt' },
+    { minDiamonds: 100, action: 'bury' },
+    { event: 'follow', action: 'heal' },
+    { gift: 'Rose', action: 'mob' },
+    { giftId: '5655', action: 'tnt' },
+  ]), [
+    { label: 'Rose', body: { kind: 'gift', giftName: 'Rose', count: 1 } },
+    { label: '💎100', body: { kind: 'gift', giftName: '100ダイヤのギフト', diamonds: 100, count: 1 } },
+    { label: 'フォロー', body: { kind: 'follow' } },
+  ]);
+});
+
+test('ルールを入れ替えると、新しいルールで判定してクールダウンも戻る', async () => {
+  const { engine, client } = setup({ rules: [{ gift: 'Rose', action: 'tnt', cooldownSec: 60 }] });
+  await engine.handleEvent(rose);
+  assert.equal((await engine.handleEvent(rose)).status, 'cooldown');
+  engine.setRules([{ minDiamonds: 1, action: 'lightning', count: 2 }]);
+  assert.equal((await engine.handleEvent(rose)).status, 'sent');
+  assert.deepEqual(client.sent.at(-1), { type: 'lightning', count: 5, from: 'たろう' }); // 2 × 3連打 = 6 → 雷の上限5
+  assert.deepEqual(engine.state.rules, [{ minDiamonds: 1, action: 'lightning', count: 2 }]);
+});
+
+test('TikTokから実際に届いたギフトを、新しい順に重複なしで覚える', () => {
+  const { engine, tiktok } = setup();
+  tiktok.emit('event', { ...rose, giftName: 'Rose', diamonds: 1 });
+  tiktok.emit('event', { ...rose, giftName: 'Galaxy', diamonds: 1000 });
+  tiktok.emit('event', { ...rose, giftName: 'Rose', diamonds: 1 });
+  tiktok.emit('event', { kind: 'follow', from: 'x' });
+  assert.deepEqual(engine.state.recentGifts, [{ giftName: 'Rose', diamonds: 1 }, { giftName: 'Galaxy', diamonds: 1000 }]);
 });
 
 test('妨害の表示名', () => {
   assert.equal(describeAction({ type: 'mob', mob: 'creeper', count: 2 }), 'クリーパー ×2');
   assert.equal(describeAction({ type: 'bury', count: 3 }), '埋め立て ×3');
   assert.equal(describeAction({ type: 'message', count: 1 }), 'メッセージ');
+  assert.equal(describeAction({ type: 'lightning', count: 3 }), '雷 ×3');
+  assert.equal(describeAction({ type: 'launch', count: 1 }), '打ち上げ');
+  assert.equal(describeAction({ type: 'heal', count: 1 }), '全回復');
 });

@@ -16,7 +16,29 @@ const ACTION_NAMES = {
   tnt: 'TNT',
   bury: '埋め立て',
   message: 'メッセージ',
+  lightning: '雷',
+  launch: '打ち上げ',
+  heal: '全回復',
 };
+
+// 回数を見せない妨害
+const SINGLE_ACTIONS = new Set(['message', 'launch', 'heal']);
+const MAX_RECENT_GIFTS = 20;
+
+/** ルールから、テスト送信のボタンを作る */
+export function testButtons(rules) {
+  const buttons = new Map();
+  for (const rule of rules) {
+    if (rule.gift !== undefined) {
+      buttons.set(String(rule.gift), { kind: 'gift', giftName: String(rule.gift), count: 1 });
+    } else if (rule.minDiamonds !== undefined) {
+      buttons.set(`💎${rule.minDiamonds}`, { kind: 'gift', giftName: `${rule.minDiamonds}ダイヤのギフト`, diamonds: rule.minDiamonds, count: 1 });
+    } else if (rule.event !== undefined) {
+      buttons.set(rule.event === 'follow' ? 'フォロー' : 'シェア', { kind: rule.event });
+    }
+  }
+  return [...buttons].map(([label, body]) => ({ label, body }));
+}
 
 const MOB_NAMES = {
   zombie: 'ゾンビ',
@@ -29,7 +51,7 @@ const MOB_NAMES = {
 
 export function describeAction(action) {
   const name = action.type === 'mob' ? MOB_NAMES[action.mob ?? 'zombie'] : ACTION_NAMES[action.type];
-  return action.type === 'message' ? name : `${name} ×${action.count}`;
+  return SINGLE_ACTIONS.has(action.type) ? name : `${name} ×${action.count}`;
 }
 
 /**
@@ -50,6 +72,8 @@ export class Engine extends EventEmitter {
     this.dispatcher = new Dispatcher({ rules: config.rules, client: this.client, now });
     this.logs = [];
     this.mock = false;
+    // 実際に届いたギフト（設定画面で「最近届いたギフト」として出す）
+    this.recentGifts = [];
 
     this.client.on('status', ({ connected, players }) => {
       if (!connected) {
@@ -63,7 +87,10 @@ export class Engine extends EventEmitter {
     });
     this.tiktok.on('status', () => this.emitState());
     this.tiktok.on('log', ({ level, text }) => this.log(level, text));
-    this.tiktok.on('event', (event) => this.handleEvent(event));
+    this.tiktok.on('event', (event) => {
+      if (event.kind === 'gift') this.rememberGift(event);
+      this.handleEvent(event);
+    });
   }
 
   get state() {
@@ -74,9 +101,24 @@ export class Engine extends EventEmitter {
       tiktokUsername: this.config.tiktokUsername,
       mod: this.client.status,
       stats: { ...this.dispatcher.stats },
-      // テスト送信の候補
-      giftNames: [...new Set(this.config.rules.filter((rule) => rule.gift !== undefined).map((rule) => String(rule.gift)))],
+      rules: this.config.rules,
+      testButtons: testButtons(this.config.rules),
+      recentGifts: this.recentGifts,
     };
+  }
+
+  /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。 */
+  setRules(rules) {
+    this.config.rules = rules;
+    this.dispatcher.rules = rules;
+    this.dispatcher.lastFiredAt.clear();
+    this.log('ok', `妨害の設定を保存しました（ルール ${rules.length}件）`);
+    this.emitState();
+  }
+
+  rememberGift({ giftName, diamonds }) {
+    if (!giftName) return;
+    this.recentGifts = [{ giftName, diamonds }, ...this.recentGifts.filter((g) => g.giftName !== giftName)].slice(0, MAX_RECENT_GIFTS);
   }
 
   start({ mock = false } = {}) {

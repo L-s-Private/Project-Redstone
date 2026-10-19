@@ -19,6 +19,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     --gift: #c792ea;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     background: var(--bg);
@@ -97,6 +98,44 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .checks small { color: var(--muted); display: block; font-size: 12px; word-break: break-all; }
   .primary { width: 100%; font-weight: 700; padding: 12px; background: #24533a; border-color: #2f6b4b; }
   .ready { padding: 10px 12px; border-radius: 8px; background: #17321f; color: #9be7b4; font-weight: 600; }
+  nav { display: flex; gap: 4px; margin-right: auto; }
+  nav button { background: transparent; border-color: transparent; color: var(--muted); }
+  nav button.active { background: var(--bg); border-color: var(--line); color: var(--text); }
+  header h1 { margin-right: 12px; }
+  main.single { display: block; max-width: 1100px; }
+  main.single .card + .card { margin-top: 16px; }
+  .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .preset { text-align: left; white-space: normal; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .preset b { font-size: 15px; }
+  .preset span { color: var(--muted); font-size: 13px; }
+  .preset.selected { border-color: var(--ok); background: #17321f; }
+  .table-wrap { overflow-x: auto; }
+  table.rules { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.rules th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.rules td { padding: 6px 4px; border-bottom: 1px solid #22252b; vertical-align: middle; }
+  table.rules select, table.rules input { padding: 6px 8px; }
+  table.rules .num { width: 72px; }
+  table.rules .order { white-space: nowrap; }
+  table.rules .order button, table.rules .del { padding: 4px 8px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .toolbar .grow { flex: 1; }
+  .dirty { color: var(--warn); font-weight: 600; }
+  .recent { display: flex; flex-wrap: wrap; gap: 6px; }
+  .recent button { font-size: 13px; padding: 4px 10px; }
+  select {
+    font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; max-width: 100%;
+  }
+  dialog {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px; width: min(560px, calc(100vw - 32px));
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, .6); }
+  dialog h2 { margin: 0 0 4px; font-size: 20px; }
+  .steps { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; }
+  .wizard-actions .next { background: #24533a; border-color: #2f6b4b; font-weight: 700; }
+  .wizard-presets { display: flex; flex-direction: column; gap: 8px; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
     background: var(--bad); color: #fff; font-weight: 600; display: none;
@@ -106,11 +145,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <body>
 <header>
   <h1>Project <span>Redstone</span></h1>
+  <nav>
+    <button class="active" data-tab="tabLive">配信</button>
+    <button data-tab="tabRules">妨害の設定</button>
+    <button id="openWizard">はじめの設定</button>
+  </nav>
   <span class="chip"><span class="dot" id="tiktokDot"></span>TikTok: <span id="tiktokText">—</span></span>
   <span class="chip"><span class="dot" id="modDot"></span>マイクラ: <span id="modText">—</span></span>
 </header>
 
-<main>
+<main id="tabLive">
   <div class="side">
     <section class="card">
       <div class="controls">
@@ -134,10 +178,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <div class="side">
     <section class="card">
       <h2>マイクラの準備（Java版 <span id="mcVersion">26.3</span>）</h2>
-      <ul class="checks" id="checks"></ul>
-      <div id="setupReady" class="ready" hidden>準備できています。ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動してください。</div>
-      <div id="setupTodo" hidden>
-        <button class="primary" id="install">まとめて導入する</button>
+      <ul class="checks setup-checks"></ul>
+      <div class="ready setup-ready" hidden>準備できています。ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動してください。</div>
+      <div class="setup-todo" hidden>
+        <button class="primary install-btn">まとめて導入する</button>
         <p class="hint">マイクラを閉じた状態で押してください。足りないものだけ入れます。</p>
       </div>
     </section>
@@ -165,11 +209,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <datalist id="giftList"></datalist>
       </form>
       <div class="quick" id="quick"></div>
-      <div class="quick">
-        <button data-kind="follow">フォロー</button>
-        <button data-kind="share">シェア</button>
-      </div>
-      <p class="hint">実際のギフトの代わりに、届いたことにして試せます。</p>
+      <p class="hint">実際のギフトの代わりに、届いたことにして試せます。ボタンは「妨害の設定」のルールに合わせて変わります。</p>
     </section>
 
     <section class="card">
@@ -182,6 +222,72 @@ export const PANEL_HTML = String.raw`<!doctype html>
     </section>
   </div>
 </main>
+
+<main id="tabRules" class="single" hidden>
+  <section class="card">
+    <h2>企画を選ぶ（プリセット）</h2>
+    <p class="hint" style="margin: 0 0 12px;">選ぶと、下のルールがその企画の内容に置き換わります。ギフトの大きさ（1個あたりのダイヤ数）で妨害が変わるので、どのギフトでも動きます。</p>
+    <div class="presets" id="presets"></div>
+  </section>
+
+  <section class="card">
+    <h2>ルール</h2>
+    <p class="hint" style="margin: 0 0 12px;">上から順に見て、最初に合ったルールの妨害を出します。ギフトを連打すると、数も連打の回数だけ増えます。</p>
+    <div class="table-wrap">
+      <table class="rules">
+        <thead><tr><th>順番</th><th>きっかけ</th><th></th><th>妨害</th><th>詳細</th><th>数</th><th>待ち時間（秒）</th><th></th></tr></thead>
+        <tbody id="ruleRows"></tbody>
+      </table>
+    </div>
+    <div class="toolbar">
+      <button id="addRule">＋ ルールを追加</button>
+      <span class="grow"></span>
+      <span class="dirty" id="dirty" hidden>保存していない変更があります</span>
+      <button id="revertRules">元に戻す</button>
+      <button id="saveRules" class="next" style="background: #24533a; border-color: #2f6b4b; font-weight: 700;">保存する</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>最近届いたギフト</h2>
+    <p class="hint" style="margin: 0 0 12px;">配信中に実際に届いたギフトです。押すと、そのギフト名のルールを一番上に追加します。</p>
+    <div class="recent" id="recent"></div>
+  </section>
+</main>
+
+<dialog id="wizard">
+  <div class="steps" id="wizSteps"></div>
+  <div data-step="0">
+    <h2>マイクラの準備</h2>
+    <p class="hint">Minecraft Java版 <span class="mcv"></span> に、必要なものをまとめて入れます。マイクラを閉じた状態で押してください。</p>
+    <ul class="checks setup-checks"></ul>
+    <div class="ready setup-ready" hidden>準備できています。</div>
+    <div class="setup-todo" hidden><button class="primary install-btn">まとめて導入する</button></div>
+  </div>
+  <div data-step="1" hidden>
+    <h2>TikTok ID</h2>
+    <p class="hint">配信するアカウントのIDを入れてください（@なし）。配信が始まると自動でつながります。</p>
+    <input id="wizUsername" autocomplete="off" spellcheck="false" placeholder="例: my_tiktok_id">
+  </div>
+  <div data-step="2" hidden>
+    <h2>企画を選ぶ</h2>
+    <p class="hint">あとから「妨害の設定」でいつでも変えられます。</p>
+    <div class="wizard-presets" id="wizPresets"></div>
+  </div>
+  <div data-step="3" hidden>
+    <h2>準備ができました</h2>
+    <ol class="hint" style="font-size: 15px; line-height: 1.9; color: var(--text);">
+      <li>ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動</li>
+      <li>ワールドを開く（上の「マイクラ」が緑になります）</li>
+      <li>「テスト送信」のボタンで妨害が出るか試す</li>
+      <li>TikTok LIVE を始める</li>
+    </ol>
+  </div>
+  <div class="wizard-actions">
+    <button id="wizBack">戻る</button>
+    <button id="wizNext" class="next">次へ</button>
+  </div>
+</dialog>
 
 <div id="offline">アプリと切断されました。アプリ（黒いウィンドウ）が開いているか確認してください。</div>
 
@@ -218,16 +324,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
     if (document.activeElement !== $('username')) $('username').value = state.tiktokUsername;
 
-    const names = state.giftNames;
-    if ($('quick').dataset.names !== names.join('\n')) {
-      $('quick').dataset.names = names.join('\n');
-      $('quick').replaceChildren(...names.map((name) => {
+    const buttonsKey = JSON.stringify(state.testButtons);
+    if ($('quick').dataset.key !== buttonsKey) {
+      $('quick').dataset.key = buttonsKey;
+      $('quick').replaceChildren(...state.testButtons.map(({ label, body }) => {
         const b = document.createElement('button');
-        b.textContent = name;
-        b.addEventListener('click', () => post('/api/test', { kind: 'gift', giftName: name, count: 1 }));
+        b.textContent = label;
+        b.addEventListener('click', () => post('/api/test', body));
         return b;
       }));
+      const names = state.testButtons.filter((t) => t.body.kind === 'gift' && !t.body.diamonds).map((t) => t.body.giftName);
       $('giftList').replaceChildren(...names.map((name) => Object.assign(document.createElement('option'), { value: name })));
+    }
+
+    if (!rulesDirty) loadRules(state.rules);
+    renderRecent();
+    if (!wizardChecked) {
+      wizardChecked = true;
+      if (!state.tiktokUsername && !storage('redstone.wizardDone')) openWizard();
     }
   }
 
@@ -269,8 +383,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
     if (!$('giftName').value.trim()) return;
     post('/api/test', { kind: 'gift', giftName: $('giftName').value, count: Number($('giftCount').value) });
   });
-  document.querySelectorAll('[data-kind]').forEach((b) =>
-    b.addEventListener('click', () => post('/api/test', { kind: b.dataset.kind })));
 
   function renderSetup(setup) {
     const items = [
@@ -279,7 +391,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       [setup.fabricApi.installed, 'Fabric API', setup.fabricApi.fileName ?? '未導入'],
       [setup.mod.upToDate, 'Project Redstone MOD', setup.mod.upToDate ? setup.mod.fileName : setup.mod.installed ? '古いバージョン（' + setup.mod.fileName + '）' : '未導入'],
     ];
-    $('checks').replaceChildren(...items.map(([ok, name, detail]) => {
+    const make = () => items.map(([ok, name, detail]) => {
       const li = document.createElement('li');
       li.className = ok ? 'yes' : 'no';
       const mark = document.createElement('span');
@@ -292,11 +404,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
       text.append(small);
       li.append(mark, text);
       return li;
-    }));
+    });
+    document.querySelectorAll('.setup-checks').forEach((el) => el.replaceChildren(...make()));
     $('mcVersion').textContent = setup.minecraftVersion;
     document.querySelectorAll('.mcv').forEach((el) => (el.textContent = setup.minecraftVersion));
-    $('setupReady').hidden = !setup.ready;
-    $('setupTodo').hidden = setup.ready;
+    document.querySelectorAll('.setup-ready').forEach((el) => (el.hidden = !setup.ready));
+    document.querySelectorAll('.setup-todo').forEach((el) => (el.hidden = setup.ready));
   }
 
   async function loadSetup() {
@@ -306,15 +419,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
     } catch {}
   }
 
-  $('install').addEventListener('click', async () => {
-    $('install').disabled = true;
-    $('install').textContent = '導入中…';
+  document.querySelectorAll('.install-btn').forEach((button) => button.addEventListener('click', async () => {
+    const all = document.querySelectorAll('.install-btn');
+    all.forEach((b) => { b.disabled = true; b.textContent = '導入中…'; });
     const data = await post('/api/setup/install');
-    $('install').disabled = false;
-    $('install').textContent = 'まとめて導入する';
+    all.forEach((b) => { b.disabled = false; b.textContent = 'まとめて導入する'; });
     if (data?.setup) renderSetup(data.setup);
     else loadSetup();
-  });
+  }));
   window.addEventListener('focus', loadSetup);
   loadSetup();
 
@@ -324,6 +436,275 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('copyOverlay').textContent = 'コピーしました';
     setTimeout(() => ($('copyOverlay').textContent = 'コピー'), 1500);
   });
+
+  function storage(key, value) {
+    try {
+      if (value === undefined) return localStorage.getItem(key);
+      localStorage.setItem(key, value);
+    } catch {}
+    return null;
+  }
+
+  // ---- タブ ----
+  function showTab(id) {
+    document.querySelectorAll('nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
+    $('tabLive').hidden = id !== 'tabLive';
+    $('tabRules').hidden = id !== 'tabRules';
+  }
+  document.querySelectorAll('nav [data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+  // ---- ルールの表 ----
+  const ACTIONS = [
+    ['tnt', 'TNT'], ['mob', 'モブ'], ['bury', '埋め立て'], ['lightning', '雷'],
+    ['launch', '打ち上げ'], ['heal', '全回復'], ['message', 'メッセージだけ'],
+  ];
+  const MOBS = [['zombie', 'ゾンビ'], ['skeleton', 'スケルトン'], ['creeper', 'クリーパー'], ['spider', 'クモ'], ['witch', 'ウィッチ'], ['silverfish', 'シルバーフィッシュ']];
+  const BLOCKS = [['sand', '砂'], ['gravel', '砂利']];
+  const TRIGGERS = [['gift', 'ギフト名'], ['minDiamonds', 'ダイヤ数が以上'], ['giftId', 'ギフトID'], ['follow', 'フォロー'], ['share', 'シェア']];
+  const NO_COUNT = new Set(['message', 'launch', 'heal']);
+  const MAX_COUNT = { tnt: 20, mob: 10, bury: 5, lightning: 5 };
+
+  let rows = [];
+  let rulesDirty = false;
+  let savedRulesKey = '';
+
+  function toRow(rule) {
+    const trigger = rule.event ?? (rule.gift !== undefined ? 'gift' : rule.minDiamonds !== undefined ? 'minDiamonds' : 'giftId');
+    const value = rule.gift ?? rule.minDiamonds ?? rule.giftId ?? '';
+    return { trigger, value: String(value), action: rule.action, mob: rule.mob ?? 'zombie', block: rule.block ?? 'sand',
+      label: rule.label ?? '', count: rule.count ?? 1, cooldownSec: rule.cooldownSec ?? 0, maxCount: rule.maxCount };
+  }
+
+  function toRule(row) {
+    const rule = {};
+    if (row.trigger === 'follow' || row.trigger === 'share') rule.event = row.trigger;
+    else if (row.trigger === 'minDiamonds') rule.minDiamonds = Number(row.value);
+    else if (row.trigger === 'giftId') rule.giftId = row.value.trim();
+    else rule.gift = row.value;
+    rule.action = row.action;
+    if (row.action === 'mob') rule.mob = row.mob;
+    if (row.action === 'bury' && row.block !== 'sand') rule.block = row.block; // 砂は既定なので書かない
+    if (!NO_COUNT.has(row.action)) rule.count = Number(row.count);
+    if (row.label) rule.label = row.label;
+    if (Number(row.cooldownSec) > 0) rule.cooldownSec = Number(row.cooldownSec);
+    if (row.maxCount !== undefined) rule.maxCount = row.maxCount;
+    return rule;
+  }
+
+  function loadRules(rules) {
+    const key = JSON.stringify(rules);
+    if (key === savedRulesKey && rows.length) return;
+    savedRulesKey = key;
+    rows = rules.map(toRow);
+    setDirty(false);
+    renderRows();
+    renderPresets();
+  }
+
+  function setDirty(value) {
+    rulesDirty = value;
+    $('dirty').hidden = !value;
+  }
+
+  function select(options, value, onChange) {
+    const el = document.createElement('select');
+    for (const [v, text] of options) el.append(Object.assign(document.createElement('option'), { value: v, textContent: text }));
+    el.value = value;
+    el.addEventListener('change', () => onChange(el.value));
+    return el;
+  }
+
+  function input(value, onInput, { list, ...attrs } = {}) {
+    const el = Object.assign(document.createElement('input'), attrs);
+    if (list) el.setAttribute('list', list); // list は代入できない
+    el.value = value;
+    el.addEventListener('input', () => onInput(el.value));
+    return el;
+  }
+
+  function cell(...children) {
+    const td = document.createElement('td');
+    td.append(...children);
+    return td;
+  }
+
+  function renderRows() {
+    const change = (row, key, rerender) => (value) => {
+      row[key] = value;
+      setDirty(true);
+      if (rerender) renderRows();
+    };
+    $('ruleRows').replaceChildren(...rows.map((row, i) => {
+      const tr = document.createElement('tr');
+      const up = Object.assign(document.createElement('button'), { textContent: '↑', disabled: i === 0, title: '上へ' });
+      const down = Object.assign(document.createElement('button'), { textContent: '↓', disabled: i === rows.length - 1, title: '下へ' });
+      up.addEventListener('click', () => { [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]]; setDirty(true); renderRows(); });
+      down.addEventListener('click', () => { [rows[i + 1], rows[i]] = [rows[i], rows[i + 1]]; setDirty(true); renderRows(); });
+      const order = cell(up, ' ', down);
+      order.className = 'order';
+
+      const needsValue = row.trigger === 'gift' || row.trigger === 'minDiamonds' || row.trigger === 'giftId';
+      const value = needsValue
+        ? input(row.value, change(row, 'value'), row.trigger === 'minDiamonds'
+          ? { type: 'number', min: 0, className: 'num', placeholder: '1' }
+          : { placeholder: row.trigger === 'gift' ? '例: Rose' : 'ID', list: 'giftList' })
+        : document.createTextNode('');
+
+      let detail;
+      if (row.action === 'mob') detail = select(MOBS, row.mob, change(row, 'mob'));
+      else if (row.action === 'bury') detail = select(BLOCKS, row.block, change(row, 'block'));
+      else detail = input(row.label, change(row, 'label'), { placeholder: row.action === 'message' ? '表示する文（必須）' : '表示する文（任意）', maxLength: 100 });
+
+      const count = NO_COUNT.has(row.action)
+        ? document.createTextNode('—')
+        : input(row.count, change(row, 'count'), { type: 'number', min: 1, max: MAX_COUNT[row.action], className: 'num' });
+      const cooldown = input(row.cooldownSec, change(row, 'cooldownSec'), { type: 'number', min: 0, className: 'num' });
+
+      const del = Object.assign(document.createElement('button'), { textContent: '✕', className: 'del', title: '削除' });
+      del.addEventListener('click', () => { rows.splice(i, 1); setDirty(true); renderRows(); });
+
+      tr.append(
+        order,
+        cell(select(TRIGGERS, row.trigger, change(row, 'trigger', true))),
+        cell(value),
+        cell(select(ACTIONS, row.action, change(row, 'action', true))),
+        cell(detail),
+        cell(count),
+        cell(cooldown),
+        cell(del),
+      );
+      return tr;
+    }));
+  }
+
+  $('addRule').addEventListener('click', () => {
+    rows.push(toRow({ gift: '', action: 'tnt', count: 1 }));
+    setDirty(true);
+    renderRows();
+  });
+  $('revertRules').addEventListener('click', () => {
+    savedRulesKey = '';
+    loadRules(state.rules);
+  });
+  async function saveRules(rules) {
+    const data = await post('/api/rules', { rules });
+    if (data?.ok) {
+      savedRulesKey = '';
+      loadRules(data.state.rules);
+      return true;
+    }
+    return false;
+  }
+  $('saveRules').addEventListener('click', () => saveRules(rows.map(toRule)));
+
+  // ---- プリセット ----
+  let presets = [];
+  // 項目の並び順の違いは無視して比べる
+  const normalize = (rules) => JSON.stringify(rules.map((r) => Object.fromEntries(Object.entries(r).sort(([a], [b]) => (a < b ? -1 : 1)))));
+  const sameRules = (a, b) => normalize(a) === normalize(b);
+
+  function renderPresets() {
+    if (!presets.length || !state) return;
+    $('presets').replaceChildren(...presets.map((preset) => {
+      const b = document.createElement('button');
+      b.className = 'preset' + (sameRules(preset.rules, state.rules) ? ' selected' : '');
+      const name = document.createElement('b');
+      name.textContent = preset.name;
+      const description = document.createElement('span');
+      description.textContent = preset.description;
+      b.append(name, description);
+      b.addEventListener('click', () => {
+        if (rulesDirty && !confirm('保存していない変更は消えます。よろしいですか？')) return;
+        if (!confirm('「' + preset.name + '」にします。今のルールは置き換わります。')) return;
+        saveRules(preset.rules);
+      });
+      return b;
+    }));
+  }
+
+  fetch('/api/presets').then((r) => r.json()).then((data) => {
+    presets = data.presets;
+    renderPresets();
+    renderWizardPresets();
+  }).catch(() => {});
+
+  // ---- 最近届いたギフト ----
+  function renderRecent() {
+    const gifts = state.recentGifts;
+    if (!gifts.length) {
+      $('recent').replaceChildren(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'まだありません（TikTok LIVE につながると、届いたギフトがここに出ます）' }));
+      return;
+    }
+    $('recent').replaceChildren(...gifts.map((gift) => {
+      const b = document.createElement('button');
+      b.textContent = gift.giftName + '（💎' + gift.diamonds + '）';
+      b.addEventListener('click', () => {
+        rows.unshift(toRow({ gift: gift.giftName, action: 'tnt', count: 1 }));
+        setDirty(true);
+        renderRows();
+      });
+      return b;
+    }));
+  }
+
+  // ---- 初回ウィザード ----
+  const STEP_NAMES = ['マイクラの準備', 'TikTok ID', '企画を選ぶ', '完了'];
+  let wizardStep = 0;
+  let wizardChecked = false;
+  let wizardPreset = 'balance';
+
+  function renderWizardPresets() {
+    $('wizPresets').replaceChildren(...presets.map((preset) => {
+      const b = document.createElement('button');
+      b.className = 'preset' + (preset.id === wizardPreset ? ' selected' : '');
+      const name = document.createElement('b');
+      name.textContent = preset.name;
+      const description = document.createElement('span');
+      description.textContent = preset.description;
+      b.append(name, description);
+      b.addEventListener('click', () => { wizardPreset = preset.id; renderWizardPresets(); });
+      return b;
+    }));
+  }
+
+  function showWizardStep(step) {
+    wizardStep = step;
+    document.querySelectorAll('#wizard [data-step]').forEach((el) => (el.hidden = Number(el.dataset.step) !== step));
+    $('wizSteps').textContent = STEP_NAMES.map((name, i) => (i === step ? '● ' : '○ ') + name).join('　');
+    $('wizBack').style.visibility = step === 0 ? 'hidden' : 'visible';
+    $('wizNext').textContent = step === STEP_NAMES.length - 1 ? 'はじめる' : '次へ';
+    if (step === 0) loadSetup();
+    if (step === 1) $('wizUsername').value = state?.tiktokUsername ?? '';
+  }
+
+  function openWizard() {
+    showWizardStep(0);
+    $('wizard').showModal();
+  }
+
+  $('openWizard').addEventListener('click', openWizard);
+  $('wizBack').addEventListener('click', () => showWizardStep(Math.max(0, wizardStep - 1)));
+  $('wizNext').addEventListener('click', async () => {
+    if (wizardStep === 1) {
+      const username = $('wizUsername').value.trim();
+      if (username && username !== state?.tiktokUsername) {
+        const data = await post('/api/tiktok', { username });
+        if (!data?.ok) return;
+      }
+    }
+    if (wizardStep === 2) {
+      const preset = presets.find((p) => p.id === wizardPreset);
+      if (preset && !(await saveRules(preset.rules))) return;
+    }
+    if (wizardStep === STEP_NAMES.length - 1) {
+      storage('redstone.wizardDone', '1');
+      $('wizard').close();
+      showTab('tabLive');
+      return;
+    }
+    showWizardStep(wizardStep + 1);
+  });
+  $('wizard').addEventListener('close', () => storage('redstone.wizardDone', '1'));
 
   const events = new EventSource('/events');
   events.addEventListener('snapshot', (e) => {

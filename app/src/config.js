@@ -7,6 +7,9 @@ const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'event'];
 // MOD が出せるもの（docs/protocol.md）
 const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish'];
 const BURY_BLOCKS = ['sand', 'gravel'];
+const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'block', 'label', 'cooldownSec'];
+const MAX_RULES = 50;
+const MAX_LABEL_LENGTH = 100;
 
 export class ConfigError extends Error {}
 
@@ -41,19 +44,28 @@ export function parseConfig(raw) {
   if (!Array.isArray(raw.rules) || raw.rules.length === 0) {
     throw new ConfigError('rules に妨害のルールを1つ以上書いてください');
   }
+  if (raw.rules.length > MAX_RULES) {
+    throw new ConfigError(`ルールは${MAX_RULES}件までにしてください`);
+  }
   const rules = raw.rules.map((rule, i) => validateRule(rule, i + 1));
 
   return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules };
 }
 
 function validateRule(rule, number) {
-  const where = `rules の${number}番目`;
+  const where = `${number}番目のルール`;
   if (typeof rule !== 'object' || rule === null) {
     throw new ConfigError(`${where}が { ... } の形になっていません`);
   }
   const triggers = TRIGGER_KEYS.filter((key) => rule[key] !== undefined);
   if (triggers.length !== 1) {
     throw new ConfigError(`${where}: gift / giftId / minDiamonds / event のどれか1つだけを書いてください`);
+  }
+  if (rule.gift !== undefined && !(typeof rule.gift === 'string' && rule.gift.trim())) {
+    throw new ConfigError(`${where}: ギフト名を入れてください`);
+  }
+  if (rule.label !== undefined && !(typeof rule.label === 'string' && rule.label.length <= MAX_LABEL_LENGTH)) {
+    throw new ConfigError(`${where}: 表示する文は${MAX_LABEL_LENGTH}文字までにしてください`);
   }
   if (rule.event !== undefined && !SOCIAL_EVENTS.includes(rule.event)) {
     throw new ConfigError(`${where}: event は ${SOCIAL_EVENTS.join(' / ')} のどれかにしてください`);
@@ -81,5 +93,6 @@ function validateRule(rule, number) {
   if (rule.cooldownSec !== undefined && !(Number.isFinite(rule.cooldownSec) && rule.cooldownSec >= 0)) {
     throw new ConfigError(`${where}: cooldownSec は0以上の数にしてください`);
   }
-  return rule;
+  // 知らない項目は捨てる
+  return Object.fromEntries(RULE_KEYS.filter((key) => rule[key] !== undefined).map((key) => [key, key === 'gift' ? rule.gift.trim() : rule[key]]));
 }

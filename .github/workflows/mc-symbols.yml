@@ -1,0 +1,60 @@
+# Minecraft（MOD が対象にしている版）のクラス・関数の名前を調べる。
+# 版が上がると名前がよく変わるので、MOD のコードを書く前にここで確かめる。
+#
+# 使い方: Actions → mc-symbols → Run workflow
+#   classes: 調べたいクラス（例: net.minecraft.world.level.block.Blocks net.minecraft.server.level.ServerPlayer）
+#   grep:    出力をこの言葉で絞る（例: GLASS|teleport）。空ならすべて
+#   find:    クラス名をこの言葉で探す（例: StainedGlass|BossEvent）。空なら探さない
+name: mc-symbols
+
+on:
+  workflow_dispatch:
+    inputs:
+      classes:
+        description: 調べるクラス（空白区切り）
+        required: false
+        default: ''
+      grep:
+        description: 出力の絞り込み（正規表現）
+        required: false
+        default: ''
+      find:
+        description: クラス名の検索（正規表現）
+        required: false
+        default: ''
+
+jobs:
+  symbols:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: gradle
+      # コンパイルすると、Loom が Minecraft 本体を用意する
+      - run: ./gradlew compileJava --no-daemon -q
+      - name: クラス・関数の一覧を出す
+        env:
+          CLASSES: ${{ inputs.classes }}
+          GREP: ${{ inputs.grep }}
+          FIND: ${{ inputs.find }}
+        run: |
+          JAR=$(find ~/.gradle/caches/fabric-loom -name '*.jar' -path '*minecraft*' ! -name '*sources*' -size +10M | head -1)
+          echo "jar: $JAR"
+          if [ -n "$FIND" ]; then
+            echo "===== クラス名の検索: $FIND ====="
+            unzip -Z1 "$JAR" | grep '\.class$' | grep -v '\$' | sed 's/\.class$//; s#/#.#g' | grep -E "$FIND" | head -200
+          fi
+          for CLASS in $CLASSES; do
+            echo "===== $CLASS ====="
+            if [ -n "$GREP" ]; then
+              javap -cp "$JAR" -public "$CLASS" | grep -E "$GREP" || echo "（$GREP に合うものはありません）"
+            else
+              javap -cp "$JAR" -public "$CLASS"
+            fi
+          done

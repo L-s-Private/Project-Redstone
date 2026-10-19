@@ -97,6 +97,29 @@ export async function installAll({ dir, bundledMod, fetch = globalThis.fetch, lo
   return getSetupStatus({ dir, bundledMod });
 }
 
+/**
+ * すでに入っている Project Redstone MOD が古ければ、同梱の新しいものに入れ替える（アプリ起動時に呼ぶ）。
+ * 初めての導入は「まとめて導入」で行うので、入っていなければ何もしない。
+ * @returns {Promise<'updated' | 'up_to_date' | 'not_installed' | 'busy'>}
+ */
+export async function updateModIfOutdated({ dir, bundledMod, log = () => {} }) {
+  if (!bundledMod) return 'not_installed';
+  const status = await getSetupStatus({ dir, bundledMod });
+  if (!status.mod.installed) return 'not_installed';
+  if (status.mod.upToDate) return 'up_to_date';
+  try {
+    await replaceMods(dir, OUR_MOD_FILE, bundledMod.fileName, await bundledMod.read());
+  } catch (e) {
+    if (['EBUSY', 'EPERM', 'EACCES'].includes(e.code)) {
+      log('warn', `MOD を新しくできませんでした（マイクラが開いているかもしれません）。マイクラを閉じてから「まとめて導入する」を押してください`);
+      return 'busy';
+    }
+    throw e;
+  }
+  log('ok', `MOD を新しい版に入れ替えました（${status.mod.fileName} → ${bundledMod.fileName}）`);
+  return 'updated';
+}
+
 async function installFabricLoader(dir, http) {
   const loaders = await http.json(`${FABRIC_META}/versions/loader/${MINECRAFT_VERSION}`);
   if (!Array.isArray(loaders) || loaders.length === 0) {

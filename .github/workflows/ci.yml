@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
+  workflow_dispatch:
 
 jobs:
   app:
@@ -15,10 +19,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: electron-linux-${{ hashFiles('app/package-lock.json') }}
       - run: npm ci
       - run: npm test
       # 配布と同じ形（asar にまとめた状態）で起動して、入れ忘れたファイルがないか確かめる
-      - name: 配布形式にまとめたデスクトップ版を起動して画面を撮る
+      - name: 配布形式にまとめたデスクトップ版を起動して確かめる
         run: |
           mkdir -p ../mod/build/libs "$RUNNER_TEMP/mc"
           npx electron-builder --linux dir --publish never
@@ -43,6 +55,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
+          # Minecraft 本体や Fabric のダウンロードも ~/.gradle に入るので、まとめて使い回す
+          cache: gradle
       - run: ./gradlew build --no-daemon
       - uses: actions/upload-artifact@v4
         with:
@@ -60,6 +74,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-windows-${{ hashFiles('app/package-lock.json') }}
       - uses: actions/download-artifact@v4
         with:
           name: project-redstone-mod
@@ -72,3 +94,5 @@ jobs:
         with:
           name: project-redstone-app-windows
           path: app/dist/*.exe
+          # exe はほとんど圧縮できないので、zip 化の時間を省く
+          compression-level: 0

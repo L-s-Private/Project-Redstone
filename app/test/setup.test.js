@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/prom
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { getSetupStatus, installAll, minecraftDir, PROFILE_KEY, SetupError } from '../src/setup.js';
+import { getSetupStatus, installAll, minecraftDir, PROFILE_KEY, SetupError, updateModIfOutdated } from '../src/setup.js';
 
 const FABRIC_API_JAR = Buffer.from('fabric-api-jar');
 const LOADER_ID = 'fabric-loader-0.19.5-26.3';
@@ -127,4 +127,22 @@ test('同梱の MOD がないときは、ほかの2つだけ入れる', async ()
   assert.equal(status.fabricApi.installed, true);
   assert.equal(status.mod.installed, false);
   assert.ok(logs.some((l) => l.includes('MOD が入っていない')));
+});
+
+test('起動時に、古い MOD だけを新しいものへ入れ替える（入っていなければ何もしない）', async () => {
+  const dir = await minecraftFolder();
+  const logs = [];
+  const log = (level, text) => logs.push(text);
+  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('project-redstone-0.4.0.jar'), log }), 'not_installed');
+
+  await mkdir(join(dir, 'mods'));
+  await writeFile(join(dir, 'mods', 'project-redstone-0.3.0.jar'), 'old');
+  await writeFile(join(dir, 'mods', 'sodium.jar'), 'other');
+  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('project-redstone-0.4.0.jar'), log }), 'updated');
+  assert.deepEqual((await readdir(join(dir, 'mods'))).sort(), ['project-redstone-0.4.0.jar', 'sodium.jar']);
+  assert.equal(await readFile(join(dir, 'mods', 'project-redstone-0.4.0.jar'), 'utf8'), 'mod:project-redstone-0.4.0.jar');
+  assert.ok(logs.some((l) => l.includes('0.3.0.jar → project-redstone-0.4.0.jar')));
+
+  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('project-redstone-0.4.0.jar'), log }), 'up_to_date');
+  assert.equal(await updateModIfOutdated({ dir, bundledMod: null, log }), 'not_installed');
 });

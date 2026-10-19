@@ -146,7 +146,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 </head>
 <body>
 <header>
-  <h1>Project <span>Redstone</span></h1>
+  <h1>Project <span>Redstone</span> <small id="appVersion" style="color: var(--muted); font-size: 12px; font-weight: 400;"></small></h1>
   <nav>
     <button class="active" data-tab="tabLive">配信</button>
     <button data-tab="tabRules">妨害の設定</button>
@@ -334,6 +334,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   function renderState(next) {
     state = next;
+    $('appVersion').textContent = state.version ? 'v' + state.version : '';
     let tiktok;
     if (state.mock) tiktok = ['warn', 'テストモード'];
     else if (!state.tiktokUsername) tiktok = ['bad', 'ID未設定'];

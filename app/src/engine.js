@@ -66,9 +66,10 @@ export function describeAction(action) {
  *   'alert' {who, action}  妨害を出したとき（オーバーレイ用）
  */
 export class Engine extends EventEmitter {
-  constructor({ config, client, tiktok, now = Date.now }) {
+  constructor({ config, client, tiktok, now = Date.now, version = '' }) {
     super();
     this.config = config;
+    this.version = version;
     this.now = now;
     this.client = client ?? new ModClient(config.mod);
     this.tiktok = tiktok ?? new TikTokSource();
@@ -103,6 +104,7 @@ export class Engine extends EventEmitter {
 
   get state() {
     return {
+      version: this.version,
       mock: this.mock,
       paused: this.dispatcher.paused,
       tiktok: this.tiktok.status,

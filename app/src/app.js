@@ -5,7 +5,8 @@ import { dirname, join } from 'node:path';
 import { loadBundledMod } from './bundledMod.js';
 import { Engine } from './engine.js';
 import { createUiServer, DEFAULT_UI_PORT } from './server.js';
-import { getSetupStatus, installAll, minecraftDir } from './setup.js';
+import { getSetupStatus, installAll, minecraftDir, updateModIfOutdated } from './setup.js';
+import pkg from '../package.json' with { type: 'json' };
 import { loadUserConfig, saveUserConfig } from './userConfig.js';
 
 /**
@@ -20,7 +21,7 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const { config, path: configPath, created, removed } = await loadUserConfig();
   const logFile = join(dirname(configPath), 'app.log');
 
-  const engine = new Engine({ config });
+  const engine = new Engine({ config, version: pkg.version });
   engine.on('log', (entry) => {
     onLog(entry);
     // 困ったときに送ってもらえるよう、ファイルにも残す
@@ -43,7 +44,10 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const ui = createUiServer({ engine, port, setup, saveConfig: (c) => saveUserConfig(configPath, c) });
   await ui.listen();
 
-  engine.log('info', `設定ファイル: ${configPath}${created ? '（新しく作りました）' : ''}`);
+  engine.log('info', `Project Redstone v${pkg.version} / 設定ファイル: ${configPath}${created ? '（新しく作りました）' : ''}`);
+  await updateModIfOutdated({ dir, bundledMod, log: (level, text) => engine.log(level, text) }).catch((e) => {
+    engine.log('warn', `MOD の更新を確かめられませんでした: ${e.message}`);
+  });
   if (removed) engine.log('warn', `前の版の妨害（砂・雷・打ち上げ・回復）のルールを ${removed}件 取り除きました`);
   engine.start({ mock });
 

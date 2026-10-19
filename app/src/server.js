@@ -1,7 +1,7 @@
 // 画面版の Web サーバー。操作画面（/）と LIVE Studio 用オーバーレイ（/overlay）を出す。
 // 同じPCからしか開けないよう 127.0.0.1 にだけ待ち受け、ほかのサイトからの操作（CSRF・DNSリバインディング）も断る。
 import http from 'node:http';
-import { ConfigError, parseConfig } from './config.js';
+import { ConfigError, MOBS, parseConfig } from './config.js';
 import { OVERLAY_HTML } from './ui/overlay.js';
 import { PANEL_HTML } from './ui/panel.js';
 
@@ -54,21 +54,34 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
       await saveConfig(engine.config);
     },
     'POST /api/fill/start': async (body) => {
-      const { width, height, countdown, wall, block, skyY, reach } = body;
+      const { width, height, countdown, wall, block, skyY, reach, placeSpeed } = body;
       try {
-        await engine.startFill({ width, height, countdown, wall, block, skyY, reach });
+        await engine.startFill({ width, height, countdown, wall, block, skyY, reach, placeSpeed });
       } catch (e) {
         return { status: 400, error: e.message };
       }
       await saveConfig(engine.config);
     },
     'POST /api/action': async (body) => {
-      // 画面のボタンから出せるのは、埋め立ての操作と TNT だけ
-      const counts = { tnt: [1, 20], fill_expand: [1, 5], fill_shrink: [1, 5], fill_help: [1, 64] };
-      const range = counts[body.type];
-      if (!range) return { status: 400, error: 'この操作はできません' };
-      const count = Math.min(range[1], Math.max(range[0], Math.floor(Number(body.count)) || 1));
-      const result = await engine.manualAction({ type: body.type, count, from: '' });
+      // 画面のボタン（配信タブ・テストタブ）から出せるもの
+      const counts = { tnt: [1, 20], mob: [1, 10], fill_expand: [1, 5], fill_shrink: [1, 5], fill_help: [1, 64] };
+      let action;
+      if (body.type === 'fill_set') {
+        // テスト用: 枠の中を指定の割合まで一気に埋める（0 なら空にする）
+        const percent = Math.min(100, Math.max(0, Math.floor(Number(body.percent))));
+        if (!Number.isFinite(percent)) return { status: 400, error: '割合が正しくありません' };
+        action = { type: 'fill_set', percent, from: '' };
+      } else {
+        const range = counts[body.type];
+        if (!range) return { status: 400, error: 'この操作はできません' };
+        const count = Math.min(range[1], Math.max(range[0], Math.floor(Number(body.count)) || 1));
+        action = { type: body.type, count, from: '' };
+        if (body.type === 'mob') {
+          if (!MOBS.includes(body.mob)) return { status: 400, error: 'このモブは出せません' };
+          action.mob = body.mob;
+        }
+      }
+      const result = await engine.manualAction(action);
       if (result.status === 'failed') return { status: 400, error: result.error };
       if (result.status === 'paused') return { status: 400, error: '一時停止中です' };
     },

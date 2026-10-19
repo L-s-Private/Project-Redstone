@@ -11,7 +11,7 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
 | `id` | 文字列 | 応答と対応づけるためのID（任意） |
-| `type` | 文字列 | `ping` / `tnt` / `mob` / `message` / `fill_start` / `fill_stop` / `fill_expand` / `fill_shrink` / `fill_help` |
+| `type` | 文字列 | `ping` / `tnt` / `mob` / `message` / `fill_start` / `fill_stop` / `fill_expand` / `fill_shrink` / `fill_help` / `fill_set` |
 | `count` | 数値 | 回数。種類ごとの上限で丸める（`tnt` 20、`mob` 10、`fill_expand`・`fill_shrink` 5マス、`fill_help` 64個） |
 | `from` | 文字列 | ギフトを送った人の表示名（画面表示用、最大32文字） |
 | `label` | 文字列 | 画面に出す文言（最大100文字）。`message` では本文 |
@@ -22,6 +22,8 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | `block` | 文字列 | `fill_start` で配る・お助けで置くブロック。`amethyst_block`（既定）`diamond_block` `emerald_block` `gold_block` `iron_block` `lapis_block` `redstone_block` `quartz_block` |
 | `skyY` | 数値 | `fill_start` の枠の床の高さ（既定150。ワールドの高さに収まるよう丸める） |
 | `reach` | 数値 | `fill_start` で設定するブロックを置ける距離（1〜64。既定8。バニラは4.5） |
+| `placeSpeed` | 文字列 | `fill_start` で設定する、右クリック押しっぱなしで置く速さ。`normal`（1秒に5個・バニラ）/ `fast`（10個・既定）/ `fastest`（20個） |
+| `percent` | 数値 | `fill_set` で埋める割合（0〜100。既定100） |
 
 ### 妨害の内容
 
@@ -33,10 +35,11 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 
 空中（天空）に作った枠の中を、ブロックで埋めきるゲーム。埋めきるとカウントダウンが始まり、崩されずに 0 になればクリア。進み具合はボスバーに出る。壊れた枠は自動で直り、枠から落ちたプレイヤーは枠の上に戻される。
 
-- `fill_start`: プレイヤーの真上、高さ `skyY` に枠（`wall`）を作り、プレイヤーを中へ移す。`block` を64個配り、届く距離を `reach` にする（前のゲームは終わる）。
+- `fill_start`: プレイヤーの真上、高さ `skyY` に枠（`wall`）を作り、プレイヤーを中へ移す。`block` を渡し、置いても減らないようにする（手に持っている分をいつも64個に戻す）。届く距離を `reach`、置く速さを `placeSpeed` にする（前のゲームは終わる）。埋め立て中に落とした TNT は枠と床を壊さず、爆心から半径3マス以内の中のブロックだけを消す（アイテムは落ちない）。枠のまわりに落ちたアイテムは消す。
 - `fill_stop`: ゲームを終える（置いたブロックはそのまま。届く距離は元に戻す）。
 - `fill_expand` / `fill_shrink`: 枠を `count` マス広げる / 縮める。縮めて枠の外に出たブロックは消える。
 - `fill_help`: 空いているマスを下の段から `count` 個、`block` で埋める（お助け）。
+- `fill_set`: テスト用。中を下の段から `percent`% まで埋め、残りを空にする（0 なら空にする）。クリア後でも100%未満にすれば埋め立て中に戻る。
 
 `fill_expand` などは、埋め立てが始まっていないと `"埋め立てが始まっていません"` で断る。
 

@@ -5,7 +5,7 @@ export const DEFAULT_MOD_PORT = 25599;
 
 const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event'];
 // MOD が出せるもの（docs/protocol.md）
-const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
+export const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
 const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec'];
 const MAX_RULES = 50;
 const MAX_LABEL_LENGTH = 100;
@@ -13,7 +13,9 @@ const MAX_LABEL_LENGTH = 100;
 // 埋め立ての設定（MOD の docs/protocol.md と同じ値）
 export const FILL_WALLS = ['glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock'];
 export const FILL_BLOCKS = ['amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block', 'quartz_block'];
-export const DEFAULT_FILL = { width: 11, height: 9, countdown: 10, wall: 'glass', block: 'amethyst_block', skyY: 150, reach: 8 };
+/** ブロックを置く速さ（右クリック押しっぱなし）。normal はバニラと同じ */
+export const FILL_PLACE_SPEEDS = ['normal', 'fast', 'fastest'];
+export const DEFAULT_FILL = { width: 11, height: 9, countdown: 10, wall: 'glass', block: 'amethyst_block', skyY: 150, reach: 8, placeSpeed: 'fast' };
 
 /** 埋め立ての設定を読む。おかしな値は既定値にする（設定ファイルが壊れても起動できるように） */
 export function parseFill(raw = {}) {
@@ -30,6 +32,7 @@ export function parseFill(raw = {}) {
     block: FILL_BLOCKS.includes(fill.block) ? fill.block : DEFAULT_FILL.block,
     skyY: int(fill.skyY, DEFAULT_FILL.skyY, -60, 300),
     reach: int(fill.reach, DEFAULT_FILL.reach, 1, 64),
+    placeSpeed: FILL_PLACE_SPEEDS.includes(fill.placeSpeed) ? fill.placeSpeed : DEFAULT_FILL.placeSpeed,
   };
 }
 

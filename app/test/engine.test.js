@@ -155,7 +155,7 @@ test('いいねは回数がたまるたびに出し、端数は次に持ち越�
 test('埋め立ての開始・終了を MOD に送り、断られたら理由を返す', async () => {
   const { engine, client } = setup();
   await engine.startFill({ width: 15, height: 5, countdown: 30, block: 'diamond_block' });
-  const sent = { width: 15, height: 5, countdown: 30, wall: 'glass', block: 'diamond_block', skyY: 150, reach: 8 };
+  const sent = { width: 15, height: 5, countdown: 30, wall: 'glass', block: 'diamond_block', skyY: 150, reach: 8, placeSpeed: 'fast' };
   assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent });
   assert.deepEqual(engine.config.fill, sent, '使った設定を覚える');
   assert.deepEqual(engine.state.fillSettings, sent);

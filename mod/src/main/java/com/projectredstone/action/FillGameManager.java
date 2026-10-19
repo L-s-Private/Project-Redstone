@@ -14,11 +14,17 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +34,7 @@ import java.util.UUID;
 /**
  * 埋め立てモードを Minecraft の上で動かす。
  * 枠は空中（天空）に作り、プレイヤーを中へ移す。落ちたら枠の上に戻す。進み具合はボスバーに出す。
+ * 埋めるブロックは減らない（いつも64個にしておく）。TNT は枠を壊さず、中のブロックだけを消す（アイテムも落とさない）。
  * status() と running() 以外はサーバースレッドから呼ぶこと。
  */
 public final class FillGameManager {
@@ -40,10 +47,21 @@ public final class FillGameManager {
 
     private static final Random RANDOM = new Random();
 
+    /** TNT が中のブロックを消す半径（バニラの TNT とだいたい同じ） */
+    private static final double BLAST_RADIUS = 3.0;
+    /** 見た目と音、プレイヤーへのダメージ用の爆発の強さ（バニラの TNT と同じ） */
+    private static final float BLAST_POWER = 4.0f;
+    private static final int STACK = 64;
+
     private static FillGame game;
     private static LevelWorld world;
     private static ServerBossEvent bar;
     private static int ticks;
+    private static ItemStack fillerStack = ItemStack.EMPTY;
+    /** 枠に落とした TNT。爆発の直前に、枠を壊さない爆発へ差し替える */
+    private static final List<PrimedTnt> trackedTnt = new ArrayList<>();
+    /** ブロックを置く間隔（tick）。0 なら変えない。クライアント側（RedstoneClient）から読む */
+    private static volatile int placeDelayTicks;
     /** 届く距離を元に戻すため、変える前の値を覚えておく */
     private static final Map<UUID, Double> originalReach = new HashMap<>();
     /** アプリへの応答用（通信スレッドから読む） */
@@ -60,6 +78,10 @@ public final class FillGameManager {
         return lastStatus;
     }
 
+    public static int placeDelayTicks() {
+        return placeDelayTicks;
+    }
+
     /** プレイヤーの真上の空中に枠を作り、中へ移す */
     public static void start(ServerPlayer player, ActionRequest request) {
         stop(player.level().getServer());
@@ -74,8 +96,10 @@ public final class FillGameManager {
         game = FillGame.create(world, feet.getX(), floorY, feet.getZ(), request.width(), height, request.countdown());
 
         moveIntoFrame(player);
-        player.getInventory().add(new ItemStack(filler.asItem(), 64));
+        fillerStack = new ItemStack(filler.asItem(), STACK);
+        refillBlocks(player);
         setReach(player, request.reach());
+        placeDelayTicks = request.placeDelayTicks();
 
         bar = new ServerBossEvent(UUID.randomUUID(), Component.literal("埋め立て"), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS);
         bar.addPlayer(player);
@@ -93,6 +117,9 @@ public final class FillGameManager {
             }
         }
         originalReach.clear();
+        trackedTnt.clear();
+        fillerStack = ItemStack.EMPTY;
+        placeDelayTicks = 0;
         game = null;
         world = null;
         bar = null;
@@ -116,6 +143,20 @@ public final class FillGameManager {
         return placed;
     }
 
+    /** デバッグ用: 中を percent% まで一気に埋める（0 なら空にする） */
+    public static void setFillPercent(int percent) {
+        if (game == null) {
+            return;
+        }
+        game.setFillPercent(world, percent);
+        update();
+    }
+
+    /** 枠に落とした TNT を覚えておく（爆発を枠を壊さないものに差し替えるため） */
+    public static void trackTnt(PrimedTnt tnt) {
+        trackedTnt.add(tnt);
+    }
+
     /** 埋め立て中なら、TNT を落とす位置（枠の真上）を返す。そうでなければ null */
     public static List<double[]> tntPositions(int count) {
         if (game == null || game.phase() == FillGame.Phase.CLEARED) {
@@ -125,9 +166,19 @@ public final class FillGameManager {
     }
 
     public static void onServerTick(MinecraftServer server) {
-        if (game == null || ++ticks % CHECK_INTERVAL_TICKS != 0) {
+        if (game == null) {
             return;
         }
+        explodeTrackedTnt();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.level() == world.level()) {
+                refillBlocks(player);
+            }
+        }
+        if (++ticks % CHECK_INTERVAL_TICKS != 0) {
+            return;
+        }
+        removeDroppedItems();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             // 途中で入り直したプレイヤーにもボスバーを見せる
             bar.addPlayer(player);
@@ -142,6 +193,57 @@ public final class FillGameManager {
             }
         }
         update();
+    }
+
+    /**
+     * 爆発する直前（残り1tick）の TNT を消して、ブロックを壊さない爆発（見た目・音・ダメージだけ）に差し替える。
+     * ブロックは FillGame.blast で枠の中のものだけを消す。setBlock で消すのでアイテムは落ちない。
+     */
+    private static void explodeTrackedTnt() {
+        boolean changed = false;
+        for (var it = trackedTnt.iterator(); it.hasNext(); ) {
+            PrimedTnt tnt = it.next();
+            if (tnt.isRemoved()) {
+                it.remove();
+            } else if (tnt.getFuse() <= 1) {
+                it.remove();
+                double x = tnt.getX();
+                double y = tnt.getY();
+                double z = tnt.getZ();
+                tnt.discard();
+                world.level().explode(null, x, y, z, BLAST_POWER, Level.ExplosionInteraction.NONE);
+                game.blast(world, x, y, z, BLAST_RADIUS);
+                changed = true;
+            }
+        }
+        if (changed) {
+            update();
+        }
+    }
+
+    /** 埋めるブロックを減らさない: 手に持っていれば64個に戻し、持ち物になければ64個渡す */
+    private static void refillBlocks(ServerPlayer player) {
+        if (fillerStack.isEmpty()) {
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        ItemStack held = inventory.getSelectedItem();
+        if (ItemStack.isSameItem(held, fillerStack)) {
+            if (held.getCount() < STACK) {
+                held.setCount(STACK);
+            }
+        } else if (!inventory.contains(fillerStack)) {
+            inventory.add(fillerStack.copy());
+        }
+    }
+
+    /** 枠のまわりに落ちたアイテム（クリーパーの爆発や、手で壊したブロック）を消す */
+    private static void removeDroppedItems() {
+        int[] a = game.area();
+        AABB box = new AABB(a[0] - 2, a[1] - 2, a[2] - 2, a[3] + 3, a[4] + 1, a[5] + 3);
+        for (ItemEntity item : world.level().getEntitiesOfClass(ItemEntity.class, box)) {
+            item.discard();
+        }
     }
 
     private static Block blockById(String id, Block fallback) {

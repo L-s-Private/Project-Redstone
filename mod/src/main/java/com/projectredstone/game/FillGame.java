@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * 埋め立てモード。岩盤で囲った枠の中を、配信者がブロックで埋めきるゲーム。
+ * 埋め立てモード。枠（ガラスなど）で囲ったの中を、配信者がブロックで埋めきるゲーム。
  * 全部埋まるとカウントダウンが始まり、崩されずに 0 になればクリア。
  * Minecraft に依存しないので単体テストできる（ワールドの読み書きは World に任せる）。
  */
@@ -154,6 +154,54 @@ public final class FillGame {
         return placed;
     }
 
+    /**
+     * デバッグ用: 中を下の段から percent% まで埋め、残りを空にする。クリア後でもやり直せるよう、埋めきらなければ埋め立て中に戻す。
+     * @return 埋まっているマスの数
+     */
+    public int setFillPercent(World world, int percent) {
+        int target = (int) Math.round(total() * clamp(percent, 0, 100) / 100.0);
+        int[] index = {0};
+        forEachInterior((x, y, z) -> {
+            if (index[0]++ < target) {
+                if (!world.isFilled(x, y, z)) {
+                    world.setFiller(x, y, z);
+                }
+            } else {
+                world.setAir(x, y, z);
+            }
+        });
+        recount(world);
+        if (filled < total()) {
+            phase = Phase.FILLING;
+        }
+        return filled;
+    }
+
+    /**
+     * TNT の爆発。(x, y, z) から radius 以内の、枠の中のマスだけを空にする（枠と床は壊さない）。
+     * @return 空にしたマスの数
+     */
+    public int blast(World world, double x, double y, double z, double radius) {
+        int[] removed = {0};
+        forEachInterior((bx, by, bz) -> {
+            double ddx = bx + 0.5 - x;
+            double ddy = by + 0.5 - y;
+            double ddz = bz + 0.5 - z;
+            if (ddx * ddx + ddy * ddy + ddz * ddz <= radius * radius && world.isFilled(bx, by, bz)) {
+                world.setAir(bx, by, bz);
+                removed[0]++;
+            }
+        });
+        recount(world);
+        return removed[0];
+    }
+
+    /** 枠と、その上の TNT が落ちてくる空間を含む範囲 {minX, minY, minZ, maxX, maxY, maxZ}（両端を含む） */
+    public int[] area() {
+        int ring = radius + 1;
+        return new int[] {centerX - ring, floorY - 1, centerZ - ring, centerX + ring, floorY + height + 3, centerZ + ring};
+    }
+
     /** TNT を落とす位置（枠の真上）。{x, y, z} を count 個返す。座標はブロックの中心。 */
     public List<double[]> dropPositions(int count, Random random) {
         List<double[]> positions = new ArrayList<>();
@@ -244,10 +292,11 @@ public final class FillGame {
         void apply(int x, int y, int z);
     }
 
+    /** 中のマスを、下の段から順にたどる */
     private void forEachInterior(CellAction action) {
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                for (int y = floorY; y < floorY + height; y++) {
+        for (int y = floorY; y < floorY + height; y++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
                     action.apply(centerX + dx, y, centerZ + dz);
                 }
             }

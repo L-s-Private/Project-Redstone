@@ -191,7 +191,7 @@ test('埋め立ての開始・終了を伝え、断られたら理由を返す',
       throw new Error('埋め立てが始まっていません');
     };
     assert.equal((await json(port, '/api/fill/start', { width: 15, block: 'diamond_block', junk: 1 })).status, 200);
-    assert.deepEqual(calls, [{ width: 15, height: undefined, countdown: undefined, wall: undefined, block: 'diamond_block', skyY: undefined, reach: undefined }]);
+    assert.deepEqual(calls, [{ width: 15, height: undefined, countdown: undefined, wall: undefined, block: 'diamond_block', skyY: undefined, reach: undefined, placeSpeed: undefined }]);
     assert.equal(saved.length, 1, '始めたら設定を保存する');
     const stop = await json(port, '/api/fill/stop', {});
     assert.equal(stop.status, 400);
@@ -203,5 +203,26 @@ test('テスト送信でいいねも送れる', async () => {
   await withServer(async ({ engine, port }) => {
     await json(port, '/api/test', { kind: 'like', count: 1000 });
     assert.deepEqual(engine.calls, [{ kind: 'like', count: 1000, from: 'テスト' }]);
+  });
+});
+
+test('テストタブの操作: 一気に埋める・モブを出す（決まったものだけ）', async () => {
+  await withServer(async ({ engine, port }) => {
+    const actions = [];
+    engine.manualAction = async (action) => {
+      actions.push(action);
+      return { status: 'sent', action };
+    };
+    assert.equal((await json(port, '/api/action', { type: 'fill_set', percent: 150 })).status, 200);
+    assert.equal((await json(port, '/api/action', { type: 'fill_set', percent: 0 })).status, 200);
+    assert.equal((await json(port, '/api/action', { type: 'fill_set' })).status, 400);
+    assert.equal((await json(port, '/api/action', { type: 'mob', mob: 'creeper', count: 99 })).status, 200);
+    assert.equal((await json(port, '/api/action', { type: 'mob', mob: 'wither' })).status, 400);
+    assert.equal((await json(port, '/api/action', { type: 'fill_start' })).status, 400);
+    assert.deepEqual(actions, [
+      { type: 'fill_set', percent: 100, from: '' },
+      { type: 'fill_set', percent: 0, from: '' },
+      { type: 'mob', count: 10, from: '', mob: 'creeper' },
+    ]);
   });
 });

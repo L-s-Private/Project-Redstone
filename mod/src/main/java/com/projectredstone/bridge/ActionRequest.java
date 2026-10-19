@@ -13,9 +13,10 @@ import java.util.Set;
  * 値の検証と上限の丸めはここで済ませ、実行側は信頼して使ってよい。
  */
 public record ActionRequest(String id, Type type, int count, String from, String label, String mob,
-                            int width, int height, int countdown, String wall, String block, int skyY, int reach) {
+                            int width, int height, int countdown, String wall, String block, int skyY, int reach,
+                            String placeSpeed, int percent) {
 
-    public enum Type { PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP }
+    public enum Type { PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET }
 
     /** 1回の要求で出せる数の上限。配信中の事故とサーバー負荷を防ぐ。 */
     public static final Map<Type, Integer> MAX_COUNT = Map.of(
@@ -44,6 +45,9 @@ public record ActionRequest(String id, Type type, int count, String from, String
     /** ブロックを置ける距離。バニラは 4.5（クリエイティブは 5） */
     public static final int DEFAULT_REACH = 8;
     public static final int MAX_REACH = 64;
+    /** ブロックを置く速さ。押しっぱなしで置ける間隔（tick）。バニラは 4（1秒に5個） */
+    public static final Map<String, Integer> PLACE_DELAY_TICKS = Map.of("normal", 4, "fast", 2, "fastest", 1);
+    public static final String DEFAULT_PLACE_SPEED = "fast";
 
     static final int MAX_FROM_LENGTH = 32;
     static final int MAX_LABEL_LENGTH = 100;
@@ -98,7 +102,19 @@ public record ActionRequest(String id, Type type, int count, String from, String
         int skyY = optInt(json, "skyY", DEFAULT_SKY_Y);
         int reach = Math.max(1, Math.min(MAX_REACH, optInt(json, "reach", DEFAULT_REACH)));
 
-        return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach);
+        String placeSpeed = optString(json, "placeSpeed", DEFAULT_PLACE_SPEED);
+        if (!PLACE_DELAY_TICKS.containsKey(placeSpeed)) {
+            throw new InvalidRequestException("未対応の置く速さです: " + placeSpeed);
+        }
+        // fill_set（デバッグ用）: 埋める割合 0〜100
+        int percent = Math.max(0, Math.min(100, optInt(json, "percent", 100)));
+
+        return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach, placeSpeed, percent);
+    }
+
+    /** 押しっぱなしで次のブロックを置けるまでの tick 数 */
+    public int placeDelayTicks() {
+        return PLACE_DELAY_TICKS.get(placeSpeed);
     }
 
     private static Type parseType(String raw) throws InvalidRequestException {
@@ -115,6 +131,7 @@ public record ActionRequest(String id, Type type, int count, String from, String
             case "fill_expand" -> Type.FILL_EXPAND;
             case "fill_shrink" -> Type.FILL_SHRINK;
             case "fill_help" -> Type.FILL_HELP;
+            case "fill_set" -> Type.FILL_SET;
             default -> throw new InvalidRequestException("未対応の type です: " + raw);
         };
     }

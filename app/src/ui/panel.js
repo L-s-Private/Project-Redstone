@@ -150,6 +150,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <nav>
     <button class="active" data-tab="tabLive">配信</button>
     <button data-tab="tabRules">妨害の設定</button>
+    <button data-tab="tabDebug">テスト</button>
     <button id="openWizard">はじめの設定</button>
   </nav>
   <span class="chip"><span class="dot" id="tiktokDot"></span>TikTok: <span id="tiktokText">—</span></span>
@@ -186,13 +187,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
             <option value="light_blue_stained_glass">空色のガラス</option><option value="bedrock">岩盤</option>
           </select></div>
           <div><label for="fillReach">届く距離（マス）</label><input id="fillReach" type="number" min="1" max="64"></div>
+          <div><label for="fillPlaceSpeed">置く速さ（押しっぱなし）</label><select id="fillPlaceSpeed">
+            <option value="normal">ふつう（1秒に5個）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
+          </select></div>
           <div><label for="fillWidth">枠の幅（マス）</label><input id="fillWidth" type="number" min="3" max="41" step="2"></div>
           <div><label for="fillHeight">枠の高さ（マス）</label><input id="fillHeight" type="number" min="1" max="30"></div>
           <div><label for="fillSkyY">枠を作る高さ（Y）</label><input id="fillSkyY" type="number" min="-60" max="300"></div>
           <div><label for="fillCountdown">埋めきってからクリアまで（秒）</label><input id="fillCountdown" type="number" min="0" max="600"></div>
         </div>
         <button class="primary" id="fillStart">埋め立てを始める</button>
-        <p class="hint">押すと、マイクラのプレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックが64個配られ、届く距離が伸びます（終えると元に戻ります）。枠から落ちると、自動で枠の上に戻ります。</p>
+        <p class="hint">押すと、マイクラのプレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは置いても減らず、届く距離と置く速さが上がります（終えると元に戻ります）。枠から落ちると、自動で枠の上に戻ります。TNT は枠を壊さず、中のブロックだけを消します。</p>
       </div>
       <div id="fillRunning" hidden>
         <div class="fill-text"><span id="fillPhase"></span><b id="fillPercent"></b></div>
@@ -289,6 +293,56 @@ export const PANEL_HTML = String.raw`<!doctype html>
   </section>
 </main>
 
+<main id="tabDebug" class="single" hidden>
+  <section class="card">
+    <h2>埋め立て（始めてから使えます）</h2>
+    <div class="quick">
+        <button data-action="fill_set" data-percent="100">一気に埋める（100%）</button>
+        <button data-action="fill_set" data-percent="90">90% まで埋める</button>
+        <button data-action="fill_set" data-percent="50">50% まで埋める</button>
+        <button data-action="fill_set" data-percent="0">枠の中を空にする</button>
+    </div>
+    <p class="hint">下の段から順に埋めます。100% にするとカウントダウンが始まり、クリア後でも割合を下げればやり直せます。</p>
+  </section>
+  <section class="card">
+    <h2>妨害を出す</h2>
+    <div class="quick">
+        <button data-action="tnt">TNT ×1</button>
+        <button data-action="tnt" data-count="5">TNT ×5</button>
+        <button data-action="tnt" data-count="20">TNT ×20</button>
+        <button data-action="fill_help" data-count="10">お助け +10</button>
+        <button data-action="fill_help" data-count="64">お助け +64</button>
+        <button data-action="fill_expand">枠 +1</button>
+        <button data-action="fill_shrink">枠 −1</button>
+    </div>
+    <div class="quick" style="margin-top: 8px;">
+        <button data-action="mob" data-mob="zombie">ゾンビ</button>
+        <button data-action="mob" data-mob="skeleton">スケルトン</button>
+        <button data-action="mob" data-mob="creeper">クリーパー</button>
+        <button data-action="mob" data-mob="spider">クモ</button>
+        <button data-action="mob" data-mob="witch">ウィッチ</button>
+        <button data-action="mob" data-mob="silverfish">シルバーフィッシュ</button>
+        <button data-action="mob" data-mob="pig">ブタ</button>
+    </div>
+    <p class="hint">ルールを通さずに、そのまま出します。一時停止中は出ません。</p>
+  </section>
+  <section class="card">
+    <h2>視聴者の反応を試す</h2>
+    <div class="quick">
+        <button data-test="like" data-count="100">いいね +100</button>
+        <button data-test="like" data-count="1000">いいね +1000</button>
+        <button data-test="like" data-count="10000">いいね +10000</button>
+        <button data-test="follow">フォロー</button>
+        <button data-test="share">シェア</button>
+    </div>
+    <p class="hint">届いたことにして、「妨害の設定」のルールどおりに動くか試せます。ギフトは「配信」タブのテスト送信から送れます。</p>
+  </section>
+  <section class="card">
+    <h2>いまの状態</h2>
+    <pre id="debugState" style="margin: 0; font-size: 12px; white-space: pre-wrap; color: var(--muted);"></pre>
+  </section>
+</main>
+
 <dialog id="wizard">
   <div class="steps" id="wizSteps"></div>
   <div data-step="0">
@@ -370,6 +424,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     }
 
     renderFill(state.fill);
+    $('debugState').textContent = JSON.stringify({ mod: { connected: state.mod.connected, players: state.mod.players }, fill: state.fill, paused: state.paused, stats: state.stats }, null, 2);
     renderFillSettings(state.fillSettings);
     if (!rulesDirty) loadRules(state.rules);
     renderRecent();
@@ -484,6 +539,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     document.querySelectorAll('nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     $('tabLive').hidden = id !== 'tabLive';
     $('tabRules').hidden = id !== 'tabRules';
+    $('tabDebug').hidden = id !== 'tabDebug';
   }
   document.querySelectorAll('nav [data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
@@ -647,7 +703,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
 
   // 前回の設定を入れる（入力中は上書きしない）
-  const FILL_FIELDS = { fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillWall: 'wall', fillBlock: 'block', fillSkyY: 'skyY', fillReach: 'reach' };
+  const FILL_FIELDS = { fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillWall: 'wall', fillBlock: 'block', fillSkyY: 'skyY', fillReach: 'reach', fillPlaceSpeed: 'placeSpeed' };
   let fillFormDirty = false;
   Object.keys(FILL_FIELDS).forEach((id) => $(id).addEventListener('input', () => (fillFormDirty = true)));
   function renderFillSettings(settings) {
@@ -666,8 +722,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
   $('fillStop').addEventListener('click', () => {
     if (confirm('埋め立てを終えますか？（置いたブロックはそのまま残ります）')) post('/api/fill/stop');
   });
-  document.querySelectorAll('[data-action]').forEach((b) => b.addEventListener('click', () =>
-    post('/api/action', { type: b.dataset.action, count: Number(b.dataset.count ?? 1) })));
+  document.querySelectorAll('[data-action]').forEach((b) => b.addEventListener('click', () => {
+    const body = { type: b.dataset.action, count: Number(b.dataset.count ?? 1) };
+    if (b.dataset.mob) body.mob = b.dataset.mob;
+    if (b.dataset.percent !== undefined) body.percent = Number(b.dataset.percent);
+    post('/api/action', body);
+  }));
+  document.querySelectorAll('[data-test]').forEach((b) => b.addEventListener('click', () =>
+    post('/api/test', { kind: b.dataset.test, count: Number(b.dataset.count ?? 1) })));
 
   // ---- 最近届いたギフト ----
   function renderRecent() {

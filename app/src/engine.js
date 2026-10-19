@@ -19,11 +19,13 @@ const ACTION_NAMES = {
   fill_expand: '枠を広げる',
   fill_shrink: '枠を縮める',
   fill_help: 'お助けブロック',
+  fill_set: 'テスト: 一気に埋める',
 };
 
 // 回数を見せない妨害
 const SINGLE_ACTIONS = new Set(['message']);
 const MAX_RECENT_GIFTS = 20;
+const PLACE_SPEED_NAMES = { normal: 'ふつう', fast: '速い', fastest: 'とても速い' };
 
 /** ルールから、テスト送信のボタンを作る */
 export function testButtons(rules) {
@@ -53,6 +55,7 @@ const MOB_NAMES = {
 };
 
 export function describeAction(action) {
+  if (action.type === 'fill_set') return action.percent === 0 ? 'テスト: 枠の中を空にする' : `テスト: ${action.percent}% まで埋める`;
   const name = action.type === 'mob' ? MOB_NAMES[action.mob ?? 'zombie'] : ACTION_NAMES[action.type];
   return SINGLE_ACTIONS.has(action.type) ? name : `${name} ×${action.count}`;
 }
@@ -171,7 +174,7 @@ export class Engine extends EventEmitter {
     const response = await this.client.send({ type: 'fill_start', ...fill });
     if (!response.ok) throw new Error(response.error);
     this.config.fill = fill;
-    this.log('ok', `埋め立てを始めました（幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}）`);
+    this.log('ok', `埋め立てを始めました（幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}・置く速さ${PLACE_SPEED_NAMES[fill.placeSpeed]}）`);
     this.emitState();
   }
 

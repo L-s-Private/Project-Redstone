@@ -40,6 +40,12 @@ class ActionRequestTest {
         assertEquals("amethyst_block", defaults.block());
         assertEquals(150, defaults.skyY());
         assertEquals(8, defaults.reach());
+        assertEquals(2, defaults.placeDelayTicks(), "既定は速い（バニラの2倍）");
+        assertEquals(4, ActionRequest.parse("{\"type\":\"fill_start\",\"placeSpeed\":\"normal\"}").placeDelayTicks());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"placeSpeed\":\"warp\"}"));
+        assertEquals(100, ActionRequest.parse("{\"type\":\"fill_set\"}").percent());
+        assertEquals(0, ActionRequest.parse("{\"type\":\"fill_set\",\"percent\":-5}").percent());
+        assertEquals(100, ActionRequest.parse("{\"type\":\"fill_set\",\"percent\":500}").percent());
         ActionRequest custom = ActionRequest.parse("{\"type\":\"fill_start\",\"wall\":\"bedrock\",\"block\":\"diamond_block\",\"skyY\":200,\"reach\":999}");
         assertEquals("bedrock", custom.wall());
         assertEquals("diamond_block", custom.block());

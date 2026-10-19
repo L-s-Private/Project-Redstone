@@ -62,13 +62,14 @@ public final class ActionExecutor {
             case FILL_EXPAND -> FillGameManager.resize(request.count());
             case FILL_SHRINK -> FillGameManager.resize(-request.count());
             case FILL_HELP -> FillGameManager.help(request.count());
+            case FILL_SET -> FillGameManager.setFillPercent(request.percent());
             case MESSAGE, PING -> {
             }
         }
         announce(player, request);
     }
 
-    /** 埋め立て中は枠の真上から落とし、埋めたブロックを壊す。そうでなければプレイヤーの周りに出す。 */
+    /** 埋め立て中は枠の真上から落とし、枠の中のブロックだけを壊す。そうでなければプレイヤーの周りに出す。 */
     private static void spawnTnt(ServerLevel level, ServerPlayer player, int count) {
         RandomSource random = level.getRandom();
         List<double[]> inFrame = FillGameManager.tntPositions(count);
@@ -88,6 +89,9 @@ public final class ActionExecutor {
             PrimedTnt tnt = new PrimedTnt(level, x, y, z, null);
             tnt.setFuse(TNT_FUSE_TICKS + random.nextInt(20));
             level.addFreshEntity(tnt);
+            if (inFrame != null) {
+                FillGameManager.trackTnt(tnt);
+            }
         }
     }
 
@@ -115,6 +119,7 @@ public final class ActionExecutor {
             case FILL_EXPAND -> "枠が " + request.count() + " マス広がった！";
             case FILL_SHRINK -> "枠が " + request.count() + " マス縮んだ！";
             case FILL_HELP -> "お助けブロック ×" + request.count();
+            case FILL_SET -> "（テスト）" + request.percent() + "% まで埋めました";
             case FILL_START, FILL_STOP, MESSAGE, PING -> "";
         };
     }

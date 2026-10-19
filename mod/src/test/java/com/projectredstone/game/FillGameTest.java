@@ -195,4 +195,37 @@ class FillGameTest {
         assertTrue(game.hasFallen(146.9), "3マス以上落ちた");
         assertEquals(152, game.topY());
     }
+
+    @Test
+    void setFillPercentFillsFromTheBottomAndCanRestartAfterClear() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 3, 2, 0);
+        assertEquals(18, game.setFillPercent(world, 100));
+        assertTrue(game.tick(world), "カウントダウン0秒なのですぐクリア");
+        assertEquals(FillGame.Phase.CLEARED, game.phase());
+
+        assertEquals(9, game.setFillPercent(world, 50));
+        assertEquals(FillGame.Phase.FILLING, game.phase(), "やり直せる");
+        assertEquals("dirt", world.at(1, 0, 1), "下の段は埋まる");
+        assertEquals(null, world.at(1, 1, 1), "上の段は空");
+        assertEquals("bedrock", world.at(2, 0, 0), "枠はそのまま");
+
+        assertEquals(0, game.setFillPercent(world, 0));
+        assertEquals(null, world.at(0, 0, 0));
+    }
+
+    @Test
+    void blastRemovesOnlyBlocksInsideTheFrame() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 5, 3, 0);
+        world.fillInterior(2, 0, 3);
+        int removed = game.blast(world, 2.5, 0.5, 0.5, 3);
+
+        assertTrue(removed > 0);
+        assertEquals(75 - removed, game.status().filled());
+        assertEquals(null, world.at(2, 0, 0), "爆心のブロックは消える");
+        assertEquals("bedrock", world.at(3, 0, 0), "壁は壊れない");
+        assertEquals("bedrock", world.at(2, -1, 0), "床も壊れない");
+        assertEquals("stone", world.at(-2, 2, -2), "遠いブロックは残る");
+    }
 }

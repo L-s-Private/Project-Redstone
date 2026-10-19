@@ -66,7 +66,7 @@ public class RedstoneMod implements ModInitializer {
             throw new InvalidRequestException("ワールドにプレイヤーがいません");
         }
         boolean needsGame = switch (request.type()) {
-            case FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_STOP -> true;
+            case FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET, FILL_STOP -> true;
             default -> false;
         };
         if (needsGame && !FillGameManager.running()) {

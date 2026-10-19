@@ -53,8 +53,8 @@ jobs:
           for CLASS in $CLASSES; do
             echo "===== $CLASS ====="
             if [ -n "$GREP" ]; then
-              javap -cp "$JAR" -public "$CLASS" | grep -E "$GREP" || echo "（$GREP に合うものはありません）"
+              javap -cp "$JAR" -p "$CLASS" | grep -E "$GREP" || echo "（$GREP に合うものはありません）"
             else
-              javap -cp "$JAR" -public "$CLASS"
+              javap -cp "$JAR" -p "$CLASS"
             fi
           done

@@ -48,7 +48,7 @@ public class RedstoneMod implements ModInitializer {
     }
 
     private static JsonObject handle(MinecraftServer server, ActionRequest request) throws InvalidRequestException {
-        int players = server.getCurrentPlayerCount();
+        int players = server.getPlayerCount();
         if (request.type() == ActionRequest.Type.PING) {
             JsonObject status = new JsonObject();
             status.addProperty("players", players);

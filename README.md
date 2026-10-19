@@ -24,7 +24,7 @@ TikTok LIVE ──ギフト──▶ PCアプリ（app/, Node.js） ──TCP 12
 
 ### 1. MOD を入れる
 
-対応: Minecraft Java版 **1.21.1** + Fabric Loader + Fabric API。
+対応: Minecraft Java版 **26.3** + Fabric Loader + Fabric API。ビルドには Java 25 が必要。
 
 ```sh
 cd mod

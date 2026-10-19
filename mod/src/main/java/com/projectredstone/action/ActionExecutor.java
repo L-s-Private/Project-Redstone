@@ -1,18 +1,18 @@
 package com.projectredstone.action;
 
 import com.projectredstone.bridge.ActionRequest;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.SpawnReason;
-import net.minecraft.entity.TntEntity;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 
 import java.util.List;
 import java.util.Map;
@@ -48,65 +48,65 @@ public final class ActionExecutor {
     }
 
     public static void execute(MinecraftServer server, ActionRequest request) {
-        List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
+        List<ServerPlayer> players = server.getPlayerList().getPlayers();
         if (players.isEmpty()) {
             return;
         }
         // シングルプレイでは最初のプレイヤーが配信者本人
-        ServerPlayerEntity player = players.get(0);
-        ServerWorld world = player.getServerWorld();
+        ServerPlayer player = players.get(0);
+        ServerLevel level = (ServerLevel) player.level();
 
         switch (request.type()) {
-            case TNT -> spawnTnt(world, player, request.count());
-            case MOB -> spawnMobs(world, player, MOBS.get(request.mob()), request.count());
-            case BURY -> bury(world, player, BURY_BLOCKS.get(request.block()), request.count());
+            case TNT -> spawnTnt(level, player, request.count());
+            case MOB -> spawnMobs(level, player, MOBS.get(request.mob()), request.count());
+            case BURY -> bury(level, player, BURY_BLOCKS.get(request.block()), request.count());
             case MESSAGE, PING -> {
             }
         }
         announce(player, request);
     }
 
-    private static void spawnTnt(ServerWorld world, ServerPlayerEntity player, int count) {
-        Random random = world.getRandom();
+    private static void spawnTnt(ServerLevel level, ServerPlayer player, int count) {
+        RandomSource random = level.getRandom();
         for (int i = 0; i < count; i++) {
             double x = player.getX() + (random.nextDouble() * 2 - 1) * SPREAD;
             double z = player.getZ() + (random.nextDouble() * 2 - 1) * SPREAD;
-            TntEntity tnt = new TntEntity(world, x, player.getY() + 1, z, null);
+            PrimedTnt tnt = new PrimedTnt(level, x, player.getY() + 1, z, null);
             tnt.setFuse(TNT_FUSE_TICKS + random.nextInt(20));
-            world.spawnEntity(tnt);
+            level.addFreshEntity(tnt);
         }
     }
 
-    private static void spawnMobs(ServerWorld world, ServerPlayerEntity player, EntityType<?> type, int count) {
-        Random random = world.getRandom();
+    private static void spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
+        RandomSource random = level.getRandom();
         for (int i = 0; i < count; i++) {
-            BlockPos pos = player.getBlockPos().add(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);
-            type.spawn(world, pos, SpawnReason.EVENT);
+            BlockPos pos = player.blockPosition().offset(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);
+            type.spawn(level, pos, EntitySpawnReason.EVENT);
         }
     }
 
     /** 頭上の3x3に砂などを layers 段置く。重力で落ちてプレイヤーが埋まる。空気のマスにだけ置く。 */
-    private static void bury(ServerWorld world, ServerPlayerEntity player, Block block, int layers) {
-        BlockPos base = player.getBlockPos().up(3);
+    private static void bury(ServerLevel level, ServerPlayer player, Block block, int layers) {
+        BlockPos base = player.blockPosition().above(3);
         for (int dy = 0; dy < layers; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
-                    BlockPos pos = base.add(dx, dy, dz);
-                    if (world.getBlockState(pos).isAir()) {
-                        world.setBlockState(pos, block.getDefaultState());
+                    BlockPos pos = base.offset(dx, dy, dz);
+                    if (level.getBlockState(pos).isAir()) {
+                        level.setBlockAndUpdate(pos, block.defaultBlockState());
                     }
                 }
             }
         }
     }
 
-    private static void announce(ServerPlayerEntity player, ActionRequest request) {
+    private static void announce(ServerPlayer player, ActionRequest request) {
         if (request.type() == ActionRequest.Type.PING) {
             return;
         }
         String body = request.label().isEmpty() ? defaultLabel(request) : request.label();
         String text = request.from().isEmpty() ? body : request.from() + "さん: " + body;
-        player.sendMessage(Text.literal(text).formatted(Formatting.GOLD), true);
+        player.sendSystemMessage(Component.literal(text).withStyle(ChatFormatting.GOLD), true);
     }
 
     private static String defaultLabel(ActionRequest request) {

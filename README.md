@@ -36,6 +36,25 @@ GitHub Actions の `project-redstone-mod` からも jar をダウンロードで
 
 ### 2. アプリを動かす
 
+#### 画面版（おすすめ）
+
+GitHub Actions の `project-redstone-app-windows` から `ProjectRedstone.exe` をダウンロードして、ダブルクリックする。
+Node.js のインストールは不要。ブラウザに操作画面が開く。
+
+- 黒いウィンドウ（ログ）を閉じるとアプリが終了する。
+- 初回は「WindowsによってPCが保護されました」と出ることがある（署名なしのため）。「詳細情報」→「実行」で起動できる。
+- 設定は `%APPDATA%\ProjectRedstone\config.json` に保存される。
+
+操作画面でできること:
+
+- TikTok ID を入れて「保存して接続」（配信前に入れておけば、始まったら自動でつながる）
+- 一時停止 / 再開、全妨害ストップ
+- TikTok・マイクラの接続状態、受信・妨害・見送り・失敗の件数、ログ
+- テスト送信（ギフト名と個数、フォロー、シェア）
+- LIVE Studio 用オーバーレイのURL（`http://127.0.0.1:25600/overlay`）。ブラウザ（リンク）のソースとして貼ると、妨害が出たときに「○○さん TNT ×3！」と表示される
+
+#### ターミナル版
+
 Node.js 20 以上が必要。
 
 ```sh
@@ -48,6 +67,7 @@ npm start
 マイクラでワールドを開くと「マイクラ（MOD）につながりました」と出る。
 
 TikTok につながずに試すなら `npm run mock` で起動し、`gift Rose 3` のように打つ。
+画面版を開発中に動かすなら `npm run gui`（TikTok なしは `npm run gui:mock`）。`npm run build:exe` で実行ファイルを作れる。
 
 ### 配信中のコマンド
 
@@ -90,5 +110,5 @@ cd mod && ./gradlew test  # MOD の通信部分のテスト
 1. ~~ギフトを受け取って表示する（Node.js）~~ ← v0.1
 2. ~~Fabric MODで、シングルワールドにTNTを出す~~ ← v0.1
 3. 埋め立てなど定番企画をMOD内に実装する（`bury` は最初の一歩）
-4. 日本語UIのPCアプリ（.exe）にまとめ、LIVE Studio用オーバーレイを付ける
+4. ~~日本語UIのPCアプリ（.exe）にまとめ、LIVE Studio用オーバーレイを付ける~~ ← v0.2（ルールの設定画面と初回ウィザードはこれから）
 5. テスターに渡す

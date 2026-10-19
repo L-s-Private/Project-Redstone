@@ -1,20 +1,12 @@
 #!/usr/bin/env node
+// ターミナル版。画面版は gui.js。
 import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
 import { HELP, parseCommand } from './commands.js';
 import { ConfigError, loadConfig } from './config.js';
-import { Dispatcher } from './dispatcher.js';
+import { Engine } from './engine.js';
 import { log } from './log.js';
-import { ModClient } from './modClient.js';
-import { describeEvent } from './rules.js';
-import { startTikTok } from './tiktok.js';
-
-const SKIP_MESSAGES = {
-  no_rule: '対応する妨害がないので無視しました',
-  paused: '一時停止中なので出しませんでした',
-  cooldown: 'クールダウン中なので出しませんでした',
-};
 
 async function main() {
   const { values } = parseArgs({
@@ -32,44 +24,13 @@ async function main() {
     throw new ConfigError('config.json の tiktokUsername に自分のTikTok IDを書いてください（試すだけなら --mock）');
   }
 
-  const client = new ModClient(config.mod);
-  const dispatcher = new Dispatcher({ rules: config.rules, client });
-
-  client.on('status', ({ connected, players }) => {
-    if (!connected) {
-      log.warn('マイクラ（MOD）との接続が切れました。つなぎ直します…');
-    } else if (players === 0) {
-      log.warn('マイクラにつながりましたが、ワールドに入っていません');
-    } else if (players !== null) {
-      log.ok('マイクラ（MOD）につながりました。妨害を受け付けています');
-    }
-  });
-  log.info(`マイクラ（MOD）を待っています: ${config.mod.host}:${config.mod.port}（ワールドを開くとつながります）`);
-  client.start();
-
-  const onEvent = async (event) => {
-    log.gift(describeEvent(event));
-    const result = await dispatcher.handle(event);
-    if (result.status === 'sent') {
-      log.ok(`  → ${result.action.type} ×${result.action.count} を出しました`);
-    } else if (result.status === 'failed') {
-      log.error(`  → 出せませんでした: ${result.error}`);
-    } else {
-      log.info(`  → ${SKIP_MESSAGES[result.status]}`);
-    }
-  };
-
-  let tiktok = null;
-  if (values.mock) {
-    log.info('モックモードです。TikTokにはつながず、下のコマンドでギフトを試せます');
-  } else {
-    tiktok = await startTikTok({ username: config.tiktokUsername, onEvent, log });
-  }
+  const engine = new Engine({ config });
+  engine.on('log', ({ level, text }) => log[level](text));
+  engine.start({ mock: values.mock });
   console.log(HELP);
 
   const shutdown = async () => {
-    client.stop();
-    await tiktok?.stop();
+    await engine.shutdown();
     process.exit(0);
   };
 
@@ -80,27 +41,21 @@ async function main() {
       case 'none':
         break;
       case 'event':
-        onEvent(parsed.event);
+        engine.handleEvent(parsed.event);
         break;
       case 'pause':
-        dispatcher.paused = true;
-        log.warn('一時停止しました（resume で再開）');
+        engine.pause();
         break;
       case 'resume':
-        dispatcher.paused = false;
-        log.ok('再開しました');
+        engine.resume();
         break;
-      case 'stop': {
-        dispatcher.paused = true;
-        const cleared = client.clear();
-        log.warn(`全妨害ストップ: 待ち行列の ${cleared}件を取り消し、一時停止しました（resume で再開）`);
+      case 'stop':
+        engine.stopAll();
         break;
-      }
       case 'status': {
-        const { connected, players } = client.status;
-        const { received, sent, skipped, failed } = dispatcher.stats;
-        log.info(`MOD: ${connected ? `接続中（プレイヤー ${players ?? '?'}人）` : '未接続'} / ${dispatcher.paused ? '一時停止中' : '受付中'}`);
-        log.info(`受信 ${received}件 / 妨害 ${sent}件 / 見送り ${skipped}件 / 失敗 ${failed}件`);
+        const { mod, paused, stats } = engine.state;
+        log.info(`MOD: ${mod.connected ? `接続中（プレイヤー ${mod.players ?? '?'}人）` : '未接続'} / ${paused ? '一時停止中' : '受付中'}`);
+        log.info(`受信 ${stats.received}件 / 妨害 ${stats.sent}件 / 見送り ${stats.skipped}件 / 失敗 ${stats.failed}件`);
         break;
       }
       case 'help':

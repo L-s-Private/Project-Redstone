@@ -165,6 +165,17 @@ test('いいねは回数がたまるたびに出し、端数は次に持ち越�
   assert.deepEqual(client.sent.at(-1), { type: 'tnt', count: 5, from: 'd' });
 });
 
+test('画面のボタンからの操作は、マイクラにつながっていなければ待たずにすぐ断る', async () => {
+  const { engine, client } = setup();
+  client.status = { connected: false, players: null };
+  const result = await engine.manualAction({ type: 'tnt', count: 1, from: '' });
+  assert.equal(result.status, 'failed');
+  assert.match(result.error, /ワールドを開いて/);
+  await assert.rejects(engine.startFill({}), /つながっていません/);
+  await assert.rejects(engine.stopFill(), /つながっていません/);
+  assert.deepEqual(client.sent, [], '何も送らない（あとで急に出ない）');
+});
+
 test('埋め立ての開始・終了を MOD に送り、断られたら理由を返す', async () => {
   const { engine, client } = setup();
   await engine.startFill({ width: 15, height: 5, countdown: 30, block: 'diamond_block' });

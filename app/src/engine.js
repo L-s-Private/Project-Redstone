@@ -186,6 +186,7 @@ export class Engine extends EventEmitter {
 
   /** 埋め立てを始める。枠はマイクラのプレイヤーの真上の空中に作られる。使った設定は覚えておく */
   async startFill(options) {
+    this.requireMod();
     const fill = parseFill({ ...this.config.fill, ...options });
     const response = await this.client.send({ type: 'fill_start', ...fill });
     if (!response.ok) throw new Error(response.error);
@@ -195,13 +196,25 @@ export class Engine extends EventEmitter {
   }
 
   async stopFill() {
+    this.requireMod();
     const response = await this.client.send({ type: 'fill_stop' });
     if (!response.ok) throw new Error(response.error);
     this.log('info', '埋め立てを終えました');
   }
 
+  /**
+   * 画面のボタンからの操作は、マイクラにつながっていなければすぐ断る。
+   * （ギフトは少しの切断なら待ち行列で待つが、ボタンは待たせると、あとで急に出て驚くため）
+   */
+  requireMod() {
+    if (!this.client.status.connected) throw new Error('マイクラ（MOD）につながっていません。ワールドを開いてから押してください');
+  }
+
   /** 配信者が画面のボタンで出す妨害（埋め立ての操作など）。ルールを通さない */
   async manualAction(action) {
+    if (!this.client.status.connected) {
+      return { status: 'failed', error: 'マイクラ（MOD）につながっていません。ワールドを開いてから押してください' };
+    }
     const result = await this.dispatcher.fire(-1, { kind: 'manual', from: '' }, action);
     this.logResult({ kind: 'manual', from: '' }, result);
     this.emitState();

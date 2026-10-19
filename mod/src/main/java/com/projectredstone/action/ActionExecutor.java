@@ -20,14 +20,6 @@ import java.util.Map;
 /** 妨害をワールドに出す。必ずサーバースレッドから呼ぶこと。 */
 public final class ActionExecutor {
 
-    private static final Map<String, EntityType<?>> MOBS = Map.of(
-            "zombie", EntityType.ZOMBIE,
-            "skeleton", EntityType.SKELETON,
-            "creeper", EntityType.CREEPER,
-            "spider", EntityType.SPIDER,
-            "witch", EntityType.WITCH,
-            "silverfish", EntityType.SILVERFISH);
-
     private static final Map<String, String> MOB_NAMES = Map.of(
             "zombie", "ゾンビ",
             "skeleton", "スケルトン",
@@ -58,7 +50,7 @@ public final class ActionExecutor {
 
         switch (request.type()) {
             case TNT -> spawnTnt(level, player, request.count());
-            case MOB -> spawnMobs(level, player, MOBS.get(request.mob()), request.count());
+            case MOB -> spawnMobs(level, player, request.mob(), request.count());
             case BURY -> bury(level, player, BURY_BLOCKS.get(request.block()), request.count());
             case MESSAGE, PING -> {
             }
@@ -77,7 +69,9 @@ public final class ActionExecutor {
         }
     }
 
-    private static void spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
+    /** mob は ActionRequest.ALLOWED_MOBS で確認済みの名前（"zombie" など）。 */
+    private static void spawnMobs(ServerLevel level, ServerPlayer player, String mob, int count) {
+        EntityType<?> type = EntityType.byString("minecraft:" + mob).orElseThrow();
         RandomSource random = level.getRandom();
         for (int i = 0; i < count; i++) {
             BlockPos pos = player.blockPosition().offset(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);

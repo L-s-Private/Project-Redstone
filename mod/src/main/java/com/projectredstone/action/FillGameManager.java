@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 /**
  * 埋め立てモードを Minecraft の上で動かす。ボスバーに進み具合を出す。
@@ -50,7 +51,7 @@ public final class FillGameManager {
         world = new LevelWorld((ServerLevel) player.level());
         BlockPos feet = player.blockPosition();
         game = FillGame.create(world, feet.getX(), feet.getY(), feet.getZ(), width, height, countdown);
-        bar = new ServerBossEvent(Component.literal("埋め立て"), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS);
+        bar = new ServerBossEvent(UUID.randomUUID(), Component.literal("埋め立て"), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS);
         bar.addPlayer(player);
         update();
     }

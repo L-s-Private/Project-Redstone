@@ -17,11 +17,13 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm test
-      - name: デスクトップ版を起動して画面を撮る
+      # 配布と同じ形（asar にまとめた状態）で起動して、入れ忘れたファイルがないか確かめる
+      - name: 配布形式にまとめたデスクトップ版を起動して画面を撮る
         run: |
-          mkdir -p "$RUNNER_TEMP/mc"
+          mkdir -p ../mod/build/libs "$RUNNER_TEMP/mc"
+          npx electron-builder --linux dir --publish never
           REDSTONE_MINECRAFT_DIR="$RUNNER_TEMP/mc" REDSTONE_SMOKE_SCREENSHOT="$GITHUB_WORKSPACE/app/electron-window.png" \
-            xvfb-run --auto-servernum npx electron . --mock --no-sandbox
+            timeout 60 xvfb-run --auto-servernum dist/linux-unpacked/project-redstone --mock --no-sandbox
           test -s electron-window.png
       - uses: actions/upload-artifact@v4
         with:

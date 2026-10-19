@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -19,6 +20,15 @@ import java.util.Map;
 
 /** 妨害をワールドに出す。必ずサーバースレッドから呼ぶこと。 */
 public final class ActionExecutor {
+
+    // 26.2 以降、バニラのエンティティ種別は EntityType ではなく EntityTypes にある
+    private static final Map<String, EntityType<?>> MOBS = Map.of(
+            "zombie", EntityTypes.ZOMBIE,
+            "skeleton", EntityTypes.SKELETON,
+            "creeper", EntityTypes.CREEPER,
+            "spider", EntityTypes.SPIDER,
+            "witch", EntityTypes.WITCH,
+            "silverfish", EntityTypes.SILVERFISH);
 
     private static final Map<String, String> MOB_NAMES = Map.of(
             "zombie", "ゾンビ",
@@ -50,7 +60,7 @@ public final class ActionExecutor {
 
         switch (request.type()) {
             case TNT -> spawnTnt(level, player, request.count());
-            case MOB -> spawnMobs(level, player, request.mob(), request.count());
+            case MOB -> spawnMobs(level, player, MOBS.get(request.mob()), request.count());
             case BURY -> bury(level, player, BURY_BLOCKS.get(request.block()), request.count());
             case MESSAGE, PING -> {
             }
@@ -69,9 +79,7 @@ public final class ActionExecutor {
         }
     }
 
-    /** mob は ActionRequest.ALLOWED_MOBS で確認済みの名前（"zombie" など）。 */
-    private static void spawnMobs(ServerLevel level, ServerPlayer player, String mob, int count) {
-        EntityType<?> type = EntityType.byString("minecraft:" + mob).orElseThrow();
+    private static void spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
         RandomSource random = level.getRandom();
         for (int i = 0; i < count; i++) {
             BlockPos pos = player.blockPosition().offset(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);

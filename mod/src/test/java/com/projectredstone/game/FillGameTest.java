@@ -185,4 +185,14 @@ class FillGameTest {
             assertEquals(69, p[1], "枠の上");
         }
     }
+
+    @Test
+    void detectsFallingOutOfTheFrame() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 150, 0, 5, 2, 0);
+        assertFalse(game.hasFallen(150), "床の上");
+        assertFalse(game.hasFallen(148.5), "床のすぐ下（床が壊れて少し落ちた）");
+        assertTrue(game.hasFallen(146.9), "3マス以上落ちた");
+        assertEquals(152, game.topY());
+    }
 }

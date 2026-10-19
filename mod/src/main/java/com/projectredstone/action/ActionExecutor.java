@@ -57,8 +57,8 @@ public final class ActionExecutor {
         switch (request.type()) {
             case TNT -> spawnTnt(level, player, request.count());
             case MOB -> spawnMobs(level, player, MOBS.get(request.mob()), request.count());
-            case FILL_START -> FillGameManager.start(player, request.width(), request.height(), request.countdown());
-            case FILL_STOP -> FillGameManager.stop();
+            case FILL_START -> FillGameManager.start(player, request);
+            case FILL_STOP -> FillGameManager.stop(server);
             case FILL_EXPAND -> FillGameManager.resize(request.count());
             case FILL_SHRINK -> FillGameManager.resize(-request.count());
             case FILL_HELP -> FillGameManager.help(request.count());

@@ -1,5 +1,6 @@
 package com.projectredstone.action;
 
+import com.projectredstone.bridge.ActionRequest;
 import com.projectredstone.game.FillGame;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -9,21 +10,44 @@ import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.BossEvent;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
 /**
- * 埋め立てモードを Minecraft の上で動かす。ボスバーに進み具合を出す。
- * status() 以外はサーバースレッドから呼ぶこと。
+ * 埋め立てモードを Minecraft の上で動かす。
+ * 枠は空中（天空）に作り、プレイヤーを中へ移す。落ちたら枠の上に戻す。進み具合はボスバーに出す。
+ * status() と running() 以外はサーバースレッドから呼ぶこと。
  */
 public final class FillGameManager {
 
     /** 0.5 秒（10 tick）ごとに数え直す */
     private static final int CHECK_INTERVAL_TICKS = 20 / FillGame.CHECKS_PER_SECOND;
+
+    private static final Map<String, Block> WALLS = Map.of(
+            "glass", Blocks.GLASS,
+            "white_stained_glass", Blocks.WHITE_STAINED_GLASS,
+            "light_blue_stained_glass", Blocks.LIGHT_BLUE_STAINED_GLASS,
+            "bedrock", Blocks.BEDROCK);
+
+    private static final Map<String, Block> FILL_BLOCKS = Map.of(
+            "amethyst_block", Blocks.AMETHYST_BLOCK,
+            "diamond_block", Blocks.DIAMOND_BLOCK,
+            "emerald_block", Blocks.EMERALD_BLOCK,
+            "gold_block", Blocks.GOLD_BLOCK,
+            "iron_block", Blocks.IRON_BLOCK,
+            "lapis_block", Blocks.LAPIS_BLOCK,
+            "redstone_block", Blocks.REDSTONE_BLOCK,
+            "quartz_block", Blocks.QUARTZ_BLOCK);
 
     private static final Random RANDOM = new Random();
 
@@ -31,6 +55,8 @@ public final class FillGameManager {
     private static LevelWorld world;
     private static ServerBossEvent bar;
     private static int ticks;
+    /** 届く距離を元に戻すため、変える前の値を覚えておく */
+    private static final Map<UUID, Double> originalReach = new HashMap<>();
     /** アプリへの応答用（通信スレッドから読む） */
     private static volatile FillGame.Status lastStatus;
 
@@ -45,21 +71,39 @@ public final class FillGameManager {
         return lastStatus;
     }
 
-    /** プレイヤーの足元を床の中心にして枠を作る */
-    public static void start(ServerPlayer player, int width, int height, int countdown) {
-        stop();
-        world = new LevelWorld((ServerLevel) player.level());
+    /** プレイヤーの真上の空中に枠を作り、中へ移す */
+    public static void start(ServerPlayer player, ActionRequest request) {
+        stop(player.level().getServer());
+        ServerLevel level = (ServerLevel) player.level();
+        Block filler = FILL_BLOCKS.get(request.block());
+        world = new LevelWorld(level, WALLS.get(request.wall()), filler);
+
+        // 枠（床の下の1段と、高さぶん）がワールドの高さに収まるようにする
+        int height = Math.max(FillGame.MIN_HEIGHT, Math.min(FillGame.MAX_HEIGHT, request.height()));
+        int floorY = Math.max(level.getMinY() + 1, Math.min(level.getMaxY() - height - 1, request.skyY()));
         BlockPos feet = player.blockPosition();
-        game = FillGame.create(world, feet.getX(), feet.getY(), feet.getZ(), width, height, countdown);
+        game = FillGame.create(world, feet.getX(), floorY, feet.getZ(), request.width(), height, request.countdown());
+
+        moveIntoFrame(player);
+        player.getInventory().add(new ItemStack(filler.asItem(), 64));
+        setReach(player, request.reach());
+
         bar = new ServerBossEvent(UUID.randomUUID(), Component.literal("埋め立て"), BossEvent.BossBarColor.YELLOW, BossEvent.BossBarOverlay.PROGRESS);
         bar.addPlayer(player);
         update();
     }
 
-    public static void stop() {
+    /** ゲームを終える。置いたブロックはそのまま。届く距離は元に戻す */
+    public static void stop(MinecraftServer server) {
         if (bar != null) {
             bar.removeAllPlayers();
         }
+        if (server != null) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                restoreReach(player);
+            }
+        }
+        originalReach.clear();
         game = null;
         world = null;
         bar = null;
@@ -95,9 +139,13 @@ public final class FillGameManager {
         if (game == null || ++ticks % CHECK_INTERVAL_TICKS != 0) {
             return;
         }
-        // 途中で入り直したプレイヤーにもボスバーを見せる
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            // 途中で入り直したプレイヤーにもボスバーを見せる
             bar.addPlayer(player);
+            // 枠から落ちたら、枠の上に戻す
+            if (player.level() == world.level() && game.hasFallen(player.getY())) {
+                moveIntoFrame(player);
+            }
         }
         if (game.tick(world)) {
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -105,6 +153,29 @@ public final class FillGameManager {
             }
         }
         update();
+    }
+
+    /** 枠の真ん中の、いちばん上に立たせる（埋めたブロックの上に乗る） */
+    private static void moveIntoFrame(ServerPlayer player) {
+        player.teleportTo(game.centerX() + 0.5, game.topY() + 0.5, game.centerZ() + 0.5);
+        player.resetFallDistance();
+    }
+
+    private static void setReach(ServerPlayer player, double reach) {
+        AttributeInstance attribute = player.getAttribute(Attributes.BLOCK_INTERACTION_RANGE);
+        if (attribute == null) {
+            return;
+        }
+        originalReach.putIfAbsent(player.getUUID(), attribute.getBaseValue());
+        attribute.setBaseValue(reach);
+    }
+
+    private static void restoreReach(ServerPlayer player) {
+        Double original = originalReach.get(player.getUUID());
+        AttributeInstance attribute = player.getAttribute(Attributes.BLOCK_INTERACTION_RANGE);
+        if (original != null && attribute != null) {
+            attribute.setBaseValue(original);
+        }
     }
 
     private static void update() {
@@ -129,7 +200,7 @@ public final class FillGameManager {
         }
     }
 
-    private record LevelWorld(ServerLevel level) implements FillGame.World {
+    private record LevelWorld(ServerLevel level, Block wall, Block filler) implements FillGame.World {
         @Override
         public boolean isFilled(int x, int y, int z) {
             BlockState state = level.getBlockState(new BlockPos(x, y, z));
@@ -139,8 +210,8 @@ public final class FillGameManager {
         @Override
         public void setWall(int x, int y, int z) {
             BlockPos pos = new BlockPos(x, y, z);
-            if (!level.getBlockState(pos).is(Blocks.BEDROCK)) {
-                level.setBlockAndUpdate(pos, Blocks.BEDROCK.defaultBlockState());
+            if (!level.getBlockState(pos).is(wall)) {
+                level.setBlockAndUpdate(pos, wall.defaultBlockState());
             }
         }
 
@@ -154,7 +225,7 @@ public final class FillGameManager {
 
         @Override
         public void setFiller(int x, int y, int z) {
-            level.setBlockAndUpdate(new BlockPos(x, y, z), Blocks.DIRT.defaultBlockState());
+            level.setBlockAndUpdate(new BlockPos(x, y, z), filler.defaultBlockState());
         }
     }
 }

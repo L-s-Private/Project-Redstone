@@ -33,7 +33,7 @@ public class RedstoneMod implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(this::startBridge);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             stopBridge();
-            FillGameManager.stop();
+            FillGameManager.stop(server);
         });
         ServerTickEvents.END_SERVER_TICK.register(FillGameManager::onServerTick);
     }

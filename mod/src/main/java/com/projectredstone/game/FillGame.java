@@ -34,6 +34,9 @@ public final class FillGame {
     public static final int MAX_HEIGHT = 30;
     public static final int MAX_COUNTDOWN_SECONDS = 600;
 
+    /** 床からこれだけ下に落ちたら、枠の上に戻す */
+    static final int FALL_MARGIN = 3;
+
     /** tick() は 0.5 秒ごとに呼ぶ */
     public static final int CHECKS_PER_SECOND = 2;
 
@@ -169,6 +172,28 @@ public final class FillGame {
 
     public Phase phase() {
         return phase;
+    }
+
+    public int centerX() {
+        return centerX;
+    }
+
+    public int centerZ() {
+        return centerZ;
+    }
+
+    public int floorY() {
+        return floorY;
+    }
+
+    /** 枠のいちばん上の段の、1つ上の高さ */
+    public int topY() {
+        return floorY + height;
+    }
+
+    /** 枠から落ちたとみなす高さか（床より3マス以上下） */
+    public boolean hasFallen(double y) {
+        return y < floorY - FALL_MARGIN;
     }
 
     public int total() {

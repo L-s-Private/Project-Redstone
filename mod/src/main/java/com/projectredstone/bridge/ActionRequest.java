@@ -13,7 +13,7 @@ import java.util.Set;
  * 値の検証と上限の丸めはここで済ませ、実行側は信頼して使ってよい。
  */
 public record ActionRequest(String id, Type type, int count, String from, String label, String mob,
-                            int width, int height, int countdown) {
+                            int width, int height, int countdown, String wall, String block, int skyY, int reach) {
 
     public enum Type { PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP }
 
@@ -31,6 +31,19 @@ public record ActionRequest(String id, Type type, int count, String from, String
     public static final int DEFAULT_WIDTH = 11;
     public static final int DEFAULT_HEIGHT = 9;
     public static final int DEFAULT_COUNTDOWN = 10;
+
+    /** 枠の素材。配信でよく見るのはガラス */
+    public static final Set<String> ALLOWED_WALLS = Set.of("glass", "white_stained_glass", "light_blue_stained_glass", "bedrock");
+    /** 埋めるブロック。音や見た目のよいものを選べるようにする */
+    public static final Set<String> ALLOWED_BLOCKS = Set.of("amethyst_block", "diamond_block", "emerald_block", "gold_block",
+            "iron_block", "lapis_block", "redstone_block", "quartz_block");
+    public static final String DEFAULT_WALL = "glass";
+    public static final String DEFAULT_BLOCK = "amethyst_block";
+    /** 枠を作る高さ（天空）。ワールドの高さに収まるよう、実行側で丸める */
+    public static final int DEFAULT_SKY_Y = 150;
+    /** ブロックを置ける距離。バニラは 4.5（クリエイティブは 5） */
+    public static final int DEFAULT_REACH = 8;
+    public static final int MAX_REACH = 64;
 
     static final int MAX_FROM_LENGTH = 32;
     static final int MAX_LABEL_LENGTH = 100;
@@ -74,8 +87,18 @@ public record ActionRequest(String id, Type type, int count, String from, String
         int width = optInt(json, "width", DEFAULT_WIDTH);
         int height = optInt(json, "height", DEFAULT_HEIGHT);
         int countdown = optInt(json, "countdown", DEFAULT_COUNTDOWN);
+        String wall = optString(json, "wall", DEFAULT_WALL);
+        if (!ALLOWED_WALLS.contains(wall)) {
+            throw new InvalidRequestException("未対応の枠の素材です: " + wall);
+        }
+        String block = optString(json, "block", DEFAULT_BLOCK);
+        if (!ALLOWED_BLOCKS.contains(block)) {
+            throw new InvalidRequestException("未対応のブロックです: " + block);
+        }
+        int skyY = optInt(json, "skyY", DEFAULT_SKY_Y);
+        int reach = Math.max(1, Math.min(MAX_REACH, optInt(json, "reach", DEFAULT_REACH)));
 
-        return new ActionRequest(id, type, count, from, label, mob, width, height, countdown);
+        return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach);
     }
 
     private static Type parseType(String raw) throws InvalidRequestException {

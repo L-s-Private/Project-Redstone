@@ -36,6 +36,17 @@ class ActionRequestTest {
         ActionRequest defaults = ActionRequest.parse("{\"type\":\"fill_start\"}");
         assertEquals(11, defaults.width());
         assertEquals(9, defaults.height());
+        assertEquals("glass", defaults.wall());
+        assertEquals("amethyst_block", defaults.block());
+        assertEquals(150, defaults.skyY());
+        assertEquals(8, defaults.reach());
+        ActionRequest custom = ActionRequest.parse("{\"type\":\"fill_start\",\"wall\":\"bedrock\",\"block\":\"diamond_block\",\"skyY\":200,\"reach\":999}");
+        assertEquals("bedrock", custom.wall());
+        assertEquals("diamond_block", custom.block());
+        assertEquals(200, custom.skyY());
+        assertEquals(64, custom.reach());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"wall\":\"obsidian\"}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"block\":\"tnt\"}"));
         assertEquals(5, ActionRequest.parse("{\"type\":\"fill_expand\",\"count\":99}").count());
         assertEquals(ActionRequest.Type.FILL_SHRINK, ActionRequest.parse("{\"type\":\"fill_shrink\"}").type());
         assertEquals(ActionRequest.Type.FILL_STOP, ActionRequest.parse("{\"type\":\"fill_stop\"}").type());

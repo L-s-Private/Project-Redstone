@@ -14,7 +14,7 @@ import java.util.Set;
  */
 public record ActionRequest(String id, Type type, int count, String from, String label, String mob,
                             int width, int height, int countdown, String wall, String block, int skyY, int reach,
-                            String placeSpeed, int percent) {
+                            String placeSpeed, int percent, int rounds, String breakSpeed) {
 
     public enum Type { PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET }
 
@@ -48,6 +48,17 @@ public record ActionRequest(String id, Type type, int count, String from, String
     /** ブロックを置く速さ。押しっぱなしで置ける間隔（tick）。バニラは 4（1秒に5個） */
     public static final Map<String, Integer> PLACE_DELAY_TICKS = Map.of("normal", 4, "fast", 2, "fastest", 1);
     public static final String DEFAULT_PLACE_SPEED = "fast";
+    /**
+     * 手でブロックを壊す速さ。押しっぱなしで次のブロックを壊せるまでの間隔（tick）。-1 はバニラのまま（素手だとアメジストで約7秒）。
+     * 置く速さと同じく、fast は1秒に10個、fastest は20個。1個ずつは一瞬で壊れるようにする
+     */
+    public static final Map<String, Integer> BREAK_DELAY_TICKS = Map.of("normal", -1, "fast", 1, "fastest", 0);
+    public static final String DEFAULT_BREAK_SPEED = "fast";
+    /** 一瞬で壊れる掘る速さの倍率（ダイヤモンドブロックを素手で掘っても1tickで壊れる） */
+    public static final double INSTANT_BREAK_SPEED = 1000.0;
+    /** 何ラウンドでおしまいにするか */
+    public static final int DEFAULT_ROUNDS = 10;
+    public static final int MAX_ROUNDS = 99;
 
     static final int MAX_FROM_LENGTH = 32;
     static final int MAX_LABEL_LENGTH = 100;
@@ -106,15 +117,26 @@ public record ActionRequest(String id, Type type, int count, String from, String
         if (!PLACE_DELAY_TICKS.containsKey(placeSpeed)) {
             throw new InvalidRequestException("未対応の置く速さです: " + placeSpeed);
         }
+        String breakSpeed = optString(json, "breakSpeed", DEFAULT_BREAK_SPEED);
+        if (!BREAK_DELAY_TICKS.containsKey(breakSpeed)) {
+            throw new InvalidRequestException("未対応の壊す速さです: " + breakSpeed);
+        }
+        int rounds = Math.max(1, Math.min(MAX_ROUNDS, optInt(json, "rounds", DEFAULT_ROUNDS)));
         // fill_set（デバッグ用）: 埋める割合 0〜100
         int percent = Math.max(0, Math.min(100, optInt(json, "percent", 100)));
 
-        return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach, placeSpeed, percent);
+        return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach, placeSpeed, percent,
+                rounds, breakSpeed);
     }
 
     /** 押しっぱなしで次のブロックを置けるまでの tick 数 */
     public int placeDelayTicks() {
         return PLACE_DELAY_TICKS.get(placeSpeed);
+    }
+
+    /** 押しっぱなしで次のブロックを壊せるまでの tick 数。-1 ならバニラのまま */
+    public int breakDelayTicks() {
+        return BREAK_DELAY_TICKS.get(breakSpeed);
     }
 
     private static Type parseType(String raw) throws InvalidRequestException {

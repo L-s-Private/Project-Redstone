@@ -14,8 +14,9 @@ const MAX_BODY_BYTES = 32 * 1024;
  * @param {import('./engine.js').Engine} options.engine
  * @param {(config: object) => Promise<void>} [options.saveConfig] TikTok ID を変えたときに保存する
  * @param {{status: () => Promise<object>, install: () => Promise<object>}} [options.setup] マイクラ側の準備（setup.js）
+ * @param {{get: (name: string) => Promise<Buffer | null>}} [options.icons] マイクラのアイコン（mcIcons.js）
  */
-export function createUiServer({ engine, saveConfig = async () => {}, setup, port = DEFAULT_UI_PORT }) {
+export function createUiServer({ engine, saveConfig = async () => {}, setup, icons, port = DEFAULT_UI_PORT }) {
   const clients = new Set();
   const allowedHosts = () => {
     const actual = server.address()?.port ?? port;
@@ -54,9 +55,9 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
       await saveConfig(engine.config);
     },
     'POST /api/fill/start': async (body) => {
-      const { width, height, countdown, wall, block, skyY, reach, placeSpeed } = body;
+      const { width, height, countdown, rounds, wall, block, skyY, reach, placeSpeed, breakSpeed } = body;
       try {
-        await engine.startFill({ width, height, countdown, wall, block, skyY, reach, placeSpeed });
+        await engine.startFill({ width, height, countdown, rounds, wall, block, skyY, reach, placeSpeed, breakSpeed });
       } catch (e) {
         return { status: 400, error: e.message };
       }
@@ -123,6 +124,16 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, por
     if (route === 'GET /favicon.ico') {
       res.writeHead(204);
       return res.end();
+    }
+    const icon = route.match(/^GET \/icons\/mc\/([a-z_]+)\.png$/);
+    if (icon) {
+      const png = await icons?.get(icon[1]).catch(() => null);
+      if (!png) return send(res, 404, { error: '見つかりません' });
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
+      return res.end(png);
+    }
+    if (route === 'GET /api/gifts') {
+      return send(res, 200, { gifts: engine.giftCatalog?.gifts ?? [] });
     }
     if (route === 'GET /api/setup') {
       if (!setup) return send(res, 404, { error: '見つかりません' });
@@ -234,7 +245,8 @@ function sendHtml(res, html) {
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
-    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
+    // ギフトの絵は TikTok の画像サーバーから直接読む
+    'Content-Security-Policy': "default-src 'self'; img-src 'self' https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
   });
   res.end(html);
 }

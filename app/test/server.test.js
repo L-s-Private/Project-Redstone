@@ -31,10 +31,10 @@ class FakeEngine extends EventEmitter {
   }
 }
 
-async function withServer(fn, { setup } = {}) {
+async function withServer(fn, { setup, icons } = {}) {
   const engine = new FakeEngine();
   const saved = [];
-  const ui = createUiServer({ engine, port: 0, setup, saveConfig: async (c) => saved.push({ ...c }) });
+  const ui = createUiServer({ engine, port: 0, setup, icons, saveConfig: async (c) => saved.push({ ...c }) });
   const port = await ui.listen();
   try {
     await fn({ engine, saved, port });
@@ -68,6 +68,21 @@ test('操作画面とオーバーレイを返す', async () => {
     assert.match((await request(port, { path: '/overlay' })).text, /オーバーレイ/);
     assert.equal((await request(port, { path: '/nope' })).status, 404);
   });
+});
+
+test('マイクラのアイコンとギフトの一覧を返す', async () => {
+  const icons = { get: async (name) => (name === 'tnt' ? Buffer.from('png') : null) };
+  await withServer(async ({ engine, port }) => {
+    const tnt = await request(port, { path: '/icons/mc/tnt.png' });
+    assert.equal(tnt.status, 200);
+    assert.equal(tnt.text, 'png');
+    assert.equal((await request(port, { path: '/icons/mc/zombie.png' })).status, 404);
+    assert.equal((await request(port, { path: '/icons/mc/..%2Fx.png' })).status, 404);
+
+    assert.deepEqual((await request(port, { path: '/api/gifts' })).json(), { gifts: [] });
+    engine.giftCatalog = { gifts: [{ name: 'Rose', diamonds: 1, image: 'https://p16-webcast.tiktokcdn.com/rose.webp' }] };
+    assert.equal((await request(port, { path: '/api/gifts' })).json().gifts[0].name, 'Rose');
+  }, { icons });
 });
 
 test('ボタン操作をエンジンに伝える', async () => {
@@ -191,7 +206,10 @@ test('埋め立ての開始・終了を伝え、断られたら理由を返す',
       throw new Error('埋め立てが始まっていません');
     };
     assert.equal((await json(port, '/api/fill/start', { width: 15, block: 'diamond_block', junk: 1 })).status, 200);
-    assert.deepEqual(calls, [{ width: 15, height: undefined, countdown: undefined, wall: undefined, block: 'diamond_block', skyY: undefined, reach: undefined, placeSpeed: undefined }]);
+    assert.deepEqual(calls, [{
+      width: 15, height: undefined, countdown: undefined, rounds: undefined, wall: undefined, block: 'diamond_block', skyY: undefined, reach: undefined,
+      placeSpeed: undefined, breakSpeed: undefined,
+    }]);
     assert.equal(saved.length, 1, '始めたら設定を保存する');
     const stop = await json(port, '/api/fill/stop', {});
     assert.equal(stop.status, 400);

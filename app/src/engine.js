@@ -26,6 +26,7 @@ const ACTION_NAMES = {
 const SINGLE_ACTIONS = new Set(['message']);
 const MAX_RECENT_GIFTS = 20;
 const PLACE_SPEED_NAMES = { normal: 'ふつう', fast: '速い', fastest: 'とても速い' };
+const BREAK_SPEED_NAMES = { normal: 'ふつう', fast: '速い', fastest: 'とても速い' };
 
 /** ルールから、テスト送信のボタンを作る */
 export function testButtons(rules) {
@@ -66,13 +67,14 @@ export function describeAction(action) {
  * イベント:
  *   'log'   {time, level, text}   level = info | ok | warn | error | gift
  *   'state' Engine#state と同じ形
- *   'alert' {who, action}  妨害を出したとき（オーバーレイ用）
+ *   'alert' {who, action, icon, giftImage}  妨害を出したとき（オーバーレイ用）。icon はマイクラのアイコン名（mcIcons.js）
  */
 export class Engine extends EventEmitter {
-  constructor({ config, client, tiktok, now = Date.now, version = '' }) {
+  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '' }) {
     super();
     this.config = config;
     this.version = version;
+    this.giftCatalog = giftCatalog;
     this.now = now;
     this.client = client ?? new ModClient(config.mod);
     this.tiktok = tiktok ?? new TikTokSource();
@@ -99,7 +101,8 @@ export class Engine extends EventEmitter {
     });
     this.tiktok.on('status', () => this.emitState());
     this.tiktok.on('log', ({ level, text }) => this.log(level, text));
-    this.tiktok.on('event', (event) => {
+    this.tiktok.on('event', (raw) => {
+      const event = this.withGiftInfo(raw);
       if (event.kind === 'gift') this.rememberGift(event);
       this.handleEvent(event);
     });
@@ -119,7 +122,17 @@ export class Engine extends EventEmitter {
       rules: this.config.rules,
       testButtons: testButtons(this.config.rules),
       recentGifts: this.recentGifts,
+      giftCatalogVersion: this.giftCatalog?.version ?? 0,
     };
+  }
+
+  /** ギフトの絵の URL（わからなければ空） */
+  /** ギフトに、ギフト一覧の日本語名（giftNameJa）と公式の絵（image）を足す。一覧にないギフトはそのまま */
+  withGiftInfo(event) {
+    if (event.kind !== 'gift') return event;
+    const gift = this.giftCatalog?.find(event);
+    if (!gift) return event;
+    return { ...event, giftId: event.giftId || gift.id, giftNameJa: gift.nameJa, image: event.image || gift.image };
   }
 
   /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。 */
@@ -130,9 +143,12 @@ export class Engine extends EventEmitter {
     this.emitState();
   }
 
-  rememberGift({ giftName, diamonds }) {
-    if (!giftName) return;
-    this.recentGifts = [{ giftName, diamonds }, ...this.recentGifts.filter((g) => g.giftName !== giftName)].slice(0, MAX_RECENT_GIFTS);
+  rememberGift(event) {
+    if (!event.giftName) return;
+    // 画面ではルールと同じく日本語名を使う
+    const giftName = event.giftNameJa || event.giftName;
+    const gift = { giftName, diamonds: event.diamonds, image: event.image ?? '' };
+    this.recentGifts = [gift, ...this.recentGifts.filter((g) => g.giftName !== giftName)].slice(0, MAX_RECENT_GIFTS);
   }
 
   start({ mock = false } = {}) {
@@ -174,7 +190,7 @@ export class Engine extends EventEmitter {
     const response = await this.client.send({ type: 'fill_start', ...fill });
     if (!response.ok) throw new Error(response.error);
     this.config.fill = fill;
-    this.log('ok', `埋め立てを始めました（幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}・置く速さ${PLACE_SPEED_NAMES[fill.placeSpeed]}）`);
+    this.log('ok', `埋め立てを始めました（${fill.rounds}ラウンド・幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}・置く速さ${PLACE_SPEED_NAMES[fill.placeSpeed]}・壊す速さ${BREAK_SPEED_NAMES[fill.breakSpeed]}）`);
     this.emitState();
   }
 
@@ -192,9 +208,11 @@ export class Engine extends EventEmitter {
     return result;
   }
 
-  async handleEvent(event) {
-    if (event.kind === 'like') return this.handleLikes(event);
-    this.log('gift', describeEvent(event));
+  async handleEvent(raw) {
+    if (raw.kind === 'like') return this.handleLikes(raw);
+    // テスト送信のギフトにも日本語名と絵を足す
+    const event = this.withGiftInfo(raw);
+    this.log('gift', describeEvent(event), event.image ? { giftImage: event.image } : {});
     const result = await this.dispatcher.handle(event);
     this.logResult(event, result);
     this.emitState();
@@ -203,10 +221,12 @@ export class Engine extends EventEmitter {
 
   logResult(event, result) {
     if (result.status === 'sent') {
-      this.log('ok', `  → ${describeAction(result.action)} を出しました`);
+      const icon = result.action.type === 'mob' ? (result.action.mob ?? 'zombie') : result.action.type;
+      this.log('ok', `  → ${describeAction(result.action)} を出しました`, { icon });
       // オーバーレイに出す「誰が」
       const who = event.kind === 'like' ? `いいね${result.likes}回` : event.kind === 'manual' ? '配信者' : `${event.from || '誰か'}さん`;
-      this.emit('alert', { who, action: describeAction(result.action) });
+      const giftImage = event.kind === 'gift' ? event.image ?? '' : '';
+      this.emit('alert', { who, action: describeAction(result.action), icon, giftImage });
     } else if (result.status === 'failed') {
       this.log('error', `  → 出せませんでした: ${result.error}`);
     } else {
@@ -251,8 +271,9 @@ export class Engine extends EventEmitter {
     await this.tiktok.stop();
   }
 
-  log(level, text) {
-    const entry = { time: this.now(), level, text };
+  /** extra は画面で絵を出すための giftName・icon */
+  log(level, text, extra = {}) {
+    const entry = { time: this.now(), level, text, ...extra };
     this.logs.push(entry);
     if (this.logs.length > MAX_LOGS) this.logs.shift();
     this.emit('log', entry);

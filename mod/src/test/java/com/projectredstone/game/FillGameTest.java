@@ -102,6 +102,67 @@ class FillGameTest {
     }
 
     @Test
+    void clearingARoundResetsTheFrameUntilTheLastRound() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 3, 1, 0, 2);
+        game.resize(world, 1);
+        world.fillInterior(2, 0, 1);
+
+        assertTrue(game.tick(world), "1ラウンド目クリア");
+        assertEquals(FillGame.Phase.FILLING, game.phase(), "次のラウンドへ");
+        assertEquals(1, game.status().round());
+        assertEquals(2, game.status().rounds());
+        assertEquals(3, game.status().width(), "枠は最初の大きさに戻る");
+        assertEquals(0, game.status().filled(), "中は空になる");
+        assertEquals(null, world.at(0, 0, 0));
+        assertEquals("bedrock", world.at(2, 0, 0), "枠は作り直す");
+        assertEquals(null, world.at(3, 0, 0), "広げた分の壁は消える");
+
+        world.fillInterior(1, 0, 1);
+        assertTrue(game.tick(world), "2ラウンド目クリア");
+        assertEquals(FillGame.Phase.CLEARED, game.phase(), "最後のラウンドで終わり");
+        assertEquals(2, game.status().round());
+        assertEquals("stone", world.at(0, 0, 0), "最後は空にしない");
+    }
+
+    @Test
+    void cannotPlaceAboveTheFrame() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 10, 0, 3, 2, 0);
+        assertFalse(game.isAboveFrame(0, 11, 0), "いちばん上の段は置ける");
+        assertTrue(game.isAboveFrame(0, 12, 0), "枠より上は置けない");
+        assertTrue(game.isAboveFrame(2, 12, -2), "壁の上も置けない");
+        assertTrue(game.isAboveFrame(0, 40, 0), "ずっと上も置けない");
+        assertFalse(game.isAboveFrame(3, 12, 0), "枠の外は関係ない");
+    }
+
+    @Test
+    void knowsWhichBlocksAreTheFrame() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 10, 0, 3, 2, 0);
+        assertTrue(game.isFrame(2, 10, 0), "壁");
+        assertTrue(game.isFrame(-2, 11, 2), "壁の角のいちばん上");
+        assertTrue(game.isFrame(0, 9, 0), "床");
+        assertTrue(game.isFrame(2, 9, -2), "床の角");
+        assertFalse(game.isFrame(0, 10, 0), "中は壊せる");
+        assertFalse(game.isFrame(2, 12, 0), "壁より上は枠ではない");
+        assertFalse(game.isFrame(3, 10, 0), "枠の外");
+    }
+
+    @Test
+    void spawnPositionsAreInsideOnTopOfTheBlocks() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 10, 0, 3, 3, 0);
+        world.fillInterior(1, 10, 1);
+        for (double[] p : game.spawnPositions(world, 30, new Random(3))) {
+            assertTrue(p[0] >= -1 && p[0] <= 2 && p[2] >= -1 && p[2] <= 2, "枠の中");
+            assertEquals(11, p[1], "埋めたブロックのすぐ上");
+        }
+        world.fillInterior(1, 10, 3);
+        assertEquals(13, game.spawnPositions(world, 1, new Random(3)).get(0)[1], "埋まっていれば枠の上");
+    }
+
+    @Test
     void countdownStopsWhenBlocksAreBroken() {
         FakeWorld world = new FakeWorld();
         FillGame game = FillGame.create(world, 0, 0, 0, 3, 1, 5);

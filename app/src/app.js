@@ -4,6 +4,8 @@ import { appendFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { loadBundledMod } from './bundledMod.js';
 import { Engine } from './engine.js';
+import { GiftCatalog } from './giftCatalog.js';
+import { createIconSource } from './mcIcons.js';
 import { createUiServer, DEFAULT_UI_PORT } from './server.js';
 import { getSetupStatus, installAll, minecraftDir, updateModIfOutdated } from './setup.js';
 import pkg from '../package.json' with { type: 'json' };
@@ -21,7 +23,8 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const { config, path: configPath, created, removed } = await loadUserConfig();
   const logFile = join(dirname(configPath), 'app.log');
 
-  const engine = new Engine({ config, version: pkg.version });
+  const giftCatalog = new GiftCatalog({ path: join(dirname(configPath), 'gifts.json') });
+  const engine = new Engine({ config, version: pkg.version, giftCatalog });
   engine.on('log', (entry) => {
     onLog(entry);
     // 困ったときに送ってもらえるよう、ファイルにも残す
@@ -41,7 +44,10 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
     },
   };
 
-  const ui = createUiServer({ engine, port, setup, saveConfig: (c) => saveUserConfig(configPath, c) });
+  const icons = createIconSource({ dir });
+  // マイクラ本体から先に読んでおく（最初に開いた画面で絵が遅れないように）
+  icons.get('tnt_side').catch(() => {});
+  const ui = createUiServer({ engine, port, setup, icons, saveConfig: (c) => saveUserConfig(configPath, c) });
   await ui.listen();
 
   engine.log('info', `Project Redstone v${pkg.version} / 設定ファイル: ${configPath}${created ? '（新しく作りました）' : ''}`);
@@ -50,6 +56,14 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   });
   if (removed) engine.log('warn', `前の版の妨害（砂・雷・打ち上げ・回復）のルールを ${removed}件 取り除きました`);
   engine.start({ mock });
+  // ギフトの絵の一覧。取れなくても動くので待たない
+  giftCatalog.load().then(
+    () => engine.emitState(),
+    (e) => {
+      engine.log('warn', `ギフトの絵の一覧を取れませんでした（前に取った分を使います）: ${e.message}`);
+      engine.emitState();
+    },
+  );
 
   return {
     url: `http://127.0.0.1:${port}/`,

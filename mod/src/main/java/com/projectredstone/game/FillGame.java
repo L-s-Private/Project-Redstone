@@ -7,7 +7,8 @@ import java.util.Random;
 
 /**
  * 埋め立てモード。枠（ガラスなど）で囲ったの中を、配信者がブロックで埋めきるゲーム。
- * 全部埋まるとカウントダウンが始まり、崩されずに 0 になればクリア。
+ * 全部埋まるとカウントダウンが始まり、崩されずに 0 になればそのラウンドはクリア。
+ * 決めたラウンド数に届くまでは、枠を最初の大きさに戻して中を空にし、次のラウンドを始める。
  * Minecraft に依存しないので単体テストできる（ワールドの読み書きは World に任せる）。
  */
 public final class FillGame {
@@ -33,6 +34,7 @@ public final class FillGame {
     public static final int MIN_HEIGHT = 1;
     public static final int MAX_HEIGHT = 30;
     public static final int MAX_COUNTDOWN_SECONDS = 600;
+    public static final int MAX_ROUNDS = 99;
 
     /** 床からこれだけ下に落ちたら、枠の上に戻す */
     static final int FALL_MARGIN = 3;
@@ -45,28 +47,40 @@ public final class FillGame {
     private final int floorY;
     private final int height;
     private final int countdownSeconds;
+    private final int rounds;
+    /** 最初の枠の大きさ（ラウンドごとにここへ戻す） */
+    private final int startRadius;
     private int radius;
     private Phase phase = Phase.FILLING;
     private int filled;
     private int countdownChecks;
+    /** クリアしたラウンドの数 */
+    private int clearedRounds;
 
-    private FillGame(int centerX, int floorY, int centerZ, int radius, int height, int countdownSeconds) {
+    private FillGame(int centerX, int floorY, int centerZ, int radius, int height, int countdownSeconds, int rounds) {
         this.centerX = centerX;
         this.floorY = floorY;
         this.centerZ = centerZ;
+        this.startRadius = radius;
         this.radius = radius;
         this.height = height;
         this.countdownSeconds = countdownSeconds;
+        this.rounds = rounds;
+    }
+
+    /** 1ラウンドだけのゲーム */
+    public static FillGame create(World world, int centerX, int floorY, int centerZ, int width, int height, int countdownSeconds) {
+        return create(world, centerX, floorY, centerZ, width, height, countdownSeconds, 1);
     }
 
     /**
      * (centerX, floorY, centerZ) を床の中心にして枠を作る。中は空気にする。
      * 幅は奇数にそろえる（中心から左右対称にするため）。
      */
-    public static FillGame create(World world, int centerX, int floorY, int centerZ, int width, int height, int countdownSeconds) {
+    public static FillGame create(World world, int centerX, int floorY, int centerZ, int width, int height, int countdownSeconds, int rounds) {
         int clampedWidth = clamp(width, MIN_WIDTH, MAX_WIDTH);
         FillGame game = new FillGame(centerX, floorY, centerZ, clampedWidth / 2,
-                clamp(height, MIN_HEIGHT, MAX_HEIGHT), clamp(countdownSeconds, 0, MAX_COUNTDOWN_SECONDS));
+                clamp(height, MIN_HEIGHT, MAX_HEIGHT), clamp(countdownSeconds, 0, MAX_COUNTDOWN_SECONDS), clamp(rounds, 1, MAX_ROUNDS));
         game.forEachInterior((x, y, z) -> world.setAir(x, y, z));
         game.buildFrame(world);
         game.recount(world);
@@ -104,7 +118,8 @@ public final class FillGame {
 
     /**
      * 0.5 秒ごとに呼ぶ。数え直し、壊れた枠を直し、カウントダウンを進める。
-     * @return クリアした瞬間なら true
+     * ラウンドをクリアしたら、最後のラウンドなら CLEARED に、そうでなければ枠を戻して次のラウンドへ進む。
+     * @return ラウンドをクリアした瞬間なら true（最後かどうかは phase() で見る）
      */
     public boolean tick(World world) {
         if (phase == Phase.CLEARED) {
@@ -123,10 +138,24 @@ public final class FillGame {
             countdownChecks--;
         }
         if (countdownChecks <= 0) {
-            phase = Phase.CLEARED;
+            clearedRounds++;
+            if (clearedRounds >= rounds) {
+                phase = Phase.CLEARED;
+            } else {
+                nextRound(world);
+            }
             return true;
         }
         return false;
+    }
+
+    /** 枠を最初の大きさに戻し、中を空にする */
+    private void nextRound(World world) {
+        resize(world, startRadius - radius);
+        forEachInterior((x, y, z) -> world.setAir(x, y, z));
+        buildFrame(world);
+        recount(world);
+        phase = Phase.FILLING;
     }
 
     /** お助け: 空いているマスを下の段から count 個埋める。@return 実際に埋めた数 */
@@ -213,9 +242,43 @@ public final class FillGame {
         return positions;
     }
 
+    /**
+     * モブを出す位置（枠の中）。{x, y, z} を count 個返す。座標はブロックの中心。
+     * 高さは、その列で下から見て最初に空いているマス（埋まっていれば枠の上）。
+     */
+    public List<double[]> spawnPositions(World world, int count, Random random) {
+        List<double[]> positions = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            int x = centerX + random.nextInt(radius * 2 + 1) - radius;
+            int z = centerZ + random.nextInt(radius * 2 + 1) - radius;
+            int y = floorY;
+            while (y < topY() && world.isFilled(x, y, z)) {
+                y++;
+            }
+            positions.add(new double[] {x + 0.5, y, z + 0.5});
+        }
+        return positions;
+    }
+
+    /** 枠（壁と床）のブロックか。ここは壊させない */
+    public boolean isFrame(int x, int y, int z) {
+        int ring = radius + 1;
+        int distance = Math.max(Math.abs(x - centerX), Math.abs(z - centerZ));
+        if (distance > ring) {
+            return false;
+        }
+        return y == floorY - 1 || (distance == ring && y >= floorY && y < topY());
+    }
+
+    /** 枠（壁を含む）の真上で、いちばん上の段より高いか。ここにはブロックを置かせない */
+    public boolean isAboveFrame(int x, int y, int z) {
+        int ring = radius + 1;
+        return y >= topY() && Math.abs(x - centerX) <= ring && Math.abs(z - centerZ) <= ring;
+    }
+
     public Status status() {
         int secondsLeft = phase == Phase.COUNTDOWN ? (countdownChecks + CHECKS_PER_SECOND - 1) / CHECKS_PER_SECOND : 0;
-        return new Status(phase, filled, total(), radius * 2 + 1, height, secondsLeft, countdownSeconds);
+        return new Status(phase, filled, total(), radius * 2 + 1, height, secondsLeft, countdownSeconds, clearedRounds, rounds);
     }
 
     public Phase phase() {
@@ -249,8 +312,9 @@ public final class FillGame {
         return side * side * height;
     }
 
-    /** 進み具合。percent は 0〜100 の整数（埋めきるまで 100 にしない） */
-    public record Status(Phase phase, int filled, int total, int width, int height, int countdownSecondsLeft, int countdownSeconds) {
+    /** 進み具合。percent は 0〜100 の整数（埋めきるまで 100 にしない）。round はクリアしたラウンドの数 */
+    public record Status(Phase phase, int filled, int total, int width, int height, int countdownSecondsLeft, int countdownSeconds,
+                         int round, int rounds) {
         public int percent() {
             if (total == 0 || filled >= total) {
                 return 100;

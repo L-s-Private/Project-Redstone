@@ -10,7 +10,16 @@ test('v3形式の単発ギフトを読める', () => {
     user: { nickname: 'たろう', displayId: 'taro' },
     gift: { name: 'Rose', type: 2, diamondCount: 1 },
   });
-  assert.deepEqual(event, { kind: 'gift', giftId: '5655', giftName: 'Rose', diamonds: 1, count: 1, from: 'たろう' });
+  assert.deepEqual(event, { kind: 'gift', giftId: '5655', giftName: 'Rose', diamonds: 1, count: 1, from: 'たろう', image: '' });
+});
+
+test('ギフトの絵の URL も読む', () => {
+  const event = normalizeGift({
+    giftId: 5655,
+    repeatEnd: 1,
+    giftDetails: { giftName: 'Rose', diamondCount: 1, giftImage: { url: ['https://p16-webcast.tiktokcdn.com/rose.webp'] } },
+  });
+  assert.equal(event.image, 'https://p16-webcast.tiktokcdn.com/rose.webp');
 });
 
 test('連打ギフトは途中では数えず、終わったときに合計個数で返す', () => {

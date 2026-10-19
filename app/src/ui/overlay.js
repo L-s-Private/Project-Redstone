@@ -1,4 +1,6 @@
 // LIVE Studio に貼るオーバーレイ。背景は透明で、妨害が出たときと、埋め立て中だけ表示する。
+import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
+
 export const OVERLAY_HTML = String.raw`<!doctype html>
 <html lang="ja">
 <head>
@@ -33,6 +35,8 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
   }
   .alert.leaving { animation: leave .4s ease-in forwards; }
   .who { color: #ffd76a; }
+  .gift { width: 56px; height: 56px; object-fit: contain; }
+  ${MC_ICON_CSS}
   .what { color: #ff8a80; font-size: 34px; }
   @keyframes pop { from { transform: translateX(-40px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes leave { to { transform: translateX(-40px); opacity: 0; } }
@@ -45,6 +49,7 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
 </div>
 <div id="stack"></div>
 <script>
+  ${MC_ICON_JS}
   const SHOW_MS = 5000;
   const MAX_VISIBLE = 3;
   const stack = document.getElementById('stack');
@@ -58,7 +63,16 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
     const what = document.createElement('span');
     what.className = 'what';
     what.textContent = alert.action + '！';
-    el.append(who, what);
+    // 絵が読めなければ出さない
+    const picture = (className, src) => {
+      const img = Object.assign(document.createElement('img'), { className, src, alt: '', referrerPolicy: 'no-referrer' });
+      img.addEventListener('error', () => img.remove());
+      return img;
+    };
+    if (alert.giftImage) el.append(picture('gift', alert.giftImage));
+    el.append(who);
+    if (alert.icon) el.append(mcIcon(alert.icon, 48));
+    el.append(what);
     stack.append(el);
     while (stack.children.length > MAX_VISIBLE) stack.firstChild.remove();
     setTimeout(() => {
@@ -75,9 +89,10 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
     const texts = {
       filling: '埋め立て ' + fill.filled + ' / ' + fill.total,
       countdown: '完成！ あと ' + fill.countdownSecondsLeft + ' 秒',
-      cleared: '埋め立てクリア！',
+      cleared: '全ラウンドクリア！',
     };
-    document.getElementById('fillText').textContent = texts[fill.phase];
+    const round = fill.rounds ? '【' + fill.round + ' / ' + fill.rounds + '】 ' : '';
+    document.getElementById('fillText').textContent = round + texts[fill.phase];
     document.getElementById('fillPercent').textContent = fill.percent + '%';
     document.getElementById('fillBar').style.width = (fill.total ? (fill.filled / fill.total) * 100 : 0) + '%';
   }
@@ -87,8 +102,8 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
   events.addEventListener('state', (e) => showFill(JSON.parse(e.data).fill));
   events.addEventListener('alert', (e) => showAlert(JSON.parse(e.data)));
   if (location.hash === '#demo') {
-    showAlert({ who: 'テストさん', action: 'TNT ×3' });
-    showFill({ phase: 'filling', filled: 512, total: 1089, percent: 47 });
+    showAlert({ who: 'テストさん', action: 'TNT ×3', icon: 'tnt' });
+    showFill({ phase: 'filling', filled: 512, total: 1089, percent: 47, round: 1, rounds: 10 });
   }
 </script>
 </body>

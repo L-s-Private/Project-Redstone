@@ -10,7 +10,11 @@ import com.projectredstone.bridge.InvalidRequestException;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.InteractionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +40,13 @@ public class RedstoneMod implements ModInitializer {
             FillGameManager.stop(server);
         });
         ServerTickEvents.END_SERVER_TICK.register(FillGameManager::onServerTick);
+        // 埋め立て中は、枠より上にブロックを置かせない（クライアント側でも止めるので、置いた瞬間に消える見た目にならない）
+        UseBlockCallback.EVENT.register((player, level, hand, hit) ->
+                FillGameManager.isAboveFrame(hit.getBlockPos().relative(hit.getDirection())) ? InteractionResult.FAIL : InteractionResult.PASS);
+        // 枠（壁と床）は手で壊させない。叩いた時点で止め、念のため壊す直前にも止める
+        AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) ->
+                FillGameManager.isFrame(pos) ? InteractionResult.FAIL : InteractionResult.PASS);
+        PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> !FillGameManager.isFrame(pos));
     }
 
     private void startBridge(MinecraftServer server) {
@@ -90,6 +101,8 @@ public class RedstoneMod implements ModInitializer {
         json.addProperty("height", status.height());
         json.addProperty("countdownSecondsLeft", status.countdownSecondsLeft());
         json.addProperty("countdownSeconds", status.countdownSeconds());
+        json.addProperty("round", status.round());
+        json.addProperty("rounds", status.rounds());
         return json;
     }
 }

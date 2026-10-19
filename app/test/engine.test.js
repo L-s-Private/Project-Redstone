@@ -53,8 +53,21 @@ test('TikTokのギフトを妨害にして、オーバーレイ用の通知を�
   tiktok.emit('event', rose);
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(client.sent, [{ type: 'tnt', count: 6, from: 'たろう' }]);
-  assert.deepEqual(alerts, [{ who: 'たろうさん', action: 'TNT ×6' }]);
+  assert.deepEqual(alerts, [{ who: 'たろうさん', action: 'TNT ×6', icon: 'tnt', giftImage: '' }]);
   assert.equal(engine.state.stats.sent, 1);
+});
+
+test('英語名で届いたギフトも、日本語名のルールに合わせ、日本語名と公式の絵で表示する', async () => {
+  const { engine, client, tiktok, alerts, logs } = setup({ rules: [{ gift: 'バラ', action: 'tnt', count: 2 }] });
+  const image = 'https://p16-webcast.tiktokcdn.com/rose.webp';
+  engine.giftCatalog = { version: 1, find: ({ giftId }) => (giftId === '5655' ? { id: '5655', name: 'Rose', nameJa: 'バラ', image } : null) };
+  tiktok.emit('event', { ...rose, giftId: '5655' });
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(client.sent, [{ type: 'tnt', count: 6, from: 'たろう' }]);
+  assert.equal(alerts[0].giftImage, image);
+  assert.equal(logs[0].text, 'たろうさんから バラ ×3');
+  assert.equal(logs[0].giftImage, image);
+  assert.deepEqual(engine.state.recentGifts, [{ giftName: 'バラ', diamonds: 1, image }]);
 });
 
 test('起動時にIDがあればTikTokにつなぎ、モックではつながない', () => {
@@ -127,7 +140,7 @@ test('TikTokから実際に届いたギフトを、新しい順に重複なし�
   tiktok.emit('event', { ...rose, giftName: 'Galaxy', diamonds: 1000 });
   tiktok.emit('event', { ...rose, giftName: 'Rose', diamonds: 1 });
   tiktok.emit('event', { kind: 'follow', from: 'x' });
-  assert.deepEqual(engine.state.recentGifts, [{ giftName: 'Rose', diamonds: 1 }, { giftName: 'Galaxy', diamonds: 1000 }]);
+  assert.deepEqual(engine.state.recentGifts, [{ giftName: 'Rose', diamonds: 1, image: '' }, { giftName: 'Galaxy', diamonds: 1000, image: '' }]);
 });
 
 test('妨害の表示名', () => {
@@ -145,7 +158,7 @@ test('いいねは回数がたまるたびに出し、端数は次に持ち越�
   assert.equal(logs.length, 0);
   await engine.handleEvent({ kind: 'like', count: 1500, from: 'b' }); // 合計2100 → 2回分、100 持ち越し
   assert.deepEqual(client.sent, [{ type: 'fill_help', count: 20, from: 'b' }]);
-  assert.deepEqual(alerts, [{ who: 'いいね2000回', action: 'お助けブロック ×20' }]);
+  assert.deepEqual(alerts, [{ who: 'いいね2000回', action: 'お助けブロック ×20', icon: 'fill_help', giftImage: '' }]);
   await engine.handleEvent({ kind: 'like', count: 900, from: 'c' }); // 100 + 900 = 1000 → 1回
   assert.equal(client.sent.at(-1).count, 10);
   await engine.handleEvent({ kind: 'like', count: 7000, from: 'd' }); // 合計1万に届く
@@ -155,7 +168,7 @@ test('いいねは回数がたまるたびに出し、端数は次に持ち越�
 test('埋め立ての開始・終了を MOD に送り、断られたら理由を返す', async () => {
   const { engine, client } = setup();
   await engine.startFill({ width: 15, height: 5, countdown: 30, block: 'diamond_block' });
-  const sent = { width: 15, height: 5, countdown: 30, wall: 'glass', block: 'diamond_block', skyY: 150, reach: 8, placeSpeed: 'fast' };
+  const sent = { width: 15, height: 5, countdown: 30, rounds: 10, wall: 'glass', block: 'diamond_block', skyY: 150, reach: 8, placeSpeed: 'fast', breakSpeed: 'fast' };
   assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent });
   assert.deepEqual(engine.config.fill, sent, '使った設定を覚える');
   assert.deepEqual(engine.state.fillSettings, sent);

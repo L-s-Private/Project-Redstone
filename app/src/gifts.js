@@ -5,7 +5,7 @@
 const STREAKABLE_GIFT_TYPE = 1;
 
 /**
- * @returns {{kind: 'gift', giftId: string, giftName: string, diamonds: number, count: number, from: string} | null}
+ * @returns {{kind: 'gift', giftId: string, giftName: string, diamonds: number, count: number, from: string, image: string} | null}
  *   連打の途中経過のときは null（まだ数えない）
  */
 export function normalizeGift(msg) {
@@ -25,6 +25,7 @@ export function normalizeGift(msg) {
     diamonds: Number(gift.diamondCount ?? details.diamondCount ?? extended.diamond_count ?? 0),
     count: Math.max(1, Number(msg.repeatCount) || 1),
     from: displayName(msg.user),
+    image: details.giftImage?.url?.[0] || gift.image?.url_list?.[0] || extended.image?.url_list?.[0] || '',
   };
 }
 

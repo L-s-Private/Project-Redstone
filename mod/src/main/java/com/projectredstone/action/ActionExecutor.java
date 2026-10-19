@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntityTypes;
@@ -95,11 +96,18 @@ public final class ActionExecutor {
         }
     }
 
+    /** 埋め立て中は枠の中（埋めたブロックの上）に出す。そうでなければプレイヤーの周りに出す。 */
     private static void spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
         RandomSource random = level.getRandom();
+        List<double[]> inFrame = FillGameManager.mobPositions(count);
         for (int i = 0; i < count; i++) {
-            BlockPos pos = player.blockPosition().offset(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);
-            type.spawn(level, pos, EntitySpawnReason.EVENT);
+            BlockPos pos = inFrame != null
+                    ? BlockPos.containing(inFrame.get(i)[0], inFrame.get(i)[1], inFrame.get(i)[2])
+                    : player.blockPosition().offset(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);
+            Entity mob = type.spawn(level, pos, EntitySpawnReason.EVENT);
+            if (mob != null && inFrame != null) {
+                FillGameManager.trackMob(mob);
+            }
         }
     }
 

@@ -43,6 +43,13 @@ class ActionRequestTest {
         assertEquals(2, defaults.placeDelayTicks(), "既定は速い（バニラの2倍）");
         assertEquals(4, ActionRequest.parse("{\"type\":\"fill_start\",\"placeSpeed\":\"normal\"}").placeDelayTicks());
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"placeSpeed\":\"warp\"}"));
+        assertEquals(1, defaults.breakDelayTicks(), "既定は壊すのも速い（1秒に10個）");
+        assertEquals(-1, ActionRequest.parse("{\"type\":\"fill_start\",\"breakSpeed\":\"normal\"}").breakDelayTicks());
+        assertEquals(0, ActionRequest.parse("{\"type\":\"fill_start\",\"breakSpeed\":\"fastest\"}").breakDelayTicks());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"breakSpeed\":\"warp\"}"));
+        assertEquals(10, defaults.rounds());
+        assertEquals(1, ActionRequest.parse("{\"type\":\"fill_start\",\"rounds\":0}").rounds());
+        assertEquals(99, ActionRequest.parse("{\"type\":\"fill_start\",\"rounds\":1000}").rounds());
         assertEquals(100, ActionRequest.parse("{\"type\":\"fill_set\"}").percent());
         assertEquals(0, ActionRequest.parse("{\"type\":\"fill_set\",\"percent\":-5}").percent());
         assertEquals(100, ActionRequest.parse("{\"type\":\"fill_set\",\"percent\":500}").percent());

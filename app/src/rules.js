@@ -15,7 +15,9 @@ export function matches(rule, event) {
     return false;
   }
   if (rule.gift !== undefined) {
-    return event.giftName.toLowerCase() === String(rule.gift).toLowerCase();
+    // ギフト名は日本語・英語のどちらで書いてあっても合わせる（giftNameJa はギフト一覧から engine が足す）
+    const name = String(rule.gift).toLowerCase();
+    return event.giftName.toLowerCase() === name || (event.giftNameJa ?? '').toLowerCase() === name;
   }
   if (rule.giftId !== undefined) {
     return event.giftId === String(rule.giftId);
@@ -52,7 +54,7 @@ export function describeEvent(event) {
   const who = event.from ? `${event.from}さん` : '誰か';
   switch (event.kind) {
     case 'gift':
-      return `${who}から ${event.giftName || `ギフト#${event.giftId}`} ×${event.count}`;
+      return `${who}から ${event.giftNameJa || event.giftName || `ギフト#${event.giftId}`} ×${event.count}`;
     case 'follow':
       return `${who}がフォロー`;
     case 'share':

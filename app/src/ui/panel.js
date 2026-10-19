@@ -1,4 +1,6 @@
 // 操作画面。exe に入れるため、HTML ごと文字列で持つ。
+import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
+
 export const PANEL_HTML = String.raw`<!doctype html>
 <html lang="ja">
 <head>
@@ -142,6 +144,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
     background: var(--bad); color: #fff; font-weight: 600; display: none;
   }
+  /* マイクラのアイコン（mcIconScript.js）と TikTok 公式のギフトの絵 */
+  ${MC_ICON_CSS}
+  .gift-img { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; flex: none; }
+  .gift-img.big { width: 56px; height: 56px; }
+  button.icon-btn, .quick button { display: inline-flex; align-items: center; gap: 6px; }
+  .with-icon { display: flex; align-items: center; gap: 6px; }
+  #log .gift-img { width: 20px; height: 20px; margin-right: 4px; }
+  #log .mc { margin-right: 4px; }
+  /* 絵で選ぶ（置くブロック・枠の素材） */
+  .tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tiles button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; min-width: 64px; font-size: 11px; }
+  .tiles button.selected { border-color: var(--ok); background: #1d3a28; }
+  .fill-form .wide { grid-column: 1 / -1; }
+  /* ギフトを絵で選ぶ */
+  #giftPicker { width: min(760px, calc(100vw - 32px)); }
+  .gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 60vh; overflow-y: auto; margin-top: 10px; }
+  .gift-grid button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; white-space: normal; font-size: 12px; line-height: 1.3; }
+  .gift-grid small { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -176,13 +196,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <h2>埋め立てモード</h2>
       <div id="fillIdle">
         <div class="fill-form">
-          <div><label for="fillBlock">置くブロック</label><select id="fillBlock">
+          <div class="wide"><label for="fillBlock">置くブロック</label><select id="fillBlock" data-tiles>
             <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
             <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
             <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
             <option value="redstone_block">レッドストーン</option><option value="quartz_block">クォーツ</option>
           </select></div>
-          <div><label for="fillWall">枠の素材</label><select id="fillWall">
+          <div class="wide"><label for="fillWall">枠の素材</label><select id="fillWall" data-tiles>
             <option value="glass">ガラス</option><option value="white_stained_glass">白色のガラス</option>
             <option value="light_blue_stained_glass">空色のガラス</option><option value="bedrock">岩盤</option>
           </select></div>
@@ -190,23 +210,27 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <div><label for="fillPlaceSpeed">置く速さ（押しっぱなし）</label><select id="fillPlaceSpeed">
             <option value="normal">ふつう（1秒に5個）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
           </select></div>
+          <div><label for="fillBreakSpeed">壊す速さ（押しっぱなし）</label><select id="fillBreakSpeed">
+            <option value="normal">ふつう（バニラと同じ）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
+          </select></div>
+          <div><label for="fillRounds">ラウンド数</label><input id="fillRounds" type="number" min="1" max="99"></div>
           <div><label for="fillWidth">枠の幅（マス）</label><input id="fillWidth" type="number" min="3" max="41" step="2"></div>
           <div><label for="fillHeight">枠の高さ（マス）</label><input id="fillHeight" type="number" min="1" max="30"></div>
           <div><label for="fillSkyY">枠を作る高さ（Y）</label><input id="fillSkyY" type="number" min="-60" max="300"></div>
           <div><label for="fillCountdown">埋めきってからクリアまで（秒）</label><input id="fillCountdown" type="number" min="0" max="600"></div>
         </div>
         <button class="primary" id="fillStart">埋め立てを始める</button>
-        <p class="hint">押すと、マイクラのプレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは置いても減らず、届く距離と置く速さが上がります（終えると元に戻ります）。枠から落ちると、自動で枠の上に戻ります。TNT は枠を壊さず、中のブロックだけを消します。</p>
+        <p class="hint">押すと、マイクラのプレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは置いても減らず、届く距離・置く速さ・壊す速さが変わります（終えると元に戻ります）。枠より上にはブロックを置けません。枠から落ちると、自動で枠の上に戻ります。TNT とモブは枠の中に出て、TNT は枠を壊さず中のブロックだけを消します。埋めきって守りきると 1ラウンドクリアで、枠と中が最初に戻って次のラウンドが始まります。</p>
       </div>
       <div id="fillRunning" hidden>
         <div class="fill-text"><span id="fillPhase"></span><b id="fillPercent"></b></div>
         <div class="fill-progress" id="fillBar"><div></div></div>
         <div class="hint" id="fillDetail" style="margin: 0;"></div>
         <div class="fill-buttons">
-          <button data-action="fill_expand">枠 +1</button>
-          <button data-action="fill_shrink">枠 −1</button>
-          <button data-action="fill_help" data-count="10">お助け +10</button>
-          <button data-action="tnt">TNT</button>
+          <button data-action="fill_expand" data-icon="fill_expand">枠 +1</button>
+          <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
+          <button data-action="fill_help" data-count="10" data-icon="fill_help">お助け +10</button>
+          <button data-action="tnt" data-icon="tnt">TNT</button>
           <span style="flex: 1;"></span>
           <button id="fillStop">終える</button>
         </div>
@@ -246,6 +270,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <h2>テスト送信</h2>
       <form id="testForm">
         <div class="row">
+          <button type="button" id="pickTestGift" class="icon-btn" title="ギフトを絵から選ぶ">絵から選ぶ</button>
           <input id="giftName" list="giftList" placeholder="ギフト名" autocomplete="off">
           <input id="giftCount" type="number" min="1" max="100" value="1" style="width: 72px; flex: none;" aria-label="個数">
           <button type="submit">送る</button>
@@ -297,32 +322,32 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <section class="card">
     <h2>埋め立て（始めてから使えます）</h2>
     <div class="quick">
-        <button data-action="fill_set" data-percent="100">一気に埋める（100%）</button>
-        <button data-action="fill_set" data-percent="90">90% まで埋める</button>
-        <button data-action="fill_set" data-percent="50">50% まで埋める</button>
-        <button data-action="fill_set" data-percent="0">枠の中を空にする</button>
+        <button data-action="fill_set" data-percent="100" data-icon="fill_set">一気に埋める（100%）</button>
+        <button data-action="fill_set" data-percent="90" data-icon="fill_set">90% まで埋める</button>
+        <button data-action="fill_set" data-percent="50" data-icon="fill_set">50% まで埋める</button>
+        <button data-action="fill_set" data-percent="0" data-icon="glass">枠の中を空にする</button>
     </div>
     <p class="hint">下の段から順に埋めます。100% にするとカウントダウンが始まり、クリア後でも割合を下げればやり直せます。</p>
   </section>
   <section class="card">
     <h2>妨害を出す</h2>
     <div class="quick">
-        <button data-action="tnt">TNT ×1</button>
-        <button data-action="tnt" data-count="5">TNT ×5</button>
-        <button data-action="tnt" data-count="20">TNT ×20</button>
-        <button data-action="fill_help" data-count="10">お助け +10</button>
-        <button data-action="fill_help" data-count="64">お助け +64</button>
-        <button data-action="fill_expand">枠 +1</button>
-        <button data-action="fill_shrink">枠 −1</button>
+        <button data-action="tnt" data-icon="tnt">TNT ×1</button>
+        <button data-action="tnt" data-count="5" data-icon="tnt">TNT ×5</button>
+        <button data-action="tnt" data-count="20" data-icon="tnt">TNT ×20</button>
+        <button data-action="fill_help" data-count="10" data-icon="fill_help">お助け +10</button>
+        <button data-action="fill_help" data-count="64" data-icon="fill_help">お助け +64</button>
+        <button data-action="fill_expand" data-icon="fill_expand">枠 +1</button>
+        <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
     </div>
     <div class="quick" style="margin-top: 8px;">
-        <button data-action="mob" data-mob="zombie">ゾンビ</button>
-        <button data-action="mob" data-mob="skeleton">スケルトン</button>
-        <button data-action="mob" data-mob="creeper">クリーパー</button>
-        <button data-action="mob" data-mob="spider">クモ</button>
-        <button data-action="mob" data-mob="witch">ウィッチ</button>
-        <button data-action="mob" data-mob="silverfish">シルバーフィッシュ</button>
-        <button data-action="mob" data-mob="pig">ブタ</button>
+        <button data-action="mob" data-mob="zombie" data-icon="zombie">ゾンビ</button>
+        <button data-action="mob" data-mob="skeleton" data-icon="skeleton">スケルトン</button>
+        <button data-action="mob" data-mob="creeper" data-icon="creeper">クリーパー</button>
+        <button data-action="mob" data-mob="spider" data-icon="spider">クモ</button>
+        <button data-action="mob" data-mob="witch" data-icon="witch">ウィッチ</button>
+        <button data-action="mob" data-mob="silverfish" data-icon="silverfish">シルバーフィッシュ</button>
+        <button data-action="mob" data-mob="pig" data-icon="pig">ブタ</button>
     </div>
     <p class="hint">ルールを通さずに、そのまま出します。一時停止中は出ません。</p>
   </section>
@@ -374,6 +399,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
   </div>
 </dialog>
 
+<dialog id="giftPicker">
+  <h2>ギフトを選ぶ</h2>
+  <div class="row" style="margin-top: 8px;">
+    <input id="giftSearch" placeholder="名前で探す（例: バラ）" autocomplete="off" spellcheck="false">
+    <button id="giftPickerClose">閉じる</button>
+  </div>
+  <div class="gift-grid" id="giftGrid"></div>
+  <p class="hint" id="giftPickerHint"></p>
+</dialog>
+
 <div id="offline">アプリとの接続が切れました。アプリを起動し直してください。</div>
 
 <script>
@@ -385,6 +420,41 @@ export const PANEL_HTML = String.raw`<!doctype html>
     retrying: ['bad', '再接続中'],
   };
   let state = null;
+
+  // ---- 絵 ----
+  ${MC_ICON_JS}
+  /** TikTok 公式のギフトの絵（url か、ギフト名から探す）。わからないギフトには絵を出さない（空の要素） */
+  function giftIcon(nameOrUrl, big) {
+    const url = /^https:/.test(nameOrUrl ?? '') ? nameOrUrl : giftFor(nameOrUrl)?.image;
+    if (!url) return document.createDocumentFragment();
+    const img = Object.assign(document.createElement('img'), { src: url, className: 'gift-img' + (big ? ' big' : ''), alt: '', referrerPolicy: 'no-referrer' });
+    img.addEventListener('error', () => img.remove());
+    return img;
+  }
+  let gifts = [];
+  let giftsVersion = -1;
+  /** ギフト一覧から、日本語名・英語名のどちらでも探す */
+  function giftFor(name) {
+    const key = String(name ?? '').trim().toLowerCase();
+    if (!key) return null;
+    return gifts.find((g) => g.nameJa.toLowerCase() === key) ?? gifts.find((g) => g.name.toLowerCase() === key) ?? null;
+  }
+  async function loadGifts(version) {
+    giftsVersion = version;
+    try {
+      const res = await fetch('/api/gifts');
+      if (!res.ok) return;
+      gifts = (await res.json()).gifts;
+    } catch {
+      return;
+    }
+    const names = [...new Set(gifts.map((g) => g.nameJa))];
+    $('giftList').replaceChildren(...names.map((name) => Object.assign(document.createElement('option'), { value: name })));
+    renderRows();
+    renderRecent();
+    $('quick').dataset.key = '';
+    if (state) renderState(state);
+  }
 
   function renderState(next) {
     state = next;
@@ -415,13 +485,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
       $('quick').dataset.key = buttonsKey;
       $('quick').replaceChildren(...state.testButtons.map(({ label, body }) => {
         const b = document.createElement('button');
-        b.textContent = label;
+        if (body.kind === 'gift' && !body.diamonds) b.append(giftIcon(body.giftName));
+        b.append(label);
         b.addEventListener('click', () => post('/api/test', body));
         return b;
       }));
-      const names = state.testButtons.filter((t) => t.body.kind === 'gift' && !t.body.diamonds).map((t) => t.body.giftName);
-      $('giftList').replaceChildren(...names.map((name) => Object.assign(document.createElement('option'), { value: name })));
     }
+    if (state.giftCatalogVersion !== giftsVersion) loadGifts(state.giftCatalogVersion);
 
     renderFill(state.fill);
     $('debugState').textContent = JSON.stringify({ mod: { connected: state.mod.connected, players: state.mod.players }, fill: state.fill, paused: state.paused, stats: state.stats }, null, 2);
@@ -442,7 +512,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     time.textContent = new Date(entry.time).toLocaleTimeString('ja-JP', { hour12: false });
     const text = document.createElement('span');
     text.className = entry.level;
-    text.textContent = entry.text;
+    if (entry.giftImage) text.append(giftIcon(entry.giftImage));
+    if (entry.icon) text.append(mcIcon(entry.icon, 18));
+    text.append(entry.text);
     li.append(time, text);
     log.append(li);
     while (log.children.length > 300) log.firstChild.remove();
@@ -610,6 +682,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
     return el;
   }
 
+  function withIcon(iconName, el) {
+    const wrap = document.createElement('div');
+    wrap.className = 'with-icon';
+    wrap.append(mcIcon(iconName), el);
+    return wrap;
+  }
+
   function cell(...children) {
     const td = document.createElement('td');
     td.append(...children);
@@ -633,14 +712,25 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
       const needsValue = row.trigger === 'gift' || row.trigger === 'minDiamonds' || row.trigger === 'giftId' || row.trigger === 'likes';
       const numeric = row.trigger === 'minDiamonds' || row.trigger === 'likes';
-      const value = needsValue
+      let value = needsValue
         ? input(row.value, change(row, 'value'), numeric
           ? { type: 'number', min: row.trigger === 'likes' ? 1 : 0, className: 'num', placeholder: row.trigger === 'likes' ? '1000' : '1' }
-          : { placeholder: row.trigger === 'gift' ? '例: Rose' : 'ID', list: 'giftList' })
+          : { placeholder: row.trigger === 'gift' ? '例: バラ' : 'ID', list: 'giftList' })
         : document.createTextNode('');
+      if (row.trigger === 'gift') {
+        // ギフトの絵と「絵から選ぶ」ボタン
+        const wrap = document.createElement('div');
+        wrap.className = 'with-icon';
+        let icon = giftIcon(row.value);
+        value.addEventListener('input', () => { const next = giftIcon(value.value); icon.replaceWith(next); icon = next; });
+        const pick = Object.assign(document.createElement('button'), { textContent: '絵から選ぶ', title: 'ギフトを絵から選ぶ' });
+        pick.addEventListener('click', () => openGiftPicker((name) => { row.value = name; setDirty(true); renderRows(); }));
+        wrap.append(icon, value, pick);
+        value = wrap;
+      }
 
       let detail;
-      if (row.action === 'mob') detail = select(MOBS, row.mob, change(row, 'mob'));
+      if (row.action === 'mob') detail = withIcon(row.mob, select(MOBS, row.mob, change(row, 'mob', true)));
       else detail = input(row.label, change(row, 'label'), { placeholder: row.action === 'message' ? '表示する文（必須）' : '表示する文（任意）', maxLength: 100 });
 
       const count = NO_COUNT.has(row.action)
@@ -655,7 +745,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
         order,
         cell(select(TRIGGERS, row.trigger, change(row, 'trigger', true))),
         cell(value),
-        cell(select(ACTIONS, row.action, change(row, 'action', true))),
+        // モブの絵は「詳細」のほうに出す
+        cell(withIcon(row.action === 'mob' ? 'spawn_egg' : row.action, select(ACTIONS, row.action, change(row, 'action', true)))),
         cell(detail),
         cell(count),
         cell(cooldown),
@@ -693,9 +784,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const phases = {
       filling: '埋めています',
       countdown: '完成！ あと ' + fill.countdownSecondsLeft + ' 秒守りきればクリア',
-      cleared: 'クリア！',
+      cleared: '全ラウンドクリア！',
     };
-    $('fillPhase').textContent = phases[fill.phase];
+    $('fillPhase').textContent = (fill.rounds ? 'ラウンド ' + fill.round + ' / ' + fill.rounds + '　' : '') + phases[fill.phase];
     $('fillPercent').textContent = fill.percent + '%';
     $('fillBar').className = 'fill-progress ' + fill.phase;
     $('fillBar').firstElementChild.style.width = (fill.total ? (fill.filled / fill.total) * 100 : 0) + '%';
@@ -703,12 +794,18 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
 
   // 前回の設定を入れる（入力中は上書きしない）
-  const FILL_FIELDS = { fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillWall: 'wall', fillBlock: 'block', fillSkyY: 'skyY', fillReach: 'reach', fillPlaceSpeed: 'placeSpeed' };
+  const FILL_FIELDS = {
+    fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillRounds: 'rounds', fillWall: 'wall', fillBlock: 'block',
+    fillSkyY: 'skyY', fillReach: 'reach', fillPlaceSpeed: 'placeSpeed', fillBreakSpeed: 'breakSpeed',
+  };
   let fillFormDirty = false;
   Object.keys(FILL_FIELDS).forEach((id) => $(id).addEventListener('input', () => (fillFormDirty = true)));
   function renderFillSettings(settings) {
     if (fillFormDirty || !settings) return;
-    for (const [id, key] of Object.entries(FILL_FIELDS)) $(id).value = settings[key];
+    for (const [id, key] of Object.entries(FILL_FIELDS)) {
+      $(id).value = settings[key];
+      $(id).dispatchEvent(new Event('sync'));
+    }
   }
 
   $('fillStart').addEventListener('click', async () => {
@@ -730,17 +827,43 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }));
   document.querySelectorAll('[data-test]').forEach((b) => b.addEventListener('click', () =>
     post('/api/test', { kind: b.dataset.test, count: Number(b.dataset.count ?? 1) })));
+  document.querySelectorAll('button[data-icon]').forEach((b) => b.prepend(mcIcon(b.dataset.icon)));
+
+  // 置くブロック・枠の素材は、絵のタイルで選ぶ（値は隠した select に持つ）
+  document.querySelectorAll('select[data-tiles]').forEach((sel) => {
+    const tiles = document.createElement('div');
+    tiles.className = 'tiles';
+    const buttons = [...sel.options].map((option) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.append(mcIcon(option.value, 32), option.textContent);
+      b.addEventListener('click', () => {
+        sel.value = option.value;
+        sel.dispatchEvent(new Event('input'));
+        sync();
+      });
+      return b;
+    });
+    const sync = () => buttons.forEach((b, i) => b.classList.toggle('selected', sel.options[i].value === sel.value));
+    sel.addEventListener('sync', sync);
+    tiles.append(...buttons);
+    sel.hidden = true;
+    sel.after(tiles);
+    sync();
+  });
 
   // ---- 最近届いたギフト ----
   function renderRecent() {
-    const gifts = state.recentGifts;
-    if (!gifts.length) {
+    if (!state) return;
+    const recent = state.recentGifts;
+    if (!recent.length) {
       $('recent').replaceChildren(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'まだありません（TikTok LIVE につながると、届いたギフトがここに出ます）' }));
       return;
     }
-    $('recent').replaceChildren(...gifts.map((gift) => {
+    $('recent').replaceChildren(...recent.map((gift) => {
       const b = document.createElement('button');
-      b.textContent = gift.giftName + '（💎' + gift.diamonds + '）';
+      b.className = 'icon-btn';
+      b.append(giftIcon(gift.image || gift.giftName), gift.giftName + '（💎' + gift.diamonds + '）');
       b.addEventListener('click', () => {
         rows.unshift(toRow({ gift: gift.giftName, action: 'tnt', count: 1 }));
         setDirty(true);
@@ -749,6 +872,48 @@ export const PANEL_HTML = String.raw`<!doctype html>
       return b;
     }));
   }
+
+  // ---- ギフトを絵から選ぶ ----
+  let onGiftPicked = null;
+  function openGiftPicker(onPick) {
+    onGiftPicked = onPick;
+    $('giftSearch').value = '';
+    renderGiftGrid();
+    $('giftPicker').showModal();
+    $('giftSearch').focus();
+  }
+  function renderGiftGrid() {
+    const query = $('giftSearch').value.trim().toLowerCase();
+    // 同じ日本語名のギフトは1つだけ（安いほう）出す
+    const seen = new Set();
+    const shown = gifts
+      .filter((g) => !query || g.nameJa.toLowerCase().includes(query) || g.name.toLowerCase().includes(query))
+      .filter((g) => !seen.has(g.nameJa) && seen.add(g.nameJa))
+      .slice(0, 300);
+    $('giftGrid').replaceChildren(...shown.map((g) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const small = Object.assign(document.createElement('small'), { textContent: '💎' + g.diamonds });
+      b.append(giftIcon(g.image, true), g.nameJa, small);
+      b.addEventListener('click', () => {
+        $('giftPicker').close();
+        onGiftPicked?.(g.nameJa);
+      });
+      return b;
+    }));
+    $('giftPickerHint').textContent = gifts.length === 0
+      ? 'ギフトの一覧をまだ取れていません。インターネットにつながっているか確かめて、アプリを起動し直してください。'
+      : 'ダイヤの少ない順です。' + (shown.length < gifts.length ? '名前で探すと、ほかのギフトも出ます。' : '');
+  }
+  $('giftSearch').addEventListener('input', renderGiftGrid);
+  // 一覧にあるギフトなら、ボタンにその絵を出す
+  const showTestGift = () => $('pickTestGift').replaceChildren(giftFor($('giftName').value) ? giftIcon($('giftName').value) : '絵から選ぶ');
+  $('giftName').addEventListener('input', showTestGift);
+  $('pickTestGift').addEventListener('click', () => openGiftPicker((name) => {
+    $('giftName').value = name;
+    showTestGift();
+  }));
+  $('giftPickerClose').addEventListener('click', () => $('giftPicker').close());
 
   // ---- 初回ウィザード ----
   const STEP_NAMES = ['マイクラの準備', 'TikTok ID', '完了'];

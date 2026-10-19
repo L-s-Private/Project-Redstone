@@ -15,7 +15,11 @@ export const FILL_WALLS = ['glass', 'white_stained_glass', 'light_blue_stained_g
 export const FILL_BLOCKS = ['amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block', 'quartz_block'];
 /** ブロックを置く速さ（右クリック押しっぱなし）。normal はバニラと同じ */
 export const FILL_PLACE_SPEEDS = ['normal', 'fast', 'fastest'];
-export const DEFAULT_FILL = { width: 11, height: 9, countdown: 10, wall: 'glass', block: 'amethyst_block', skyY: 150, reach: 8, placeSpeed: 'fast' };
+/** 手でブロックを壊す速さ（左クリック押しっぱなし）。normal はバニラと同じ。fast・fastest は置く速さと同じ */
+export const FILL_BREAK_SPEEDS = ['normal', 'fast', 'fastest'];
+export const DEFAULT_FILL = {
+  width: 11, height: 9, countdown: 10, rounds: 10, wall: 'glass', block: 'amethyst_block', skyY: 150, reach: 8, placeSpeed: 'fast', breakSpeed: 'fast',
+};
 
 /** 埋め立ての設定を読む。おかしな値は既定値にする（設定ファイルが壊れても起動できるように） */
 export function parseFill(raw = {}) {
@@ -28,11 +32,13 @@ export function parseFill(raw = {}) {
     width: int(fill.width, DEFAULT_FILL.width, 3, 41),
     height: int(fill.height, DEFAULT_FILL.height, 1, 30),
     countdown: int(fill.countdown, DEFAULT_FILL.countdown, 0, 600),
+    rounds: int(fill.rounds, DEFAULT_FILL.rounds, 1, 99),
     wall: FILL_WALLS.includes(fill.wall) ? fill.wall : DEFAULT_FILL.wall,
     block: FILL_BLOCKS.includes(fill.block) ? fill.block : DEFAULT_FILL.block,
     skyY: int(fill.skyY, DEFAULT_FILL.skyY, -60, 300),
     reach: int(fill.reach, DEFAULT_FILL.reach, 1, 64),
     placeSpeed: FILL_PLACE_SPEEDS.includes(fill.placeSpeed) ? fill.placeSpeed : DEFAULT_FILL.placeSpeed,
+    breakSpeed: FILL_BREAK_SPEEDS.includes(fill.breakSpeed) ? fill.breakSpeed : DEFAULT_FILL.breakSpeed,
   };
 }
 

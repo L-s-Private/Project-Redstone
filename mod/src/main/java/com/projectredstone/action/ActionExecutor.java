@@ -8,6 +8,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntityTypes;
@@ -45,8 +47,9 @@ public final class ActionExecutor {
     /** 点火から爆発までの時間（tick）。配信で見せる間を取るため、既定の80より少し短くする。 */
     private static final int TNT_FUSE_TICKS = 60;
     private static final int SPREAD = 3;
-    /** 打ち上げの初速。約20ブロック上がる。 */
-    private static final double LAUNCH_SPEED = 2.0;
+    /** 打ち上げ: 浮遊 Lv10 を1.5秒。約15ブロック上がる。 */
+    private static final int LAUNCH_TICKS = 30;
+    private static final int LAUNCH_AMPLIFIER = 9;
 
     private ActionExecutor() {
     }
@@ -102,11 +105,9 @@ public final class ActionExecutor {
         }
     }
 
-    /** 真上に打ち上げる。落下ダメージは受ける。 */
+    /** 浮遊の効果で真上に打ち上げる（効果はゲームが同期してくれる）。効果が切れると落ちて、落下ダメージを受ける。 */
     private static void launch(ServerPlayer player) {
-        player.setDeltaMovement(player.getDeltaMovement().add(0, LAUNCH_SPEED, 0));
-        // 速度の変更をクライアントに送らせる
-        player.hurtMarked = true;
+        player.addEffect(new MobEffectInstance(MobEffects.LEVITATION, LAUNCH_TICKS, LAUNCH_AMPLIFIER));
     }
 
     /** 体力と満腹度を全回復する（視聴者が助けるための妨害）。 */

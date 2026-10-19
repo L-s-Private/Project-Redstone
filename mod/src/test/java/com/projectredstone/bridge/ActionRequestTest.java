@@ -27,6 +27,14 @@ class ActionRequestTest {
     }
 
     @Test
+    void parsesNewActions() throws Exception {
+        assertEquals(ActionRequest.Type.LIGHTNING, ActionRequest.parse("{\"type\":\"lightning\",\"count\":3}").type());
+        assertEquals(5, ActionRequest.parse("{\"type\":\"lightning\",\"count\":99}").count());
+        assertEquals(1, ActionRequest.parse("{\"type\":\"launch\",\"count\":99}").count());
+        assertEquals(ActionRequest.Type.HEAL, ActionRequest.parse("{\"type\":\"heal\"}").type());
+    }
+
+    @Test
     void defaultsMobAndBlock() throws Exception {
         assertEquals("zombie", ActionRequest.parse("{\"type\":\"mob\"}").mob());
         assertEquals("sand", ActionRequest.parse("{\"type\":\"bury\"}").block());

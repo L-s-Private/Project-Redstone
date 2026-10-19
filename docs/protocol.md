@@ -11,8 +11,8 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
 | `id` | 文字列 | 応答と対応づけるためのID（任意） |
-| `type` | 文字列 | `ping` / `tnt` / `mob` / `bury` / `message` |
-| `count` | 数値 | 回数。種類ごとの上限で丸める（`tnt` 20、`mob` 10、`bury` 5） |
+| `type` | 文字列 | `ping` / `tnt` / `mob` / `bury` / `message` / `lightning` / `launch` / `heal` |
+| `count` | 数値 | 回数。種類ごとの上限で丸める（`tnt` 20、`mob` 10、`bury` 5、`lightning` 5。ほかは常に1） |
 | `from` | 文字列 | ギフトを送った人の表示名（画面表示用、最大32文字） |
 | `label` | 文字列 | 画面に出す文言（最大100文字）。`message` では本文 |
 | `mob` | 文字列 | `type: mob` のときのモブ。`zombie` `skeleton` `creeper` `spider` `witch` `silverfish` |
@@ -24,6 +24,9 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 - `mob`: プレイヤーの近くに `mob` を `count` 体出す。
 - `bury`: プレイヤーの頭上に砂（または砂利）を `count` 段降らせて埋める（埋め立て）。
 - `message`: アクションバーに `label` を表示するだけ。
+- `lightning`: プレイヤーの近く（真上は避ける）に雷を `count` 回落とす。
+- `launch`: プレイヤーを真上に打ち上げる（約20ブロック。落下ダメージあり）。
+- `heal`: 体力と満腹度を全回復する（視聴者が助ける用）。
 
 ## 応答
 

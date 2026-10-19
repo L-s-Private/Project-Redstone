@@ -14,13 +14,14 @@ import java.util.Set;
  */
 public record ActionRequest(String id, Type type, int count, String from, String label, String mob, String block) {
 
-    public enum Type { PING, TNT, MOB, BURY, MESSAGE }
+    public enum Type { PING, TNT, MOB, BURY, MESSAGE, LIGHTNING, LAUNCH, HEAL }
 
     /** 1回の要求で出せる数の上限。配信中の事故とサーバー負荷を防ぐ。 */
     public static final Map<Type, Integer> MAX_COUNT = Map.of(
             Type.TNT, 20,
             Type.MOB, 10,
-            Type.BURY, 5);
+            Type.BURY, 5,
+            Type.LIGHTNING, 5);
 
     public static final Set<String> ALLOWED_MOBS = Set.of("zombie", "skeleton", "creeper", "spider", "witch", "silverfish");
     public static final Set<String> ALLOWED_BURY_BLOCKS = Set.of("sand", "gravel");
@@ -84,6 +85,9 @@ public record ActionRequest(String id, Type type, int count, String from, String
             case "mob" -> Type.MOB;
             case "bury" -> Type.BURY;
             case "message" -> Type.MESSAGE;
+            case "lightning" -> Type.LIGHTNING;
+            case "launch" -> Type.LAUNCH;
+            case "heal" -> Type.HEAL;
             default -> throw new InvalidRequestException("未対応の type です: " + raw);
         };
     }

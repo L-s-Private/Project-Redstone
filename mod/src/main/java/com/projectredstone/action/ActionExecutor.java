@@ -45,6 +45,8 @@ public final class ActionExecutor {
     /** 点火から爆発までの時間（tick）。配信で見せる間を取るため、既定の80より少し短くする。 */
     private static final int TNT_FUSE_TICKS = 60;
     private static final int SPREAD = 3;
+    /** 打ち上げの初速。約20ブロック上がる。 */
+    private static final double LAUNCH_SPEED = 2.0;
 
     private ActionExecutor() {
     }
@@ -62,6 +64,9 @@ public final class ActionExecutor {
             case TNT -> spawnTnt(level, player, request.count());
             case MOB -> spawnMobs(level, player, MOBS.get(request.mob()), request.count());
             case BURY -> bury(level, player, BURY_BLOCKS.get(request.block()), request.count());
+            case LIGHTNING -> strikeLightning(level, player, request.count());
+            case LAUNCH -> launch(player);
+            case HEAL -> heal(player);
             case MESSAGE, PING -> {
             }
         }
@@ -85,6 +90,29 @@ public final class ActionExecutor {
             BlockPos pos = player.blockPosition().offset(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);
             type.spawn(level, pos, EntitySpawnReason.EVENT);
         }
+    }
+
+    /** 近くに雷を落とす。プレイヤーの真上には落とさない（即死を避ける）。 */
+    private static void strikeLightning(ServerLevel level, ServerPlayer player, int count) {
+        RandomSource random = level.getRandom();
+        for (int i = 0; i < count; i++) {
+            int dx = (random.nextBoolean() ? 1 : -1) * (2 + random.nextInt(SPREAD));
+            int dz = random.nextInt(SPREAD * 2 + 1) - SPREAD;
+            EntityTypes.LIGHTNING_BOLT.spawn(level, player.blockPosition().offset(dx, 0, dz), EntitySpawnReason.EVENT);
+        }
+    }
+
+    /** 真上に打ち上げる。落下ダメージは受ける。 */
+    private static void launch(ServerPlayer player) {
+        player.setDeltaMovement(player.getDeltaMovement().add(0, LAUNCH_SPEED, 0));
+        // 速度の変更をクライアントに送らせる
+        player.hurtMarked = true;
+    }
+
+    /** 体力と満腹度を全回復する（視聴者が助けるための妨害）。 */
+    private static void heal(ServerPlayer player) {
+        player.setHealth(player.getMaxHealth());
+        player.getFoodData().setFoodLevel(20);
     }
 
     /** 頭上の3x3に砂などを layers 段置く。重力で落ちてプレイヤーが埋まる。空気のマスにだけ置く。 */
@@ -116,6 +144,9 @@ public final class ActionExecutor {
             case TNT -> "TNT ×" + request.count();
             case MOB -> MOB_NAMES.get(request.mob()) + " ×" + request.count();
             case BURY -> "埋め立て ×" + request.count();
+            case LIGHTNING -> "雷 ×" + request.count();
+            case LAUNCH -> "打ち上げ！";
+            case HEAL -> "全回復！";
             case MESSAGE, PING -> "";
         };
     }

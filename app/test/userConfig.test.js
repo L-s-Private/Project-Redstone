@@ -23,7 +23,18 @@ test('初回は設定例から作り、保存した内容を次回読める', as
   const second = await loadUserConfig(dir);
   assert.equal(second.created, false);
   assert.equal(second.config.tiktokUsername, 'taro');
-  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'fill', 'rules']);
+  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'fill', 'world', 'rules', 'presets']);
+});
+
+test('ワールドの設定と自分のプリセットも保存して、次回読める', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'ProjectRedstone');
+  const first = await loadUserConfig(dir);
+  first.config.world = { ...first.config.world, time: 'day' };
+  first.config.presets = [{ name: 'いつもの', rules: [{ gift: 'バラ', action: 'jail', count: 10 }] }];
+  await saveUserConfig(first.path, first.config);
+  const second = await loadUserConfig(dir);
+  assert.equal(second.config.world.time, 'day');
+  assert.deepEqual(second.config.presets, first.config.presets);
 });
 
 test('壊れた設定ファイルは理由つきで断る', async () => {
@@ -49,7 +60,19 @@ test('前の版で削除した妨害のルールは取り除いて保存し直�
   assert.deepEqual(JSON.parse(await readFile(join(dir, 'config.json'), 'utf8')).rules, config.rules);
 
   // 全部消えたら設定例のルールに戻す
-  await writeFile(join(dir, 'config.json'), JSON.stringify({ rules: [{ minDiamonds: 1, action: 'lightning' }] }));
+  await writeFile(join(dir, 'config.json'), JSON.stringify({ rules: [{ minDiamonds: 1, action: 'heal' }] }));
   const reset = await loadUserConfig(dir);
   assert.ok(reset.config.rules.some((r) => r.gift === 'GG'));
+});
+
+test('制限時間の妨害は、ルールと自分のプリセットから取り除く', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'redstone-'));
+  await writeFile(join(dir, 'config.json'), JSON.stringify({
+    rules: [{ gift: 'バラ', action: 'time_add', count: 30 }, { gift: 'GG', action: 'tnt', count: 1 }],
+    presets: [{ name: 'いつもの', rules: [{ gift: 'バラ', action: 'time_sub', count: 30 }, { gift: 'GG', action: 'jail', count: 10 }] }],
+  }));
+  const { config, removed } = await loadUserConfig(dir);
+  assert.equal(removed, 1);
+  assert.deepEqual(config.rules, [{ gift: 'GG', action: 'tnt', count: 1 }]);
+  assert.deepEqual(config.presets, [{ name: 'いつもの', rules: [{ gift: 'GG', action: 'jail', count: 10 }] }]);
 });

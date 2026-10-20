@@ -12,6 +12,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.item.PrimedTnt;
 
 import java.util.List;
@@ -64,9 +67,19 @@ public final class ActionExecutor {
             case FILL_SHRINK -> FillGameManager.resize(-request.count());
             case FILL_HELP -> FillGameManager.help(request.count());
             case FILL_SET -> FillGameManager.setFillPercent(request.percent());
+            case WORLD -> WorldSettings.apply(server, request);
+            case JAIL -> FillGameManager.jail(player, request.count());
+            case FREEZE -> FillGameManager.freeze(player, request.count());
+            case FILL_LAYER -> FillGameManager.fillLayers(request.count());
+            case FILL_CLEAR -> FillGameManager.clearAll();
+            case LIGHTNING -> strikeLightning(level, player, request.count());
+            case LEVITATE -> player.addEffect(new MobEffectInstance(MobEffects.LEVITATION, request.count() * 20, 0), null);
+            case NIGHT -> FillGameManager.night(server, request.count());
+            case FILL_RAISE -> FillGameManager.raise(request.count());
             case MESSAGE, PING -> {
             }
         }
+        Sounds.forAction(server, request.type());
         announce(player, request);
     }
 
@@ -75,6 +88,10 @@ public final class ActionExecutor {
         RandomSource random = level.getRandom();
         List<double[]> inFrame = FillGameManager.tntPositions(count);
         for (int i = 0; i < count; i++) {
+            // 枠にまだ爆発していない TNT が多すぎるときは、それ以上落とさない（重くなるため）
+            if (inFrame != null && !FillGameManager.canDropTnt()) {
+                break;
+            }
             double x;
             double y;
             double z;
@@ -96,6 +113,9 @@ public final class ActionExecutor {
         }
     }
 
+    /** ギフトで出したモブに付ける印（昼でも燃えないようにする。mixin/MobSunBurnMixin） */
+    public static final String SPAWNED_TAG = "project_redstone";
+
     /** 埋め立て中は枠の中（埋めたブロックの上）に出す。そうでなければプレイヤーの周りに出す。 */
     private static void spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
         RandomSource random = level.getRandom();
@@ -105,8 +125,29 @@ public final class ActionExecutor {
                     ? BlockPos.containing(inFrame.get(i)[0], inFrame.get(i)[1], inFrame.get(i)[2])
                     : player.blockPosition().offset(random.nextInt(SPREAD * 2 + 1) - SPREAD, 0, random.nextInt(SPREAD * 2 + 1) - SPREAD);
             Entity mob = type.spawn(level, pos, EntitySpawnReason.EVENT);
+            if (mob != null) {
+                mob.addTag(SPAWNED_TAG);
+            }
             if (mob != null && inFrame != null) {
                 FillGameManager.trackMob(mob);
+            }
+        }
+    }
+
+    /** 雷。埋め立て中は枠の中の地上に落とし、落ちた所のブロックを少し壊す。見た目だけの雷なので火事にはならない */
+    private static void strikeLightning(ServerLevel level, ServerPlayer player, int count) {
+        RandomSource random = level.getRandom();
+        List<double[]> inFrame = FillGameManager.lightningPositions(count);
+        for (int i = 0; i < count; i++) {
+            double x = inFrame != null ? inFrame.get(i)[0] : player.getX() + (random.nextDouble() * 2 - 1) * SPREAD;
+            double y = inFrame != null ? inFrame.get(i)[1] : player.getY();
+            double z = inFrame != null ? inFrame.get(i)[2] : player.getZ() + (random.nextDouble() * 2 - 1) * SPREAD;
+            LightningBolt bolt = new LightningBolt(EntityTypes.LIGHTNING_BOLT, level);
+            bolt.setVisualOnly(true);
+            bolt.snapTo(x, y, z);
+            level.addFreshEntity(bolt);
+            if (inFrame != null) {
+                FillGameManager.lightningBlast(x, y, z);
             }
         }
     }
@@ -128,7 +169,15 @@ public final class ActionExecutor {
             case FILL_SHRINK -> "枠が " + request.count() + " マス縮んだ！";
             case FILL_HELP -> "お助けブロック ×" + request.count();
             case FILL_SET -> "（テスト）" + request.percent() + "% まで埋めました";
-            case FILL_START, FILL_STOP, MESSAGE, PING -> "";
+            case JAIL -> "逮捕！ " + request.count() + "秒";
+            case FREEZE -> "操作禁止 " + request.count() + "秒";
+            case FILL_LAYER -> "一段埋め ×" + request.count();
+            case FILL_CLEAR -> "全消し！";
+            case LIGHTNING -> "雷 ×" + request.count();
+            case LEVITATE -> "浮遊 " + request.count() + "秒";
+            case NIGHT -> "夜になった！ " + request.count() + "秒";
+            case FILL_RAISE -> "枠が " + request.count() + " 段高くなった！";
+            case FILL_START, FILL_STOP, MESSAGE, PING, WORLD -> "";
         };
     }
 }

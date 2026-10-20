@@ -66,9 +66,12 @@ export class TikTokSource extends EventEmitter {
       const wasWaiting = this.status.state === 'waiting';
       if (!wasWaiting) this.setStatus('connecting', username);
       try {
-        await connection.connect();
+        const state = await connection.connect();
         if (!isCurrent()) return;
         this.setStatus('connected', username);
+        // どの配信か（配信ごとに変わる番号）。ランキングを配信ごとに数えるのに使う
+        const roomId = String(state?.roomId ?? connection.roomId ?? '');
+        if (roomId) this.emit('live', { roomId });
         this.log('ok', `TikTok LIVE（@${username}）につながりました`);
       } catch (e) {
         if (!isCurrent()) return;

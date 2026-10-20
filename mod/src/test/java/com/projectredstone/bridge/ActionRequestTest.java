@@ -3,6 +3,8 @@ package com.projectredstone.bridge;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -56,6 +58,10 @@ class ActionRequestTest {
         ActionRequest custom = ActionRequest.parse("{\"type\":\"fill_start\",\"wall\":\"bedrock\",\"block\":\"diamond_block\",\"skyY\":200,\"reach\":999}");
         assertEquals("bedrock", custom.wall());
         assertEquals("diamond_block", custom.block());
+        assertEquals("diamond_block", custom.handBlock(), "手に持つブロックは、指定がなければ置かれるブロックと同じ");
+        assertEquals("amethyst_block",
+                ActionRequest.parse("{\"type\":\"fill_start\",\"handBlock\":\"amethyst_block\",\"block\":\"diamond_block\"}").handBlock());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"handBlock\":\"tnt\"}"));
         assertEquals(200, custom.skyY());
         assertEquals(64, custom.reach());
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"wall\":\"obsidian\"}"));
@@ -64,6 +70,31 @@ class ActionRequestTest {
         assertEquals(ActionRequest.Type.FILL_SHRINK, ActionRequest.parse("{\"type\":\"fill_shrink\"}").type());
         assertEquals(ActionRequest.Type.FILL_STOP, ActionRequest.parse("{\"type\":\"fill_stop\"}").type());
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"width\":\"big\"}"));
+    }
+
+    @Test
+    void parsesNewDisruptionsAndClampsTheirCounts() throws Exception {
+        assertEquals(ActionRequest.Type.JAIL, ActionRequest.parse("{\"type\":\"jail\",\"count\":10}").type());
+        assertEquals(60, ActionRequest.parse("{\"type\":\"jail\",\"count\":999}").count());
+        assertEquals(30, ActionRequest.parse("{\"type\":\"freeze\",\"count\":999}").count());
+        assertEquals(5, ActionRequest.parse("{\"type\":\"fill_layer\",\"count\":999}").count());
+        assertEquals(1, ActionRequest.parse("{\"type\":\"fill_clear\",\"count\":999}").count(), "全消しは数がない");
+        assertEquals(10, ActionRequest.parse("{\"type\":\"lightning\",\"count\":999}").count());
+        assertEquals(15, ActionRequest.parse("{\"type\":\"levitate\",\"count\":999}").count());
+        assertEquals(300, ActionRequest.parse("{\"type\":\"night\",\"count\":999}").count());
+        assertEquals(5, ActionRequest.parse("{\"type\":\"fill_raise\",\"count\":999}").count());
+        assertTrue(ActionRequest.NEEDS_FILL_GAME.contains(ActionRequest.Type.FILL_CLEAR));
+        assertTrue(ActionRequest.NEEDS_FILL_GAME.contains(ActionRequest.Type.JAIL));
+        assertFalse(ActionRequest.NEEDS_FILL_GAME.contains(ActionRequest.Type.FREEZE), "操作禁止は埋め立て中でなくても使える");
+        assertFalse(ActionRequest.NEEDS_FILL_GAME.contains(ActionRequest.Type.LIGHTNING));
+    }
+
+    @Test
+    void mobLifetimeDefaultsTo30SecondsAndIsClamped() throws Exception {
+        assertEquals(30, ActionRequest.parse("{\"type\":\"fill_start\"}").mobLifetime());
+        assertEquals(0, ActionRequest.parse("{\"type\":\"fill_start\",\"mobLifetime\":0}").mobLifetime(), "0 なら消えない");
+        assertEquals(600, ActionRequest.parse("{\"type\":\"fill_start\",\"mobLifetime\":99999}").mobLifetime());
+        assertEquals(0, ActionRequest.parse("{\"type\":\"fill_start\",\"mobLifetime\":-5}").mobLifetime());
     }
 
     @Test
@@ -76,8 +107,9 @@ class ActionRequestTest {
     void rejectsUnknownValues() {
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mob\",\"mob\":\"wither\"}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"bury\"}"));
-        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"lightning\"}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"meteor\"}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"op\"}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"time_add\"}"), "制限時間はなくした");
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"count\":1}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"message\"}"));
     }
@@ -95,5 +127,31 @@ class ActionRequestTest {
         String longName = "あ".repeat(50);
         ActionRequest request = ActionRequest.parse("{\"type\":\"tnt\",\"from\":\"" + longName + "\"}");
         assertEquals(ActionRequest.MAX_FROM_LENGTH, request.from().length());
+    }
+
+    @Test
+    void parsesMobsAttack() throws Exception {
+        ActionRequest defaults = ActionRequest.parse("{\"type\":\"fill_start\"}");
+        assertEquals(true, defaults.mobsAttack(), "既定はモブに攻撃される");
+        assertEquals(false, ActionRequest.parse("{\"type\":\"fill_start\",\"mobsAttack\":false}").mobsAttack());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"mobsAttack\":\"yes\"}"));
+    }
+
+    @Test
+    void parsesWorldSettings() throws Exception {
+        ActionRequest defaults = ActionRequest.parse("{\"type\":\"world\"}");
+        assertEquals(ActionRequest.Type.WORLD, defaults.type());
+        assertEquals("normal", defaults.time(), "既定はバニラと同じ");
+        assertEquals("normal", defaults.weather());
+        assertEquals(true, defaults.mobSpawning());
+        assertEquals(false, defaults.keepInventory());
+        ActionRequest custom = ActionRequest.parse(
+                "{\"type\":\"world\",\"time\":\"day\",\"weather\":\"clear\",\"mobSpawning\":false,\"keepInventory\":true}");
+        assertEquals("day", custom.time());
+        assertEquals("clear", custom.weather());
+        assertEquals(false, custom.mobSpawning());
+        assertEquals(true, custom.keepInventory());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"world\",\"time\":\"dusk\"}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"world\",\"weather\":\"snow\"}"));
     }
 }

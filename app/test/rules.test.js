@@ -37,3 +37,23 @@ test('ログ用の説明文', () => {
   assert.equal(describeEvent(gift('Rose', { count: 5 })), 'たろうさんから Rose ×5');
   assert.equal(describeEvent({ kind: 'follow', from: '' }), '誰かがフォロー');
 });
+
+test('並び順に関係なく、名前のギフトが先、ダイヤ数は大きい数のルールを使う', () => {
+  const mixed = [
+    { minDiamonds: 1, action: 'tnt' },
+    { minDiamonds: 100, action: 'fill_clear' },
+    { minDiamonds: 30, action: 'fill_expand' },
+    { gift: 'クラッカー', action: 'jail', count: 10 },
+  ];
+  assert.equal(findRuleIndex(mixed, gift('クラッカー', { diamonds: 100 })), 3, '名前で決めたルールが先');
+  assert.equal(findRuleIndex(mixed, gift('Galaxy', { diamonds: 1000 })), 1, '100以上がいちばん大きい');
+  assert.equal(findRuleIndex(mixed, gift('Donut', { diamonds: 30 })), 2);
+  assert.equal(findRuleIndex(mixed, gift('Rose', { diamonds: 1 })), 0);
+  assert.equal(findRuleIndex([{ gift: 'a', action: 'tnt' }, { gift: 'A', action: 'jail' }], gift('a')), 0, '同じなら上のもの');
+});
+
+test('新しい妨害も上限で止める（秒・段）', () => {
+  assert.equal(buildAction({ gift: 'x', action: 'jail', count: 30 }, gift('x', { count: 5 })).count, 60);
+  assert.equal(buildAction({ gift: 'x', action: 'fill_clear' }, gift('x', { count: 5 })).count, 1);
+  assert.equal(buildAction({ gift: 'x', action: 'fill_layer', count: 1 }, gift('x', { count: 9 })).count, 5);
+});

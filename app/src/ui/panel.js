@@ -1,5 +1,7 @@
 // 操作画面。exe に入れるため、HTML ごと文字列で持つ。
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
+import { MAX_COUNT_BY_TYPE } from '../rules.js';
+import { OVERLAY_WIDGETS } from './overlays.js';
 
 export const PANEL_HTML = String.raw`<!doctype html>
 <html lang="ja">
@@ -186,62 +188,61 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .ready { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); font-size: 12px; }
 
   /* ---- 妨害の設定 ---- */
-  /* ルールは1行ずつ。見出しは一番上に1回だけ */
-  .section-head { margin-bottom: 12px; }
-  .section-head h2 { font-size: 13px; font-weight: 700; margin: 0 0 2px; }
-  .section-head .lead { color: var(--muted); font-size: 12px; margin: 0; }
   .count { color: var(--faint); font-weight: 600; margin-left: 4px; }
-  .rule-list { container-type: inline-size; }
-  .rule-rows { display: flex; flex-direction: column; gap: 6px; }
-  .rule {
-    display: grid; align-items: center; column-gap: 12px;
-    grid-template-columns: 44px minmax(270px, 1.4fr) 16px minmax(250px, .9fr) minmax(140px, .8fr) 96px 28px;
-    grid-template-areas: "order when arrow then text cool del";
-    background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 8px 8px 8px 6px;
-  }
-  .rule:hover { border-color: var(--line); }
-  .rule-header { background: transparent; border-color: transparent; padding-top: 0; padding-bottom: 6px; font-size: 11px; color: var(--faint); }
-  .rule-header:hover { border-color: transparent; }
-  .rule-header span:nth-child(1) { grid-area: order; text-align: center; }
-  .rule-header span:nth-child(2) { grid-area: when; }
-  .rule-header span:nth-child(4) { grid-area: then; }
-  .rule-header span:nth-child(5) { grid-area: text; }
-  .rule-header span:nth-child(6) { grid-area: cool; }
-  .rule-order { grid-area: order; display: flex; align-items: center; justify-content: center; gap: 2px; }
-  .rule-no { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 14px; text-align: right; }
-  .rule-move { display: flex; flex-direction: column; }
-  .rule-move button { padding: 0 5px; font-size: 8px; line-height: 14px; height: 15px; }
   .icon-only { padding: 4px 8px; background: transparent; border-color: transparent; color: var(--muted); font-size: 12px; }
   .icon-only:hover { background: var(--raised); color: var(--text); }
   .icon-only:disabled { opacity: .2; }
-  .rule-slot { min-width: 0; }
-  .rule-when { grid-area: when; }
-  .rule-arrow { grid-area: arrow; color: var(--faint); display: flex; justify-content: center; }
-  .rule-arrow svg { width: 14px; height: 14px; }
-  .rule-then { grid-area: then; }
-  .slot-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
-  .slot-row > select { flex: none; width: 98px; }
-  .slot-row > .gift-pick { flex: 1; justify-content: flex-start; }
-  .gift-pick .caret { margin-left: auto; }
-  .slot-row .with-icon { flex: 0 1 auto; min-width: 0; }
-  .slot-row .with-icon select { width: 150px; min-width: 0; flex: 0 1 auto; }
-  .rule-text { grid-area: text; display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .rule-cooldown { grid-area: cool; display: flex; align-items: center; gap: 8px; }
-  .inline-label { display: none; font-size: 11px; color: var(--faint); white-space: nowrap; }
-  .rule .del { grid-area: del; padding: 4px 6px; }
-  .rule .del:hover { color: var(--bad); }
-  .grow-input { flex: 1; min-width: 0; }
-  /* 狭いとき: 表示する文と待ち時間を2段目に（見出しの代わりに小さなラベル） */
-  @container (max-width: 940px) {
-    .rule {
-      grid-template-columns: 44px minmax(0, 1.3fr) 16px minmax(0, 1fr) auto 28px;
-      grid-template-areas: "order when arrow then then del" ". text text text cool cool";
-      row-gap: 8px;
-    }
-    .inline-label { display: inline; }
-    .rule-header span:nth-child(5), .rule-header span:nth-child(6) { display: none; }
-    .rule-text input, .rule-cooldown input { height: 28px; font-size: 12px; }
+  /* プリセット */
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+  .preset {
+    position: relative; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 150px; max-width: 240px;
+    padding: 9px 12px; text-align: left; background: var(--bg); border-color: var(--line-soft);
   }
+  .preset:hover { background: var(--raised); border-color: var(--line); }
+  .preset b { font-size: 13px; }
+  .preset small { color: var(--faint); font-size: 11px; font-weight: 400; }
+  .preset.current { border-color: var(--text); background: var(--raised); }
+  .preset .in-use { position: absolute; top: 8px; right: 10px; font-size: 10px; color: var(--ok); font-weight: 700; }
+  .preset-mine { display: inline-flex; align-items: stretch; }
+  .preset-mine .preset { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .preset-mine .del { border: 1px solid var(--line-soft); border-left: 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 0 9px; }
+  .preset-mine .del:hover { color: var(--bad); }
+  .preset-save { border-style: dashed; color: var(--muted); background: transparent; }
+  /* ルールの一覧（きっかけの種類ごと） */
+  .rules-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .rules-top h2 { font-size: 15px; margin: 0 auto 0 0; }
+  .rule-group { margin-top: 18px; }
+  .rule-group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .rule-group-head h3 { font-size: 13px; margin: 0; }
+  .rule-group-head p { margin: 0 auto 0 0; color: var(--faint); font-size: 11px; }
+  .rule-group-head button { padding: 3px 10px; font-size: 12px; }
+  .rule-rows { display: flex; flex-direction: column; gap: 6px; }
+  .rule-none { color: var(--faint); font-size: 12px; padding: 10px 14px; border: 1px dashed var(--line-soft); border-radius: var(--radius); }
+  .rule {
+    display: grid; align-items: center; column-gap: 12px; width: 100%; text-align: left;
+    grid-template-columns: minmax(170px, 1.1fr) 14px minmax(170px, 1.1fr) minmax(0, 1fr) auto 30px;
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 8px 6px 8px 12px;
+    font-weight: 400; min-height: 46px; cursor: pointer;
+  }
+  .rule:hover { border-color: var(--line); background: var(--raised); }
+  .rule-when, .rule-then { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
+  .rule-when > span, .rule-then > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rule-when small, .rule-then small { color: var(--faint); font-weight: 400; margin-left: 2px; }
+  .rule-when .gift-img { width: 26px; height: 26px; }
+  .rule-when .unknown { color: var(--warn); }
+  .rule-arrow { color: var(--faint); display: flex; justify-content: center; }
+  .rule-arrow svg { width: 14px; height: 14px; }
+  .rule-label { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .rule-label.empty { color: var(--faint); }
+  .rule-tag { font-size: 11px; color: var(--faint); border: 1px solid var(--line-soft); border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
+  .rule .del { padding: 4px 6px; }
+  .rule .del:hover { color: var(--bad); }
+  .trigger-icon { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 6px; background: var(--raised); font-size: 13px; }
+  @container rules (max-width: 820px) {
+    .rule { grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) auto 30px; }
+    .rule-label { display: none; }
+  }
+  .rule-list { container: rules / inline-size; }
   input.invalid { border-color: var(--warn); }
   .num-field { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
   .num-field .affix { color: var(--muted); }
@@ -253,11 +254,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .gift-pick .caret { color: var(--faint); font-size: 10px; }
   .gift-pick.unknown { border-color: var(--warn); }
   .gift-pick.unset { border-style: dashed; color: var(--warn); border-color: var(--warn); padding-left: 10px; }
-  .rule-empty { border: 1px dashed var(--line); border-radius: var(--radius); padding: 28px; text-align: center; color: var(--muted); }
-  .rule-empty p { margin: 0; }
-  .rule-empty .hint { margin: 6px auto 0; }
   .dirty { color: var(--warn); font-size: 12px; }
-  /* 最近届いたギフト（横1列。押すとルールに追加） */
+  /* 最近届いたギフト（横1列。押すとルールを作る） */
   .recent-strip {
     display: flex; align-items: center; gap: 14px; min-width: 0;
     padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--surface);
@@ -266,6 +264,52 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .recent { display: flex; gap: 6px; overflow-x: auto; min-width: 0; padding: 2px 0; }
   .recent button { flex: none; padding: 3px 10px 3px 6px; font-size: 12px; }
   .recent-empty { color: var(--faint); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* ルールを作る・変える窓 */
+  #ruleEditor { width: min(780px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; }
+  #ruleEditor[open] { display: flex; flex-direction: column; }
+  .editor-body { overflow-y: auto; padding: 22px 26px 8px; }
+  .editor-foot { display: flex; align-items: center; gap: 8px; padding: 14px 26px; border-top: 1px solid var(--line-soft); }
+  .editor-foot .grow { flex: 1; }
+  .editor-step { margin-bottom: 18px; }
+  .editor-step > h3 { font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
+  .editor-step > h3 b { color: var(--text); margin-right: 6px; }
+  .segmented { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 10px; }
+  .segmented button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 6px 14px; }
+  .segmented button + button { border-left: 1px solid var(--line); }
+  .segmented button.selected { background: var(--invert-bg); color: var(--invert-text); font-weight: 700; }
+  .trigger-value { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--muted); font-size: 12px; }
+  .action-group { margin-bottom: 10px; }
+  .action-group > span { display: block; font-size: 11px; color: var(--faint); margin-bottom: 5px; }
+  .action-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 5px; }
+  .action-tiles button {
+    justify-content: flex-start; gap: 8px; padding: 5px 8px; font-size: 12px; font-weight: 600;
+    background: var(--bg); border-color: var(--line-soft); color: var(--muted); height: 36px;
+  }
+  .action-tiles button:hover { background: var(--raised); color: var(--text); }
+  .action-tiles button.selected { border-color: var(--text); color: var(--text); background: var(--raised); }
+  .action-tiles .mc { --s: 20px; }
+  .action-desc { margin: 4px 0 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 12px; }
+  .editor-details { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: end; }
+  .editor-details label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--faint); min-width: 0; }
+  .editor-details label input:not([type=number]) { width: 100%; }
+  .form-error { color: var(--warn); font-size: 12px; margin: 0; }
+
+  /* ---- 配信画面（オーバーレイ） ---- */
+  .widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+  .widget { display: flex; flex-direction: column; gap: 12px; }
+  .widget .preview {
+    position: relative; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--line-soft);
+    /* 透明の背景がわかるよう、ゲーム画面の代わりの市松模様 */
+    background: repeating-conic-gradient(#1c1c1f 0 25%, #151517 0 50%) 0 0 / 16px 16px;
+    max-height: 240px; margin: 0 auto; width: 100%;
+  }
+  /* 部品は明るい配色の前提のページなので、枠も同じにしないと白い背景が塗られる（本番の LIVE Studio では透明） */
+  .widget .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; color-scheme: normal; }
+  .widget h2 { margin: 0; }
+  .widget .lead { margin: 0; }
+  .widget .url { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .widget .url code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .widget .size { color: var(--faint); font-size: 12px; }
 
   /* ---- テスト ---- */
   details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
@@ -339,6 +383,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 14 5v6l-6 3.2L2 11V5z"/><path d="M2 5l6 3.2L14 5M8 8.2v6"/></svg>埋め立て</button>
     <button data-tab="tabRules">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>妨害の設定<span class="badge" id="rulesBadge" title="保存していない変更があります" hidden></span></button>
+    <button data-tab="tabOverlay">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="4" y="1.5" width="8" height="13" rx="1.5"/><path d="M6 5h4M6 7.5h2.5"/></svg>配信画面</button>
     <button data-tab="tabDebug">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 1.8h4M6.8 1.8v4.4L2.6 13a.8.8 0 0 0 .7 1.2h9.4a.8.8 0 0 0 .7-1.2L9.2 6.2V1.8"/><path d="M4.4 10h7.2"/></svg>テスト</button>
     <button data-tab="tabSetup">
@@ -392,7 +438,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     </section>
 
     <section class="card log-card">
-      <div class="card-head"><h2>ログ</h2></div>
+      <div class="card-head"><h2>ログ</h2><button class="ghost" id="logLatest" hidden>最新のログへ ↓</button></div>
       <ul id="log"></ul>
     </section>
   </div>
@@ -411,8 +457,15 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <section class="card">
           <h2>見た目</h2>
           <p class="lead">配信に映るブロックと枠です。</p>
-          <p class="group-label">置くブロック</p>
-          <select id="fillBlock" data-tiles aria-label="置くブロック">
+          <p class="group-label">手に持つブロック</p>
+          <select id="fillHandBlock" data-tiles aria-label="手に持つブロック">
+            <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
+            <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
+            <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
+            <option value="redstone_block">レッドストーン</option><option value="quartz_block">クォーツ</option>
+          </select>
+          <p class="group-label" style="margin-top: 16px;">置かれるブロック（置いた瞬間にこれに変わる。お助けもこれ）</p>
+          <select id="fillBlock" data-tiles aria-label="置かれるブロック">
             <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
             <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
             <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
@@ -429,6 +482,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <p class="lead">埋めきって、決めた秒数崩されなければ 1ラウンドクリアです。</p>
           <div class="fields">
             <div><label for="fillRounds">ラウンド数</label><input id="fillRounds" type="number" min="1" max="99"></div>
+            <div><label for="fillMobLifetime">モブが消えるまで（秒・0 で消えない）</label><input id="fillMobLifetime" type="number" min="0" max="600" step="5"></div>
             <div><label for="fillCountdown">埋めきってからクリアまで（秒）</label><input id="fillCountdown" type="number" min="0" max="600"></div>
             <div><label for="fillWidth">枠の幅（マス）</label><input id="fillWidth" type="number" min="3" max="41" step="2"></div>
             <div><label for="fillHeight">枠の高さ（マス）</label><input id="fillHeight" type="number" min="1" max="30"></div>
@@ -436,9 +490,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
           </div>
         </section>
         <section class="card">
-          <h2>操作の速さ</h2>
+          <h2>プレイヤー</h2>
           <p class="lead">埋め立て中だけ変わり、終えると元に戻ります。</p>
           <div class="fields">
+            <div><label for="fillMobsAttack">モブからの攻撃</label><select id="fillMobsAttack">
+              <option value="true">モブの攻撃でだけダメージ</option><option value="false">攻撃されない</option>
+            </select></div>
             <div><label for="fillPlaceSpeed">置く速さ（押しっぱなし）</label><select id="fillPlaceSpeed">
               <option value="normal">ふつう（1秒に5個）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
             </select></div>
@@ -450,10 +507,28 @@ export const PANEL_HTML = String.raw`<!doctype html>
         </section>
         <section class="card">
           <h2>始めるとどうなるか</h2>
-          <p class="hint" style="margin: 6px 0 0;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。</p>
+          <p class="hint" style="margin: 6px 0 0;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
         </section>
       </div>
     </div>
+    <section class="card">
+      <h2>ワールド</h2>
+      <p class="lead">コマンドの代わりです。変えるとすぐマイクラに入り、ワールドに入るたびにも入れ直します。埋め立て中でも変えられます。</p>
+      <div class="fields">
+        <div><label for="worldTime">時間</label><select id="worldTime">
+          <option value="normal">進む（ふつう）</option><option value="day">昼で止める</option><option value="night">夜で止める</option>
+        </select></div>
+        <div><label for="worldWeather">天気</label><select id="worldWeather">
+          <option value="normal">変わる（ふつう）</option><option value="clear">晴れで止める</option><option value="rain">雨で止める</option>
+        </select></div>
+        <div><label for="worldMobSpawning">モブが自然に湧く</label><select id="worldMobSpawning">
+          <option value="true">湧く（ふつう）</option><option value="false">湧かない（妨害のモブだけ）</option>
+        </select></div>
+        <div><label for="worldKeepInventory">やられたときの持ち物</label><select id="worldKeepInventory">
+          <option value="false">落とす（ふつう）</option><option value="true">残る</option>
+        </select></div>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -461,27 +536,38 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <div class="page-head">
     <h1>妨害の設定</h1>
     <span class="dirty" id="dirty" hidden>保存していない変更があります</span>
-    <button class="lg" id="addRule">ルールを追加</button>
     <button class="lg ghost" id="revertRules">元に戻す</button>
     <button class="lg next" id="saveRules">保存する</button>
   </div>
   <div class="page">
-    <div class="recent-strip" title="押すと、そのギフトのルールを一番上に追加します">
+    <section class="card">
+      <div class="card-head"><h2>プリセット</h2></div>
+      <p class="lead">押すと、ルールがまとめて入れ替わります（「保存する」を押すまで確定しません）。</p>
+      <div class="presets" id="presets"></div>
+    </section>
+    <div class="recent-strip" title="押すと、そのギフトのルールを作ります">
       <span class="recent-title">最近届いたギフト</span>
       <div class="recent" id="recent"></div>
     </div>
     <section class="rules-section">
-      <div class="section-head">
+      <div class="rules-top">
         <h2>ルール <span class="count" id="ruleCount"></span></h2>
-        <p class="lead">上から順に見て、最初に合ったルールの妨害を出します。ギフトを連打すると数も増えます。</p>
+        <button class="lg next" id="addRule">＋ ルールを追加</button>
       </div>
-      <div class="rule-list">
-        <div class="rule rule-header" id="ruleHeader" aria-hidden="true">
-          <span>順番</span><span>きっかけ</span><span></span><span>出す妨害</span><span>配信画面に出す文</span><span title="同じルールを続けて出さない秒数">待ち時間</span><span></span>
-        </div>
-        <div id="ruleRows" class="rule-rows"></div>
-      </div>
+      <p class="hint" style="margin-top: 0;">行を押すと変えられます。ギフトを連打すると、出る数も増えます。</p>
+      <div class="rule-list" id="ruleGroups"></div>
     </section>
+  </div>
+</main>
+
+<main id="tabOverlay" hidden>
+  <div class="page-head"><h1>配信画面</h1></div>
+  <div class="page">
+    <section class="card">
+      <h2>配信画面に出す部品</h2>
+      <p class="lead" style="margin-bottom: 0;">TikTok LIVE Studio で「ソースを追加」→「リンク」を選び、下の URL を貼ります。部品ごとに別々に貼れるので、好きな位置・大きさに置いてください（大きさは縦画面 1080×1920 のときのおすすめです。枠を大きくすると、文字や絵も大きくなります）。下の絵は試しの表示です。</p>
+    </section>
+    <div class="widgets" id="widgets"></div>
   </div>
 </main>
 
@@ -538,6 +624,22 @@ export const PANEL_HTML = String.raw`<!doctype html>
       </div>
     </section>
     <section class="card">
+      <h2>ほかの妨害・お助けをそのまま出す</h2>
+      <p class="lead">逮捕・一段埋め・全消し・枠を高くは、埋め立て中だけ使えます。</p>
+      <div class="quick">
+        <button data-action="jail" data-count="10" data-icon="jail">逮捕 10秒</button>
+        <button data-action="freeze" data-count="5" data-icon="freeze">操作禁止 5秒</button>
+        <button data-action="lightning" data-count="3" data-icon="lightning">雷 ×3</button>
+        <button data-action="levitate" data-count="3" data-icon="levitate">浮遊 3秒</button>
+        <button data-action="night" data-count="30" data-icon="night">夜にする 30秒</button>
+      </div>
+      <div class="quick">
+        <button data-action="fill_layer" data-icon="fill_layer">一段埋め</button>
+        <button data-action="fill_clear" data-icon="fill_clear">全消し</button>
+        <button data-action="fill_raise" data-icon="fill_raise">枠を高く +1段</button>
+      </div>
+    </section>
+    <section class="card">
       <h2>埋め立てを進める</h2>
       <p class="lead">埋め立て中に使えます。下の段から順に埋めます。</p>
       <div class="quick">
@@ -586,11 +688,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
       </section>
       <section class="card">
         <h2>配信画面に表示（オーバーレイ）</h2>
-        <p class="lead">LIVE Studio で「リンク」のソースを追加して、この URL を貼ります。妨害が出たときと埋め立て中に表示されます。</p>
-        <div class="row">
-          <code id="overlayUrl"></code>
-          <button id="copyOverlay">コピー</button>
-        </div>
+        <p class="lead">ギフト通知・ギフト表・ラウンド・ランキングを、部品ごとに LIVE Studio に貼れます。</p>
+        <button data-goto="tabOverlay">配信画面の部品を見る</button>
       </section>
     </div>
   </div>
@@ -637,6 +736,43 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <p class="hint" id="giftPickerHint"></p>
 </dialog>
 
+<dialog id="ruleEditor">
+  <div class="editor-body">
+    <h2 id="editorTitle">ルールを追加</h2>
+    <p class="hint" style="margin: 0 0 18px;">①きっかけ → ②出す妨害 → ③細かい設定 の順に決めます。</p>
+    <div class="editor-step">
+      <h3><b>①</b>きっかけ（何が起きたら）</h3>
+      <div class="segmented" id="editorTriggers"></div>
+      <div class="trigger-value" id="editorTriggerValue"></div>
+    </div>
+    <div class="editor-step">
+      <h3><b>②</b>出す妨害</h3>
+      <div id="editorActions"></div>
+      <p class="action-desc" id="editorActionDesc"></p>
+    </div>
+    <div class="editor-step">
+      <h3><b>③</b>細かい設定</h3>
+      <div class="editor-details" id="editorDetails"></div>
+    </div>
+  </div>
+  <div class="editor-foot">
+    <button class="ghost" id="editorDelete">このルールを削除</button>
+    <p class="form-error grow" id="editorError"></p>
+    <button id="editorCancel">やめる</button>
+    <button class="next" id="editorOk">決定</button>
+  </div>
+</dialog>
+
+<dialog id="presetDialog" style="width: min(420px, calc(100vw - 32px));">
+  <h2>今の設定をプリセットに保存</h2>
+  <p class="hint" style="margin: 0 0 14px;">今のルールに名前を付けて取っておきます。同じ名前なら上書きします。</p>
+  <input id="presetName" maxlength="20" placeholder="名前（例: 土曜の配信）" autocomplete="off" style="width: 100%;">
+  <div class="wizard-actions" style="justify-content: flex-end;">
+    <button id="presetCancel">やめる</button>
+    <button id="presetOk" class="next">保存する</button>
+  </div>
+</dialog>
+
 <dialog id="confirmDialog" style="width: min(420px, calc(100vw - 32px));">
   <h2 id="confirmTitle"></h2>
   <p class="hint" id="confirmText"></p>
@@ -666,17 +802,30 @@ export const PANEL_HTML = String.raw`<!doctype html>
   function giftIcon(nameOrUrl, big) {
     const url = /^https:/.test(nameOrUrl ?? '') ? nameOrUrl : giftFor(nameOrUrl)?.image;
     if (!url) return document.createDocumentFragment();
-    const img = Object.assign(document.createElement('img'), { src: url, className: 'gift-img' + (big ? ' big' : ''), alt: '', referrerPolicy: 'no-referrer' });
+    // 一覧には700近くあるので、見えるところから読む
+    const img = Object.assign(document.createElement('img'), { src: url, className: 'gift-img' + (big ? ' big' : ''), alt: '', referrerPolicy: 'no-referrer', loading: 'lazy' });
     img.addEventListener('error', () => img.remove());
     return img;
   }
   let gifts = [];
   let giftsVersion = -1;
+  /** 名前（日本語・英語の小文字）→ ギフト。ルールの一覧を描くたびに引くので、一覧を読んだときに作っておく */
+  let giftsByName = new Map();
   /** ギフト一覧から、日本語名・英語名のどちらでも探す */
   function giftFor(name) {
     const key = String(name ?? '').trim().toLowerCase();
     if (!key) return null;
-    return gifts.find((g) => g.nameJa.toLowerCase() === key) ?? gifts.find((g) => g.name.toLowerCase() === key) ?? null;
+    return giftsByName.get(key) ?? null;
+  }
+  function indexGifts() {
+    const byJa = new Map();
+    const byEn = new Map();
+    for (const g of gifts) {
+      if (!byJa.has(g.nameJa.toLowerCase())) byJa.set(g.nameJa.toLowerCase(), g);
+      if (!byEn.has(g.name.toLowerCase())) byEn.set(g.name.toLowerCase(), g);
+    }
+    // 日本語名を先に探す
+    giftsByName = new Map([...byEn, ...byJa]);
   }
   async function loadGifts(version) {
     giftsVersion = version;
@@ -684,6 +833,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       const res = await fetch('/api/gifts');
       if (!res.ok) return;
       gifts = (await res.json()).gifts;
+      indexGifts();
     } catch {
       return;
     }
@@ -737,7 +887,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     renderFill(state.fill);
     $('debugState').textContent = JSON.stringify({ mod: { connected: state.mod.connected, players: state.mod.players }, fill: state.fill, paused: state.paused, stats: state.stats }, null, 2);
     renderFillSettings(state.fillSettings);
+    renderWorldSettings(state.worldSettings);
     if (!rulesDirty) loadRules(state.rules);
+    renderPresets();
     renderRecent();
     if (!wizardChecked) {
       wizardChecked = true;
@@ -745,9 +897,30 @@ export const PANEL_HTML = String.raw`<!doctype html>
     }
   }
 
+  // ログはいつも最新（いちばん下）を見せる。上に戻して読んでいる間だけ追いかけるのを止め、「最新のログへ」で戻る。
+  // 見えていない画面のあいだも追いかける（隠れている間は高さが 0 なので、そこで止めてしまわないように）
+  let followLog = true;
+  function scrollLogToEnd() {
+    $('log').scrollTop = $('log').scrollHeight;
+    followLog = true;
+    $('logLatest').hidden = true;
+  }
+  $('log').addEventListener('scroll', () => {
+    const log = $('log');
+    if (log.clientHeight === 0) return;
+    followLog = log.scrollTop + log.clientHeight >= log.scrollHeight - 24;
+    $('logLatest').hidden = followLog;
+  });
+  $('logLatest').addEventListener('click', scrollLogToEnd);
+  // あとから行が高くなったとき（ギフトの絵の読み込み・ウィンドウの大きさが変わった・隠れていた画面を開いた）も、いちばん下に付いていく
+  const keepLogAtEnd = () => {
+    if (followLog) $('log').scrollTop = $('log').scrollHeight;
+  };
+  $('log').addEventListener('load', keepLogAtEnd, true);
+  new ResizeObserver(keepLogAtEnd).observe($('log'));
+
   function addLog(entry) {
     const log = $('log');
-    const stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
     const li = document.createElement('li');
     const time = document.createElement('time');
     time.textContent = new Date(entry.time).toLocaleTimeString('ja-JP', { hour12: false });
@@ -759,7 +932,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     li.append(time, text);
     log.append(li);
     while (log.children.length > 300) log.firstChild.remove();
-    if (stick) log.scrollTop = log.scrollHeight;
+    if (followLog) log.scrollTop = log.scrollHeight;
   }
 
   // ---- お知らせ（右下に少しだけ出る。作業を止めない） ----
@@ -879,12 +1052,36 @@ export const PANEL_HTML = String.raw`<!doctype html>
   window.addEventListener('focus', loadSetup);
   loadSetup();
 
-  $('overlayUrl').textContent = location.origin + '/overlay';
-  $('copyOverlay').addEventListener('click', async () => {
-    await navigator.clipboard.writeText(location.origin + '/overlay');
-    $('copyOverlay').textContent = 'コピーしました';
-    setTimeout(() => ($('copyOverlay').textContent = 'コピー'), 1500);
-  });
+  // ---- 配信画面の部品（URL・おすすめの大きさ・試しの表示） ----
+  const OVERLAY_WIDGETS = ${JSON.stringify(OVERLAY_WIDGETS)};
+  $('widgets').replaceChildren(...OVERLAY_WIDGETS.map((w) => {
+    // 末尾の .html がないと LIVE Studio のリンク欄に「正しいURLを入力してください」と言われる
+    const url = location.origin + '/overlay/' + w.id + '.html';
+    const preview = el('div', 'preview');
+    // おすすめの大きさの縦横比で見せる（縦長のものは幅を狭く）
+    preview.style.aspectRatio = w.size[0] + ' / ' + w.size[1];
+    preview.style.maxWidth = Math.round(240 * w.size[0] / w.size[1]) + 'px';
+    const frame = Object.assign(document.createElement('iframe'), { src: '/overlay/' + w.id + '#demo', title: w.name + 'の試しの表示', loading: 'lazy' });
+    frame.tabIndex = -1;
+    preview.append(frame);
+    const copy = Object.assign(el('button', '', 'コピー'), { type: 'button' });
+    copy.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(url);
+      copy.textContent = 'コピーしました';
+      setTimeout(() => (copy.textContent = 'コピー'), 1500);
+    });
+    const card = el('section', 'card widget', preview, el('h2', '', w.name), el('p', 'lead', w.description),
+      el('div', 'url', el('code', '', url), copy), el('span', 'size', 'おすすめの大きさ: 幅' + w.size[0] + '×高さ' + w.size[1]));
+    if (w.id === 'ranking') {
+      const reset = Object.assign(el('button', '', 'ランキングをリセット'), { type: 'button' });
+      reset.addEventListener('click', async () => {
+        const ok = await askConfirm({ title: 'ランキングをリセットしますか？', text: 'この配信のギフトの合計が0に戻ります。', ok: 'リセットする' });
+        if (ok) post('/api/ranking/reset', {}, { button: reset, done: 'ランキングをリセットしました' });
+      });
+      card.append(reset);
+    }
+    return card;
+  }));
 
   function storage(key, value) {
     try {
@@ -898,6 +1095,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   function showTab(id) {
     document.querySelectorAll('nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     document.querySelectorAll('body > main').forEach((page) => (page.hidden = page.id !== id));
+    // 配信の画面に戻ったら、ログは最新を見せる
+    if (id === 'tabLive' && followLog) $('log').scrollTop = $('log').scrollHeight;
     storage('redstone.tab', id);
   }
   document.querySelectorAll('nav [data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -906,21 +1105,50 @@ export const PANEL_HTML = String.raw`<!doctype html>
   const lastTab = storage('redstone.tab');
   if (lastTab && $(lastTab)?.tagName === 'MAIN') showTab(lastTab);
 
-  // ---- ルールの表 ----
-  const ACTIONS = [
-    ['tnt', 'TNT'], ['mob', 'モブ'], ['fill_expand', '枠を広げる'], ['fill_shrink', '枠を縮める'],
-    ['fill_help', 'お助けブロック'], ['message', 'メッセージだけ'],
+  // ---- 妨害の設定 ----
+  /** 出す妨害。グループごとに絵つきで並べる。unit は数の単位（なければ数を決めない）、def は選んだときの数 */
+  const ACTION_GROUPS = [
+    ['敵・爆発', [
+      ['tnt', 'TNT', '個', 1, '枠の中に TNT が落ちて、埋めたブロックを壊す'],
+      ['mob:zombie', 'ゾンビ', '体', 1], ['mob:skeleton', 'スケルトン', '体', 1], ['mob:creeper', 'クリーパー', '体', 1],
+      ['mob:spider', 'クモ', '体', 1], ['mob:witch', 'ウィッチ', '体', 1], ['mob:silverfish', 'シルバーフィッシュ', '体', 1], ['mob:pig', 'ブタ', '体', 1],
+      ['lightning', '雷', '回', 1, '枠の中に雷が落ちて、まわりのブロックを少し壊す（火事にはならない）'],
+    ]],
+    ['動きをじゃまする', [
+      ['jail', '逮捕', '秒', 10, '枠の横の牢屋に入れられて、決めた秒数のあいだ埋められない。終わると枠に戻る'],
+      ['freeze', '操作禁止', '秒', 5, 'その場から動けず、ブロックも置けない'],
+      ['levitate', '浮遊', '秒', 3, '体がふわふわ浮き上がる'],
+      ['night', '夜にする', '秒', 30, '決めた秒数のあいだ夜になる。終わると元の時刻に戻る'],
+    ]],
+    ['埋め立てをじゃまする', [
+      ['fill_expand', '枠を広げる', 'マス', 1, '枠が広がって、埋める所が増える'],
+      ['fill_raise', '枠を高くする', '段', 1, '枠が高くなって、埋める段が増える（次のラウンドで元に戻る）'],
+      ['fill_clear', '全消し', '', 0, '埋めたブロックが全部消える'],
+    ]],
+    ['お助け', [
+      ['fill_help', 'お助けブロック', '個', 10, '空いている所が下から埋まる'],
+      ['fill_layer', '一段埋め', '段', 1, 'いちばん下の空いている段が、まるごと埋まる'],
+      ['fill_shrink', '枠を縮める', 'マス', 1, '枠が小さくなって、埋める所が減る'],
+      ['message', 'メッセージだけ', '', 0, '配信画面とマイクラに文を出すだけ（感謝などに）'],
+    ]],
   ];
-  /** 数の単位 */
-  const UNITS = { tnt: '個', mob: '体', fill_expand: 'マス', fill_shrink: 'マス', fill_help: '個' };
-  const MOBS = [['zombie', 'ゾンビ'], ['skeleton', 'スケルトン'], ['creeper', 'クリーパー'], ['spider', 'クモ'], ['witch', 'ウィッチ'], ['silverfish', 'シルバーフィッシュ'], ['pig', 'ブタ']];
-  const TRIGGERS = [['gift', 'ギフト'], ['minDiamonds', 'ダイヤ数で'], ['likes', 'いいね'], ['follow', 'フォロー'], ['share', 'シェア'], ['giftId', 'ギフトID']];
-  const NO_COUNT = new Set(['message']);
-  const MAX_COUNT = { tnt: 20, mob: 10, fill_expand: 5, fill_shrink: 5, fill_help: 64 };
+  const ACTION_INFO = Object.fromEntries(ACTION_GROUPS.flatMap(([, list]) => list.map(([key, name, unit, def, desc]) => [key, { name, unit, def, desc }])));
+  const MAX_COUNT = ${JSON.stringify(MAX_COUNT_BY_TYPE)};
+  const TRIGGERS = [['gift', 'ギフト'], ['minDiamonds', 'コイン数で'], ['likes', 'いいね'], ['follow', 'フォロー'], ['share', 'シェア']];
+  /** 一覧のグループ（きっかけの種類ごと） */
+  const RULE_GROUPS = [
+    ['gift', 'ギフト', 'このギフトが届いたら', ['gift', 'giftId']],
+    ['minDiamonds', 'コイン数で', '名前で決めていないギフトは、コイン数で決めます（大きい数から当てはめます）', ['minDiamonds']],
+    ['likes', 'いいね', 'いいねが決まった回数たまるたびに', ['likes']],
+    ['follow', 'フォロー・シェア', '', ['follow', 'share']],
+  ];
 
   let rows = [];
   let rulesDirty = false;
   let savedRulesKey = '';
+
+  const actionKey = (row) => (row.action === 'mob' ? 'mob:' + row.mob : row.action);
+  const hasCount = (action) => !!ACTION_INFO[action === 'mob' ? 'mob:zombie' : action]?.unit;
 
   function toRow(rule) {
     const trigger = rule.event ?? (rule.gift !== undefined ? 'gift' : rule.likes !== undefined ? 'likes' : rule.minDiamonds !== undefined ? 'minDiamonds' : 'giftId');
@@ -938,12 +1166,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
     else rule.gift = row.value;
     rule.action = row.action;
     if (row.action === 'mob') rule.mob = row.mob;
-    if (!NO_COUNT.has(row.action)) rule.count = Number(row.count);
+    if (hasCount(row.action)) rule.count = Number(row.count);
     if (row.label) rule.label = row.label;
     if (Number(row.cooldownSec) > 0) rule.cooldownSec = Number(row.cooldownSec);
     if (row.maxCount !== undefined) rule.maxCount = row.maxCount;
     return rule;
   }
+
+  /** 保存する順番: きっかけの種類ごと、コイン数は大きい順（当てはまり方は順番に関係ないが、設定ファイルを読みやすくする） */
+  function sortedRules(list) {
+    const groupOf = (row) => RULE_GROUPS.findIndex(([, , , triggers]) => triggers.includes(row.trigger));
+    return list.map((row, i) => ({ row, i }))
+      .sort((a, b) => groupOf(a.row) - groupOf(b.row)
+        || (a.row.trigger === 'minDiamonds' ? Number(b.row.value) - Number(a.row.value) : 0)
+        || (a.row.trigger === 'likes' ? Number(a.row.value) - Number(b.row.value) : 0)
+        || a.i - b.i)
+      .map(({ row }) => toRule(row));
+  }
+  const rulesKey = (rules) => JSON.stringify(sortedRules(rules.map(toRow)));
 
   function loadRules(rules) {
     const key = JSON.stringify(rules);
@@ -963,27 +1203,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('revertRules').disabled = !value;
   }
 
-  function select(options, value, onChange) {
-    const el = document.createElement('select');
-    for (const [v, text] of options) el.append(Object.assign(document.createElement('option'), { value: v, textContent: text }));
-    el.value = value;
-    el.addEventListener('change', () => onChange(el.value));
-    return el;
-  }
-
   function input(value, onInput, { list, ...attrs } = {}) {
     const el = Object.assign(document.createElement('input'), attrs);
     if (list) el.setAttribute('list', list); // list は代入できない
     el.value = value;
     el.addEventListener('input', () => onInput(el.value));
     return el;
-  }
-
-  function withIcon(iconName, el) {
-    const wrap = document.createElement('div');
-    wrap.className = 'with-icon';
-    wrap.append(mcIcon(iconName), el);
-    return wrap;
   }
 
   function el(tag, className, ...children) {
@@ -993,7 +1218,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     return node;
   }
 
-  /** ギフトを選ぶボタン（絵・名前・ダイヤ数）。押すとギフトの一覧が開く */
+  /** ギフトを選ぶボタン（絵・名前・コイン数）。押すとギフトの一覧が開く */
   function giftPickButton(row, onPicked) {
     const b = el('button', 'gift-pick' + (row.value.trim() ? '' : ' unset'));
     b.type = 'button';
@@ -1002,12 +1227,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
       b.append(el('span', 'gift-pick-name', 'ギフトを選ぶ'));
     } else {
       b.append(giftIcon(row.value), el('span', 'gift-pick-name', gift?.nameJa ?? row.value));
-      if (gift) b.append(el('small', '', '💎' + gift.diamonds));
+      if (gift) b.append(el('small', '', '🪙' + gift.diamonds));
       else b.classList.add('unknown');
     }
     b.append(el('span', 'caret', '▾'));
     b.title = !row.value.trim() ? 'ギフトを一覧から選ぶ'
-      : gift ? (gift.nameJa ?? row.value) + '（💎' + gift.diamonds + '）。押すと選び直せます'
+      : gift ? (gift.nameJa ?? row.value) + '（🪙' + gift.diamonds + '）。押すと選び直せます'
       : '「' + row.value + '」はギフトの一覧にない名前です。押して選び直してください';
     b.addEventListener('click', () => openGiftPicker(onPicked));
     return b;
@@ -1021,115 +1246,201 @@ export const PANEL_HTML = String.raw`<!doctype html>
     return el('span', 'num-field', ...(before ? [el('span', 'affix', before)] : []), field, ...(after ? [el('span', 'affix', after)] : []));
   }
 
-  /** 妨害の選択肢。モブは種類ごとに並べて、1回で選べるようにする（値は 'mob:creeper' の形） */
-  function actionSelect(row, onChange) {
-    const s = document.createElement('select');
-    s.setAttribute('aria-label', '出す妨害');
-    const add = (parent, value, text) => parent.append(Object.assign(document.createElement('option'), { value, textContent: text }));
-    for (const [v, text] of ACTIONS) if (v !== 'mob') add(s, v, text);
-    const mobs = Object.assign(document.createElement('optgroup'), { label: 'モブを出す' });
-    for (const [v, text] of MOBS) add(mobs, 'mob:' + v, text);
-    s.append(mobs);
-    s.value = row.action === 'mob' ? 'mob:' + row.mob : row.action;
-    s.addEventListener('change', () => {
-      const [action, mob] = s.value.split(':');
-      row.action = action;
-      if (mob) row.mob = mob;
-      onChange();
-    });
-    return s;
+  /** 一覧の左側: きっかけ（ギフトの絵・名前、コイン数など） */
+  function triggerSummary(row) {
+    const box = el('div', 'rule-when');
+    const badge = (text) => el('span', 'trigger-icon', text);
+    if (row.trigger === 'gift') {
+      const gift = giftFor(row.value);
+      const icon = giftIcon(row.value);
+      box.append(icon.nodeType === 1 ? icon : badge('🎁'), el('span', gift ? '' : 'unknown', gift?.nameJa ?? row.value));
+      if (gift) box.lastChild.append(el('small', '', '🪙' + gift.diamonds));
+      else box.title = '「' + row.value + '」はギフトの一覧にない名前です';
+    } else if (row.trigger === 'giftId') {
+      box.append(badge('🎁'), el('span', '', 'ギフトID ' + row.value));
+    } else if (row.trigger === 'minDiamonds') {
+      box.append(badge('🪙'), el('span', '', row.value + ' コイン以上'));
+    } else if (row.trigger === 'likes') {
+      box.append(badge('❤'), el('span', '', 'いいね ' + row.value + '回ごと'));
+    } else {
+      box.append(badge(row.trigger === 'follow' ? '＋' : '↗'), el('span', '', row.trigger === 'follow' ? 'フォロー' : 'シェア'));
+    }
+    return box;
   }
 
-  /** ルールを1行ずつ「きっかけ → 出す妨害」と並べる。狭いウィンドウでは表示する文・待ち時間を2段目へ */
+  /** 一覧の右側: 出す妨害（絵・名前・数） */
+  function actionSummary(row) {
+    const info = ACTION_INFO[actionKey(row)];
+    const text = el('span', '', info?.name ?? row.action);
+    if (info?.unit) text.append(el('small', '', (info.unit === '秒' ? ' ' : ' ×') + row.count + info.unit));
+    return el('div', 'rule-then', mcIcon(row.action === 'mob' ? row.mob : row.action, 22), text);
+  }
+
   function renderRows() {
-    const change = (row, key, rerender) => (value) => {
-      row[key] = value;
-      setDirty(true);
-      if (rerender) renderRows();
-    };
     $('ruleCount').textContent = rows.length ? rows.length + '件' : '';
-    $('ruleHeader').hidden = rows.length === 0;
-    if (rows.length === 0) {
-      const empty = el('div', 'rule-empty', el('p', '', 'ルールがまだありません。'), el('p', 'hint', '「ルールを追加」から、どのギフトで何を出すかを決めます。'));
-      $('ruleRows').replaceChildren(empty);
-      return;
-    }
-    $('ruleRows').replaceChildren(...rows.map((row, i) => {
-      // 順番
-      const up = Object.assign(el('button', 'icon-only', '▲'), { disabled: i === 0, title: '上へ' });
-      const down = Object.assign(el('button', 'icon-only', '▼'), { disabled: i === rows.length - 1, title: '下へ' });
-      up.addEventListener('click', () => { [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]]; setDirty(true); renderRows(); });
-      down.addEventListener('click', () => { [rows[i + 1], rows[i]] = [rows[i], rows[i + 1]]; setDirty(true); renderRows(); });
-      const order = el('div', 'rule-order', el('span', 'rule-no', String(i + 1)), el('span', 'rule-move', up, down));
-
-      // きっかけ
-      const when = el('div', 'rule-slot rule-when');
-      const whenRow = el('div', 'slot-row', select(TRIGGERS, row.trigger, (v) => {
-        row.trigger = v;
-        row.value = v === 'likes' ? '1000' : v === 'minDiamonds' ? '100' : '';
-        setDirty(true);
-        renderRows();
-      }));
-      if (row.trigger === 'gift') {
-        whenRow.append(giftPickButton(row, (name) => { row.value = name; setDirty(true); renderRows(); }));
-      } else if (row.trigger === 'likes') {
-        whenRow.append(numberField(row.value, change(row, 'value'), { min: 1, after: '回ごと', width: 80, label: 'いいねの回数' }));
-      } else if (row.trigger === 'minDiamonds') {
-        whenRow.append(numberField(row.value, change(row, 'value'), { min: 0, before: '💎', after: '以上', width: 72, label: 'ダイヤ数（以上のギフト）' }));
-      } else if (row.trigger === 'giftId') {
-        whenRow.append(input(row.value, change(row, 'value'), { placeholder: 'ギフトID', className: 'grow-input' }));
-      }
-      when.append(whenRow);
-
-      // 出す妨害
-      const then = el('div', 'rule-slot rule-then');
-      const thenRow = el('div', 'slot-row', withIcon(row.action === 'mob' ? row.mob : row.action, actionSelect(row, () => { setDirty(true); renderRows(); })));
-      if (!NO_COUNT.has(row.action)) {
-        thenRow.append(numberField(row.count, change(row, 'count'), { before: '×', after: UNITS[row.action], min: 1, max: MAX_COUNT[row.action], width: 56, label: '数' }));
-      }
-      then.append(thenRow);
-
-      // 表示する文（メッセージだけのときは必須）
-      const needsLabel = row.action === 'message';
-      const label = input(row.label, change(row, 'label'), {
-        placeholder: needsLabel ? '出す文を入れてください' : '空なら妨害の名前', maxLength: 100, className: 'grow-input',
-      });
-      label.setAttribute('aria-label', '配信画面に出す文');
-      if (needsLabel && !row.label.trim()) label.classList.add('invalid');
-      label.addEventListener('input', () => label.classList.toggle('invalid', needsLabel && !label.value.trim()));
-      const text = el('div', 'rule-text', el('span', 'inline-label', '表示する文'), label);
-      const cooldown = el('div', 'rule-cooldown', el('span', 'inline-label', '待ち時間'),
-        numberField(row.cooldownSec, change(row, 'cooldownSec'), { min: 0, after: '秒', width: 52, label: '待ち時間（秒）' }));
-
-      const del = Object.assign(el('button', 'icon-only del', '✕'), { title: 'このルールを削除' });
-      del.addEventListener('click', () => {
-        rows.splice(i, 1);
-        setDirty(true);
-        renderRows();
-        toast('ルールを削除しました。「元に戻す」で取り消せます');
-      });
-
-      const arrow = el('span', 'rule-arrow');
-      arrow.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11M9 4l4 4-4 4"/></svg>';
-      return el('div', 'rule', order, when, arrow, then, text, cooldown, del);
+    renderPresets();
+    $('ruleGroups').replaceChildren(...RULE_GROUPS.map(([trigger, title, lead, triggers]) => {
+      const add = Object.assign(el('button', '', '＋ 追加'), { type: 'button', title: title + 'のルールを追加' });
+      add.addEventListener('click', () => openEditor(null, { trigger }));
+      const head = el('div', 'rule-group-head', el('h3', '', title), el('p', '', lead), add);
+      let list = rows.map((row, i) => ({ row, i })).filter(({ row }) => triggers.includes(row.trigger));
+      if (trigger === 'minDiamonds') list = list.sort((a, b) => Number(b.row.value) - Number(a.row.value));
+      if (trigger === 'likes') list = list.sort((a, b) => Number(a.row.value) - Number(b.row.value));
+      const body = list.length === 0
+        ? el('div', 'rule-none', 'まだありません')
+        : el('div', 'rule-rows', ...list.map(({ row, i }) => ruleRow(row, i)));
+      return el('div', 'rule-group', head, body);
     }));
   }
 
-  $('addRule').addEventListener('click', () => {
-    const row = toRow({ gift: '', action: 'tnt', count: 1 });
-    rows.push(row);
+  function ruleRow(row, i) {
+    const line = el('div', 'rule');
+    line.tabIndex = 0;
+    line.setAttribute('role', 'button');
+    line.title = '押すと変えられます';
+    const arrow = el('span', 'rule-arrow');
+    arrow.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11M9 4l4 4-4 4"/></svg>';
+    const label = el('span', 'rule-label' + (row.label ? '' : ' empty'), row.label ? '「' + row.label + '」' : '');
+    const tag = Number(row.cooldownSec) > 0 ? el('span', 'rule-tag', '待ち ' + row.cooldownSec + '秒') : el('span');
+    const del = Object.assign(el('button', 'icon-only del', '✕'), { type: 'button', title: 'このルールを削除' });
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeRow(i);
+    });
+    line.append(triggerSummary(row), arrow, actionSummary(row), label, tag, del);
+    line.addEventListener('click', () => openEditor(i));
+    line.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openEditor(i);
+      }
+    });
+    return line;
+  }
+
+  function removeRow(i) {
+    rows.splice(i, 1);
     setDirty(true);
     renderRows();
-    $('ruleRows').lastElementChild?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    // いちばん多いのはギフトのルールなので、すぐギフトを選べるようにする
-    openGiftPicker((name) => { row.value = name; renderRows(); });
+    toast('ルールを削除しました。「元に戻す」で取り消せます');
+  }
+
+  // ---- ルールを作る・変える窓 ----
+  let editing = null; // { index, row }
+  function openEditor(index, defaults = {}) {
+    const row = index === null ? { ...toRow({ gift: '', action: 'tnt', count: 1 }), ...defaults } : { ...rows[index] };
+    if (index === null && row.trigger !== 'gift') row.value = row.trigger === 'likes' ? '100' : row.trigger === 'minDiamonds' ? '100' : '';
+    editing = { index, row };
+    $('editorTitle').textContent = index === null ? 'ルールを追加' : 'ルールを変える';
+    $('editorDelete').hidden = index === null;
+    $('editorError').textContent = '';
+    renderEditor();
+    $('ruleEditor').showModal();
+    $('ruleEditor').querySelector('.editor-body').scrollTop = 0;
+  }
+
+  function renderEditor() {
+    const row = editing.row;
+    // ① きっかけ
+    const triggers = row.trigger === 'giftId' ? [...TRIGGERS, ['giftId', 'ギフトID']] : TRIGGERS;
+    $('editorTriggers').replaceChildren(...triggers.map(([value, text]) => {
+      const b = Object.assign(el('button', row.trigger === value ? 'selected' : '', text), { type: 'button' });
+      b.addEventListener('click', () => {
+        if (row.trigger === value) return;
+        row.trigger = value;
+        row.value = value === 'likes' ? '100' : value === 'minDiamonds' ? '100' : '';
+        renderEditor();
+      });
+      return b;
+    }));
+    const value = $('editorTriggerValue');
+    if (row.trigger === 'gift') {
+      value.replaceChildren(giftPickButton(row, (name) => { row.value = name; renderEditor(); }), 'が届いたら');
+    } else if (row.trigger === 'minDiamonds') {
+      value.replaceChildren(numberField(row.value, (v) => (row.value = v), { min: 1, before: '🪙', after: 'コイン以上のギフトが届いたら', width: 80, label: 'コイン数' }));
+    } else if (row.trigger === 'likes') {
+      value.replaceChildren(numberField(row.value, (v) => (row.value = v), { min: 1, before: 'いいねが', after: '回たまるたびに', width: 80, label: 'いいねの回数' }));
+    } else if (row.trigger === 'giftId') {
+      value.replaceChildren(input(row.value, (v) => (row.value = v), { placeholder: 'ギフトID' }));
+    } else {
+      value.replaceChildren(row.trigger === 'follow' ? 'フォローされたら' : 'シェアされたら');
+    }
+
+    // ② 出す妨害
+    const selected = actionKey(row);
+    $('editorActions').replaceChildren(...ACTION_GROUPS.map(([title, list]) => el('div', 'action-group', el('span', '', title),
+      el('div', 'action-tiles', ...list.map(([key, name, , def]) => {
+        const b = Object.assign(el('button', key === selected ? 'selected' : '', mcIcon(key.startsWith('mob:') ? key.slice(4) : key, 20), name), { type: 'button' });
+        b.addEventListener('click', () => {
+          const [action, mob] = key.split(':');
+          if (key !== selected && def) row.count = def;
+          row.action = action;
+          if (mob) row.mob = mob;
+          renderEditor();
+        });
+        return b;
+      })))));
+    const info = ACTION_INFO[selected];
+    $('editorActionDesc').textContent = info?.desc ?? '枠の中の地上に出る（埋め立て中でなければ、プレイヤーのまわり）';
+
+    // ③ 細かい設定
+    const details = [];
+    if (info?.unit) {
+      const max = MAX_COUNT[row.action];
+      details.push(el('label', '', '数（1回あたり・最大 ' + max + info.unit + '）',
+        numberField(row.count, (v) => (row.count = v), { min: 1, max, before: info.unit === '秒' ? '' : '×', after: info.unit, width: 70, label: '数' })));
+    }
+    const needsLabel = row.action === 'message';
+    const label = input(row.label, (v) => (row.label = v), { placeholder: needsLabel ? '出す文（例: ありがとう！）' : '空なら妨害の名前', maxLength: 100 });
+    details.push(el('label', '', needsLabel ? '配信画面に出す文（必須）' : '配信画面に出す文', label));
+    details.push(el('label', '', '待ち時間（続けて出さない）',
+      numberField(row.cooldownSec, (v) => (row.cooldownSec = v), { min: 0, after: '秒', width: 60, label: '待ち時間（秒）' })));
+    $('editorDetails').replaceChildren(...details);
+  }
+
+  /** 決定する前に確かめる。@returns 問題があれば理由 */
+  function editorProblem(row) {
+    if (row.trigger === 'gift' && !row.value.trim()) return 'ギフトを選んでください';
+    if (row.trigger === 'giftId' && !row.value.trim()) return 'ギフトID を入れてください';
+    if (row.trigger === 'minDiamonds' && !(Number(row.value) >= 1)) return 'コイン数は1以上にしてください';
+    if (row.trigger === 'likes' && !(Number.isInteger(Number(row.value)) && Number(row.value) >= 1)) return 'いいねの回数は1以上の整数にしてください';
+    if (hasCount(row.action)) {
+      const count = Number(row.count);
+      if (!(Number.isInteger(count) && count >= 1)) return '数は1以上の整数にしてください';
+      if (count > MAX_COUNT[row.action]) row.count = MAX_COUNT[row.action];
+    }
+    if (row.action === 'message' && !row.label.trim()) return '出す文を入れてください';
+    if (!(Number(row.cooldownSec) >= 0)) return '待ち時間は0以上にしてください';
+    return '';
+  }
+
+  $('editorOk').addEventListener('click', () => {
+    const { index, row } = editing;
+    const problem = editorProblem(row);
+    if (problem) {
+      $('editorError').textContent = problem;
+      return;
+    }
+    if (index === null) rows.push(row);
+    else rows[index] = row;
+    setDirty(true);
+    renderRows();
+    $('ruleEditor').close();
+    toast(index === null ? 'ルールを追加しました。「保存する」で使われます' : 'ルールを変えました。「保存する」で使われます');
   });
+  $('editorCancel').addEventListener('click', () => $('ruleEditor').close());
+  $('editorDelete').addEventListener('click', () => {
+    $('ruleEditor').close();
+    removeRow(editing.index);
+  });
+
+  $('addRule').addEventListener('click', () => openEditor(null));
   $('revertRules').addEventListener('click', () => {
     savedRulesKey = '';
     loadRules(state.rules);
   });
-  async function saveRules(rules) {
-    const data = await post('/api/rules', { rules }, { button: $('saveRules'), done: '妨害の設定を保存しました' });
+  async function saveRules(list) {
+    const data = await post('/api/rules', { rules: sortedRules(list) }, { button: $('saveRules'), done: '妨害の設定を保存しました' });
     if (data?.ok) {
       savedRulesKey = '';
       loadRules(data.state.rules);
@@ -1137,14 +1448,80 @@ export const PANEL_HTML = String.raw`<!doctype html>
     }
     return false;
   }
-  $('saveRules').addEventListener('click', () => saveRules(rows.map(toRule)));
+  $('saveRules').addEventListener('click', () => saveRules(rows));
   // Ctrl+S で保存（妨害の設定の画面を開いているとき）
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !$('tabRules').hidden) {
       e.preventDefault();
-      if (rulesDirty) saveRules(rows.map(toRule));
+      if (rulesDirty) saveRules(rows);
     }
   });
+
+  // ---- プリセット ----
+  let presetsKey = '';
+  function renderPresets() {
+    if (!state?.presets) return;
+    const current = JSON.stringify(sortedRules(rows));
+    // 状態はいいねや進み具合のたびに届くので、変わっていなければ作り直さない
+    const key = JSON.stringify(state.presets) + current;
+    if (key === presetsKey) return;
+    presetsKey = key;
+    const chip = (preset, description) => {
+      const inUse = rows.length > 0 && rulesKey(preset.rules) === current;
+      const b = Object.assign(el('button', 'preset' + (inUse ? ' current' : ''), el('b', '', preset.name), el('small', '', description)), { type: 'button' });
+      if (inUse) b.append(el('span', 'in-use', '使用中'));
+      b.title = preset.rules.length + '件のルール。押すと入れ替わります';
+      b.addEventListener('click', () => applyPreset(preset));
+      return b;
+    };
+    const mine = state.presets.mine.map((preset) => {
+      const del = Object.assign(el('button', 'icon-only del', '✕'), { type: 'button', title: 'このプリセットを削除' });
+      del.addEventListener('click', async () => {
+        const ok = await askConfirm({ title: '「' + preset.name + '」を削除しますか？', text: '今のルールはそのままです。', ok: '削除する' });
+        if (ok) await post('/api/presets/delete', { name: preset.name }, { done: 'プリセットを削除しました' });
+      });
+      return el('span', 'preset-mine', chip(preset, '自分で保存・' + preset.rules.length + '件'), del);
+    });
+    const save = Object.assign(el('button', 'preset preset-save', el('b', '', '＋ 今の設定を保存'), el('small', '', '名前を付けて取っておく')), { type: 'button' });
+    save.addEventListener('click', () => {
+      $('presetName').value = '';
+      $('presetDialog').showModal();
+      $('presetName').focus();
+    });
+    $('presets').replaceChildren(...state.presets.builtin.map((p) => chip(p, p.description)), ...mine, save);
+  }
+
+  async function applyPreset(preset) {
+    if (rows.length > 0 && rulesKey(preset.rules) === JSON.stringify(sortedRules(rows))) return;
+    const ok = await askConfirm({
+      title: '「' + preset.name + '」に入れ替えますか？',
+      text: '今のルールが「' + preset.name + '」のルール（' + preset.rules.length + '件）に入れ替わります。「保存する」を押すまでは確定しないので、「元に戻す」で戻せます。',
+      ok: '入れ替える',
+    });
+    if (!ok) return;
+    rows = preset.rules.map(toRow);
+    setDirty(true);
+    renderRows();
+    toast('「' + preset.name + '」を読み込みました。よければ「保存する」を押してください');
+  }
+
+  async function savePreset() {
+    const name = $('presetName').value.trim();
+    if (!name) {
+      $('presetName').classList.add('invalid');
+      return;
+    }
+    // 保存していない変更があれば、先にルールを保存する（プリセットには保存したルールが入る）
+    if (rulesDirty && !(await saveRules(rows))) return;
+    const data = await post('/api/presets/save', { name }, { button: $('presetOk'), done: '「' + name + '」として保存しました' });
+    if (data?.ok) $('presetDialog').close();
+  }
+  $('presetOk').addEventListener('click', savePreset);
+  $('presetName').addEventListener('keydown', (e) => {
+    $('presetName').classList.remove('invalid');
+    if (e.key === 'Enter') savePreset();
+  });
+  $('presetCancel').addEventListener('click', () => $('presetDialog').close());
 
   // ---- 埋め立てモード ----
   function renderFill(fill) {
@@ -1173,27 +1550,53 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   // 前回の設定を入れる（入力中は上書きしない）
   const FILL_FIELDS = {
-    fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillRounds: 'rounds', fillWall: 'wall', fillBlock: 'block',
+    fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillRounds: 'rounds', fillWall: 'wall', fillBlock: 'block', fillHandBlock: 'handBlock',
     fillSkyY: 'skyY', fillReach: 'reach', fillPlaceSpeed: 'placeSpeed', fillBreakSpeed: 'breakSpeed',
+    fillMobsAttack: 'mobsAttack', fillMobLifetime: 'mobLifetime',
   };
   let fillFormDirty = false;
   Object.keys(FILL_FIELDS).forEach((id) => $(id).addEventListener('input', () => (fillFormDirty = true)));
+  let fillSettingsKey = '';
   function renderFillSettings(settings) {
     if (fillFormDirty || !settings) return;
+    const key = JSON.stringify(settings);
+    if (key === fillSettingsKey) return;
+    fillSettingsKey = key;
     for (const [id, key] of Object.entries(FILL_FIELDS)) {
-      $(id).value = settings[key];
+      $(id).value = String(settings[key]);
       $(id).dispatchEvent(new Event('sync'));
     }
   }
 
+  // ---- ワールドの設定（変えたらすぐ入れる） ----
+  const WORLD_FIELDS = { worldTime: 'time', worldWeather: 'weather', worldMobSpawning: 'mobSpawning', worldKeepInventory: 'keepInventory' };
+  function renderWorldSettings(settings) {
+    if (!settings) return;
+    for (const [id, key] of Object.entries(WORLD_FIELDS)) {
+      if (document.activeElement !== $(id)) $(id).value = String(settings[key]);
+    }
+  }
+  Object.keys(WORLD_FIELDS).forEach((id) => $(id).addEventListener('change', async () => {
+    const body = {};
+    for (const [field, key] of Object.entries(WORLD_FIELDS)) {
+      const value = $(field).value;
+      body[key] = value === 'true' ? true : value === 'false' ? false : value;
+    }
+    const data = await post('/api/world', body);
+    if (data?.ok) toast(data.applied ? 'ワールドの設定をマイクラに入れました' : '保存しました。マイクラのワールドに入ったら入れます');
+  }));
+
   $('fillStart').addEventListener('click', async () => {
     const body = {};
     for (const [id, key] of Object.entries(FILL_FIELDS)) {
-      body[key] = $(id).tagName === 'SELECT' ? $(id).value : Number($(id).value);
+      const value = $(id).value;
+      body[key] = $(id).tagName !== 'SELECT' ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
     }
     const data = await post('/api/fill/start', body, { button: $('fillStart'), done: '埋め立てを始めました' });
     if (data?.ok) {
       fillFormDirty = false;
+      // 保存された値（範囲に収めたもの）で入れ直す
+      fillSettingsKey = '';
       // 始めたら、状況が見える配信の画面へ
       showTab('tabLive');
     }
@@ -1237,9 +1640,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
   });
 
   // ---- 最近届いたギフト ----
+  let recentKey = '';
   function renderRecent() {
     if (!state) return;
     const recent = state.recentGifts;
+    // 変わっていなければ作り直さない（絵を読み直してちらつかないように）
+    const key = giftsVersion + JSON.stringify(recent);
+    if (key === recentKey) return;
+    recentKey = key;
     if (!recent.length) {
       $('recent').replaceChildren(Object.assign(document.createElement('span'), { className: 'recent-empty', textContent: 'まだありません。TikTok LIVE につながると、届いたギフトがここに並びます' }));
       return;
@@ -1247,13 +1655,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('recent').replaceChildren(...recent.map((gift) => {
       const b = document.createElement('button');
       b.className = 'icon-btn';
-      b.append(giftIcon(gift.image || gift.giftName), gift.giftName + '（💎' + gift.diamonds + '）');
-      b.addEventListener('click', () => {
-        rows.unshift(toRow({ gift: gift.giftName, action: 'tnt', count: 1 }));
-        setDirty(true);
-        renderRows();
-        toast('「' + gift.giftName + '」のルールを一番上に追加しました。妨害を選んで保存してください');
-      });
+      b.append(giftIcon(gift.image || gift.giftName), gift.giftName + '（🪙' + gift.diamonds + '）');
+      b.addEventListener('click', () => openEditor(null, { trigger: 'gift', value: gift.giftName }));
       return b;
     }));
   }
@@ -1273,12 +1676,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const seen = new Set();
     const shown = gifts
       .filter((g) => !query || g.nameJa.toLowerCase().includes(query) || g.name.toLowerCase().includes(query))
-      .filter((g) => !seen.has(g.nameJa) && seen.add(g.nameJa))
-      .slice(0, 300);
+      .filter((g) => !seen.has(g.nameJa) && seen.add(g.nameJa));
     $('giftGrid').replaceChildren(...shown.map((g) => {
       const b = document.createElement('button');
       b.type = 'button';
-      const small = Object.assign(document.createElement('small'), { textContent: '💎' + g.diamonds });
+      const small = Object.assign(document.createElement('small'), { textContent: '🪙' + g.diamonds });
       b.append(giftIcon(g.image, true), g.nameJa, small);
       b.addEventListener('click', () => {
         $('giftPicker').close();
@@ -1288,7 +1690,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     }));
     $('giftPickerHint').textContent = gifts.length === 0
       ? 'ギフトの一覧をまだ取れていません。インターネットにつながっているか確かめて、アプリを起動し直してください。'
-      : 'ダイヤの少ない順です。' + (shown.length < gifts.length ? '名前で探すと、ほかのギフトも出ます。' : '');
+      : (query ? shown.length + '件見つかりました。' : '全' + shown.length + '種類。') + 'コインの少ない順です。';
   }
   $('giftSearch').addEventListener('input', renderGiftGrid);
   // 一覧にあるギフトなら、ボタンにその絵を出す

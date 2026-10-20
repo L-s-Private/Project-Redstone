@@ -7,8 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FillGameTest {
@@ -89,16 +91,21 @@ class FillGameTest {
         FillGame game = FillGame.create(world, 0, 0, 0, 3, 2, 2);
         world.fillInterior(1, 0, 2);
 
-        assertFalse(game.tick(world));
+        assertEquals(FillGame.TickResult.NONE, game.tick(world));
         assertEquals(FillGame.Phase.COUNTDOWN, game.phase());
         assertEquals(2, game.status().countdownSecondsLeft());
         assertEquals(100, game.status().percent());
-        assertFalse(game.tick(world));
-        assertFalse(game.tick(world));
-        assertFalse(game.tick(world));
-        assertTrue(game.tick(world), "2秒（4回）でクリア");
+        // 残り2秒は2.5秒（5回）、残り1秒は3秒（6回）かかる
+        for (int i = 0; i < 5; i++) {
+            assertEquals(FillGame.TickResult.NONE, game.tick(world));
+        }
+        assertEquals(1, game.status().countdownSecondsLeft());
+        for (int i = 0; i < 5; i++) {
+            assertEquals(FillGame.TickResult.NONE, game.tick(world));
+        }
+        assertEquals(FillGame.TickResult.ROUND_CLEARED, game.tick(world), "最後の2秒は5.5秒かけてクリア");
         assertEquals(FillGame.Phase.CLEARED, game.phase());
-        assertFalse(game.tick(world), "クリア後は何もしない");
+        assertEquals(FillGame.TickResult.NONE, game.tick(world), "クリア後は何もしない");
     }
 
     @Test
@@ -108,7 +115,7 @@ class FillGameTest {
         game.resize(world, 1);
         world.fillInterior(2, 0, 1);
 
-        assertTrue(game.tick(world), "1ラウンド目クリア");
+        assertEquals(FillGame.TickResult.ROUND_CLEARED, game.tick(world), "1ラウンド目クリア");
         assertEquals(FillGame.Phase.FILLING, game.phase(), "次のラウンドへ");
         assertEquals(1, game.status().round());
         assertEquals(2, game.status().rounds());
@@ -117,12 +124,99 @@ class FillGameTest {
         assertEquals(null, world.at(0, 0, 0));
         assertEquals("bedrock", world.at(2, 0, 0), "枠は作り直す");
         assertEquals(null, world.at(3, 0, 0), "広げた分の壁は消える");
+        assertEquals(null, world.at(3, -1, 3), "広げた分の床も消える（前のラウンドの枠が残らない）");
+        assertEquals("bedrock", world.at(2, -1, 2), "今の枠の床は残る");
 
         world.fillInterior(1, 0, 1);
-        assertTrue(game.tick(world), "2ラウンド目クリア");
+        assertEquals(FillGame.TickResult.ROUND_CLEARED, game.tick(world), "2ラウンド目クリア");
         assertEquals(FillGame.Phase.CLEARED, game.phase(), "最後のラウンドで終わり");
         assertEquals(2, game.status().round());
         assertEquals("stone", world.at(0, 0, 0), "最後は空にしない");
+    }
+
+    @Test
+    void onlyTheInsideOfTheFrameIsInterior() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 3, 2, 0);
+        assertTrue(game.isInterior(0, 0, 0));
+        assertTrue(game.isInterior(1, 1, -1));
+        assertFalse(game.isInterior(2, 0, 0), "壁");
+        assertFalse(game.isInterior(5, 0, 0), "枠の外");
+        assertFalse(game.isInterior(0, -1, 0), "床");
+        assertFalse(game.isInterior(0, 2, 0), "いちばん上の段より上");
+        game.raise(world, 1);
+        assertTrue(game.isInterior(0, 2, 0), "高くしたら置ける");
+    }
+
+    @Test
+    void centerTextShowsOnlyTheCountdown() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 3, 1, 5);
+        assertNull(FillGame.centerText(game.status()), "埋め立て中は出さない");
+
+        world.fillInterior(1, 0, 1);
+        game.tick(world);
+        assertArrayEquals(new String[] {"5", "崩されなければクリア"}, FillGame.centerText(game.status()));
+    }
+
+    @Test
+    void countdownSlowsDownNearTheEnd() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 3, 1, 10);
+        world.fillInterior(1, 0, 1);
+        game.tick(world);
+        List<Integer> shown = new java.util.ArrayList<>();
+        int ticks = 1;
+        while (game.tick(world) == FillGame.TickResult.NONE) {
+            shown.add(game.status().countdownSecondsLeft());
+            ticks++;
+        }
+        ticks++;
+        // 10〜6 は1秒（2回）ずつ、5・4 は1.5秒、3 は2秒、2 は2.5秒、1 は3秒
+        assertEquals(1 + 10 + 3 + 3 + 4 + 5 + 6, ticks, "10秒のカウントダウンは実際には16秒");
+        assertEquals(2, java.util.Collections.frequency(shown, 6), "残り6秒は1秒（2回）");
+        assertEquals(6, java.util.Collections.frequency(shown, 1), "残り1秒は3秒（6回）");
+    }
+
+    @Test
+    void raisingTheFrameAddsRowsAndTheNextRoundLowersItAgain() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 3, 2, 0, 2);
+        assertEquals(2, game.raise(world, 2));
+        assertEquals(4, game.status().height());
+        assertEquals(36, game.status().total());
+        assertEquals("bedrock", world.at(2, 3, 0), "壁も高くなる");
+        assertTrue(game.isAboveFrame(0, 4, 0));
+        assertFalse(game.isAboveFrame(0, 3, 0));
+
+        world.fillInterior(1, 0, 4);
+        assertEquals(FillGame.TickResult.ROUND_CLEARED, game.tick(world));
+        assertEquals(2, game.status().height(), "次のラウンドは元の高さ");
+        assertEquals(null, world.at(2, 3, 0), "高くした壁は消える");
+        assertEquals(null, world.at(0, 2, 0), "高くした段の中も消える");
+        assertEquals(30, game.raise(world, 99) + 2, "上限は30段");
+    }
+
+    @Test
+    void fillLayersFillsTheLowestRowsThatHaveGaps() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 0, 0, 3, 3, 0);
+        world.fillInterior(1, 0, 1);
+        world.put(0, 1, 0, "stone");
+        assertEquals(8, game.fillLayers(world, 1), "2段目の空いている8マスを埋める");
+        assertEquals(18, game.status().filled());
+        assertEquals(9, game.fillLayers(world, 5), "残りは1段だけ");
+        assertEquals(27, game.status().filled());
+    }
+
+    @Test
+    void shrinkingRemovesTheFloorOutsideTheNewFrame() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 5, 0, 7, 2, 0);
+        game.resize(world, -2);
+        assertEquals(null, world.at(4, 4, 0), "外の床は消える");
+        assertEquals(null, world.at(3, 4, 3));
+        assertEquals("bedrock", world.at(2, 4, 2), "新しい枠の床は残る");
     }
 
     @Test
@@ -160,6 +254,40 @@ class FillGameTest {
         }
         world.fillInterior(1, 10, 3);
         assertEquals(13, game.spawnPositions(world, 1, new Random(3)).get(0)[1], "埋まっていれば枠の上");
+    }
+
+    @Test
+    void mobsSpawnOnTheSurfaceNotUnderAnOverhang() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 10, 0, 3, 5, 0);
+        // 床から1段目は空いていて、2〜3段目に張り出したブロックがある（下から探すと生き埋めになる形）
+        world.put(0, 12, 0, "stone");
+        world.put(0, 11, 0, "stone");
+        assertEquals(13, game.surfaceY(world, 0, 0), "いちばん上のブロックの上");
+        assertEquals(10, game.surfaceY(world, 1, 1), "何もなければ床");
+        for (double[] p : game.spawnPositions(world, 50, new Random(1))) {
+            assertFalse(game.isBuried(world, p[0], p[1], p[2], 1.95), "出した直後に埋まっていない");
+        }
+    }
+
+    @Test
+    void findsMobsOutsideTheStageOrBuriedAndReturnsThemInside() {
+        FakeWorld world = new FakeWorld();
+        FillGame game = FillGame.create(world, 0, 10, 0, 5, 5, 0);
+        assertTrue(game.isInsideColumn(2.9, -1.5));
+        assertFalse(game.isInsideColumn(3.1, 0), "壁の上・外は枠の外");
+        assertFalse(game.isInsideColumn(0, -3.5));
+
+        world.put(2, 10, 2, "stone");
+        world.put(2, 11, 2, "stone");
+        double[] back = game.returnPosition(world, 7.2, 9.9);
+        assertEquals(2.5, back[0], "いちばん近い枠の中の列");
+        assertEquals(2.5, back[2]);
+        assertEquals(12, back[1], "その列の地上");
+
+        assertTrue(game.isBuried(world, 2.5, 11, 2.5, 1.95), "足元がブロックの中");
+        assertTrue(game.isBuried(world, 2.5, 9.5, 2.5, 1.95), "頭がブロックの中");
+        assertFalse(game.isBuried(world, 2.5, 12, 2.5, 1.95), "ブロックの上に立っている");
     }
 
     @Test
@@ -262,7 +390,7 @@ class FillGameTest {
         FakeWorld world = new FakeWorld();
         FillGame game = FillGame.create(world, 0, 0, 0, 3, 2, 0);
         assertEquals(18, game.setFillPercent(world, 100));
-        assertTrue(game.tick(world), "カウントダウン0秒なのですぐクリア");
+        assertEquals(FillGame.TickResult.ROUND_CLEARED, game.tick(world), "カウントダウン0秒なのですぐクリア");
         assertEquals(FillGame.Phase.CLEARED, game.phase());
 
         assertEquals(9, game.setFillPercent(world, 50));

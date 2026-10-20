@@ -34,11 +34,11 @@ class FakeTikTok extends EventEmitter {
   }
 }
 
-function setup(configOverrides = {}) {
+function setup(configOverrides = {}, engineOptions = {}) {
   const config = { tiktokUsername: 'taro', mod: { host: '127.0.0.1', port: 1 }, rules: [{ gift: 'Rose', action: 'tnt', count: 2 }], ...configOverrides };
   const client = new FakeClient();
   const tiktok = new FakeTikTok();
-  const engine = new Engine({ config, client, tiktok });
+  const engine = new Engine({ config, client, tiktok, ...engineOptions });
   const alerts = [];
   const logs = [];
   engine.on('alert', (a) => alerts.push(a));
@@ -53,7 +53,8 @@ test('TikTokのギフトを妨害にして、オーバーレイ用の通知を�
   tiktok.emit('event', rose);
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(client.sent, [{ type: 'tnt', count: 6, from: 'たろう' }]);
-  assert.deepEqual(alerts, [{ who: 'たろうさん', action: 'TNT ×6', icon: 'tnt', giftImage: '' }]);
+  assert.deepEqual(alerts, [{ who: 'たろうさん', action: 'TNT ×6', icon: 'tnt', giftImage: '', giftName: 'Rose', count: 3 }]);
+  assert.deepEqual(engine.state.ranking, [{ name: 'たろう', coins: 3 }], 'ギフトランキングに足す');
   assert.equal(engine.state.stats.sent, 1);
 });
 
@@ -118,7 +119,7 @@ test('テスト送信のボタンをルールから作る', () => {
     { giftId: '5655', action: 'tnt' },
   ]), [
     { label: 'Rose', body: { kind: 'gift', giftName: 'Rose', count: 1 } },
-    { label: '💎100', body: { kind: 'gift', giftName: '100ダイヤのギフト', diamonds: 100, count: 1 } },
+    { label: '🪙100', body: { kind: 'gift', giftName: '100コインのギフト', diamonds: 100, count: 1 } },
     { label: 'いいね1000', body: { kind: 'like', count: 1000 } },
     { label: 'フォロー', body: { kind: 'follow' } },
   ]);
@@ -158,7 +159,7 @@ test('いいねは回数がたまるたびに出し、端数は次に持ち越�
   assert.equal(logs.length, 0);
   await engine.handleEvent({ kind: 'like', count: 1500, from: 'b' }); // 合計2100 → 2回分、100 持ち越し
   assert.deepEqual(client.sent, [{ type: 'fill_help', count: 20, from: 'b' }]);
-  assert.deepEqual(alerts, [{ who: 'いいね2000回', action: 'お助けブロック ×20', icon: 'fill_help', giftImage: '' }]);
+  assert.deepEqual(alerts, [{ who: 'いいね2000回', action: 'お助けブロック ×20', icon: 'fill_help', giftImage: '', giftName: '', count: 1 }]);
   await engine.handleEvent({ kind: 'like', count: 900, from: 'c' }); // 100 + 900 = 1000 → 1回
   assert.equal(client.sent.at(-1).count, 10);
   await engine.handleEvent({ kind: 'like', count: 7000, from: 'd' }); // 合計1万に届く
@@ -179,7 +180,10 @@ test('画面のボタンからの操作は、マイクラにつながってい�
 test('埋め立ての開始・終了を MOD に送り、断られたら理由を返す', async () => {
   const { engine, client } = setup();
   await engine.startFill({ width: 15, height: 5, countdown: 30, block: 'diamond_block' });
-  const sent = { width: 15, height: 5, countdown: 30, rounds: 10, wall: 'glass', block: 'diamond_block', skyY: 150, reach: 8, placeSpeed: 'fast', breakSpeed: 'fast' };
+  const sent = {
+    width: 15, height: 5, countdown: 30, rounds: 10, wall: 'glass', block: 'diamond_block', handBlock: 'diamond_block', skyY: 150, reach: 8,
+    placeSpeed: 'fast', breakSpeed: 'fast', mobsAttack: true, mobLifetime: 30,
+  };
   assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent });
   assert.deepEqual(engine.config.fill, sent, '使った設定を覚える');
   assert.deepEqual(engine.state.fillSettings, sent);
@@ -190,8 +194,90 @@ test('埋め立ての開始・終了を MOD に送り、断られたら理由を
   await assert.rejects(engine.stopFill(), /始まっていません/);
 });
 
+test('ワールドの設定（昼に固定など）は、マイクラにつながっていればすぐ送り、つながっていなければ覚えておく', async () => {
+  const { engine, client, logs } = setup();
+  assert.equal(await engine.setWorld({ time: 'day', weather: 'clear', mobSpawning: false, keepInventory: true, junk: 1 }), true);
+  assert.deepEqual(client.sent.at(-1), { type: 'world', time: 'day', weather: 'clear', mobSpawning: false, keepInventory: true });
+  assert.match(logs.at(-1).text, /昼で止める/);
+  assert.deepEqual(engine.state.worldSettings, { time: 'day', weather: 'clear', mobSpawning: false, keepInventory: true });
+
+  client.status = { connected: false, players: null };
+  assert.equal(await engine.setWorld({ time: 'night' }), false);
+  assert.equal(client.sent.length, 1, 'つながっていなければ送らない');
+  assert.equal(engine.config.world.time, 'night', '設定は覚える');
+  assert.equal(engine.config.world.weather, 'clear', 'ほかの項目はそのまま');
+});
+
+test('ワールドに入ってマイクラにつながったら、ワールドの設定を入れ直す', async () => {
+  const { engine, client } = setup({ world: { time: 'day', weather: 'normal', mobSpawning: true, keepInventory: false } });
+  client.status = { connected: true, players: 1 };
+  client.emit('status', { connected: true, players: 1 });
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(client.sent, [{ type: 'world', time: 'day', weather: 'normal', mobSpawning: true, keepInventory: false }]);
+});
+
 test('MOD から届いた埋め立ての状況を state に出す', () => {
   const { engine, client } = setup();
   client.status = { connected: true, players: 1, fill: { phase: 'filling', percent: 40 } };
   assert.deepEqual(engine.state.fill, { phase: 'filling', percent: 40 });
+});
+
+test('新しい妨害の説明文（秒・段・数なし）', async () => {
+  const { describeAction } = await import('../src/engine.js');
+  assert.equal(describeAction({ type: 'jail', count: 10 }), '逮捕 10秒');
+  assert.equal(describeAction({ type: 'fill_layer', count: 2 }), '一段埋め ×2段');
+  assert.equal(describeAction({ type: 'fill_clear', count: 1 }), '全消し');
+  assert.equal(describeAction({ type: 'lightning', count: 3 }), '雷 ×3');
+});
+
+test('今のルールを自分のプリセットとして保存し、同じ名前なら上書きする', () => {
+  const { engine } = setup();
+  engine.savePreset('いつもの');
+  engine.config.rules = [{ gift: 'バラ', action: 'jail', count: 10 }];
+  engine.savePreset(' いつもの ');
+  assert.deepEqual(engine.state.presets.mine, [{ name: 'いつもの', rules: [{ gift: 'バラ', action: 'jail', count: 10 }] }]);
+  assert.deepEqual(engine.state.presets.builtin.map((p) => p.name), ['定番', 'やさしめ', '激辛']);
+  assert.throws(() => engine.savePreset(''), /名前/);
+  engine.deletePreset('いつもの');
+  assert.deepEqual(engine.state.presets.mine, []);
+});
+
+test('ギフトランキング: 本物のギフトだけ数え、新しい配信で0に戻し、少し後にまとめて保存する', async () => {
+  const saved = [];
+  const { engine, tiktok } = setup({}, { saveRanking: async (data) => saved.push(data), ranking: { roomId: 'room1', coins: [['じろう', 50]] } });
+  tiktok.emit('live', { roomId: 'room1' });
+  assert.deepEqual(engine.state.ranking, [{ name: 'じろう', coins: 50 }], '同じ配信なら続きから');
+  await engine.handleEvent({ kind: 'gift', giftName: 'Rose', diamonds: 1, count: 1, from: 'テスト' });
+  assert.deepEqual(engine.state.ranking, [{ name: 'じろう', coins: 50 }], 'テスト送信は数えない');
+  tiktok.emit('live', { roomId: 'room2' });
+  assert.deepEqual(engine.state.ranking, []);
+  tiktok.emit('event', rose);
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(engine.state.ranking, [{ name: 'たろう', coins: 3 }]);
+  assert.equal(saved.length, 0, 'すぐには書かない');
+  await engine.flushRanking();
+  assert.deepEqual(saved, [{ roomId: 'room2', coins: [['たろう', 3]] }], '続けて変わっても1回にまとめる');
+});
+
+test('状態の知らせは、続けて変わっても1回にまとめる', async () => {
+  const { engine } = setup();
+  const states = [];
+  engine.on('state', (s) => states.push(s));
+  engine.pause();
+  engine.resume();
+  engine.pause();
+  assert.equal(states.length, 0);
+  await Promise.resolve();
+  assert.equal(states.length, 1);
+  assert.equal(states[0].paused, true, '最後の状態');
+});
+
+test('ギフトの処理で思わぬエラーが起きても、止まらずにログに出す', async () => {
+  const { engine, logs } = setup();
+  engine.dispatcher.handle = async () => {
+    throw new Error('こわれた');
+  };
+  const result = await engine.handleEvent({ kind: 'gift', giftName: 'Rose', diamonds: 1, count: 1, from: 'a' });
+  assert.equal(result.status, 'failed');
+  assert.ok(logs.some((l) => l.level === 'error' && l.text.includes('こわれた')));
 });

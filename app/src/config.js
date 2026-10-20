@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { ACTION_TYPES, SOCIAL_EVENTS } from './rules.js';
+import { MAX_PRESET_NAME, MAX_USER_PRESETS } from './presets.js';
 
 export const DEFAULT_MOD_PORT = 25599;
 
@@ -18,8 +19,26 @@ export const FILL_PLACE_SPEEDS = ['normal', 'fast', 'fastest'];
 /** 手でブロックを壊す速さ（左クリック押しっぱなし）。normal はバニラと同じ。fast・fastest は置く速さと同じ */
 export const FILL_BREAK_SPEEDS = ['normal', 'fast', 'fastest'];
 export const DEFAULT_FILL = {
-  width: 11, height: 9, countdown: 10, rounds: 10, wall: 'glass', block: 'amethyst_block', skyY: 150, reach: 8, placeSpeed: 'fast', breakSpeed: 'fast',
+  width: 11, height: 9, countdown: 10, rounds: 10, wall: 'glass', block: 'amethyst_block', handBlock: 'amethyst_block', skyY: 150, reach: 8,
+  placeSpeed: 'fast', breakSpeed: 'fast', mobsAttack: true, mobLifetime: 30,
 };
+
+/** ワールドの設定。time: normal（進む）/ day・night（その時間で止める）、weather: normal（変わる）/ clear・rain（止める） */
+export const WORLD_TIMES = ['normal', 'day', 'night'];
+export const WORLD_WEATHERS = ['normal', 'clear', 'rain'];
+export const DEFAULT_WORLD = { time: 'normal', weather: 'normal', mobSpawning: true, keepInventory: false };
+
+/** ワールドの設定を読む。おかしな値は既定値（バニラと同じ）にする */
+export function parseWorld(raw = {}) {
+  const world = raw && typeof raw === 'object' ? raw : {};
+  const bool = (value, fallback) => (typeof value === 'boolean' ? value : fallback);
+  return {
+    time: WORLD_TIMES.includes(world.time) ? world.time : DEFAULT_WORLD.time,
+    weather: WORLD_WEATHERS.includes(world.weather) ? world.weather : DEFAULT_WORLD.weather,
+    mobSpawning: bool(world.mobSpawning, DEFAULT_WORLD.mobSpawning),
+    keepInventory: bool(world.keepInventory, DEFAULT_WORLD.keepInventory),
+  };
+}
 
 /** 埋め立ての設定を読む。おかしな値は既定値にする（設定ファイルが壊れても起動できるように） */
 export function parseFill(raw = {}) {
@@ -28,17 +47,24 @@ export function parseFill(raw = {}) {
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
   };
   const fill = raw && typeof raw === 'object' ? raw : {};
+  const block = FILL_BLOCKS.includes(fill.block) ? fill.block : DEFAULT_FILL.block;
   return {
     width: int(fill.width, DEFAULT_FILL.width, 3, 41),
     height: int(fill.height, DEFAULT_FILL.height, 1, 30),
     countdown: int(fill.countdown, DEFAULT_FILL.countdown, 0, 600),
     rounds: int(fill.rounds, DEFAULT_FILL.rounds, 1, 99),
     wall: FILL_WALLS.includes(fill.wall) ? fill.wall : DEFAULT_FILL.wall,
-    block: FILL_BLOCKS.includes(fill.block) ? fill.block : DEFAULT_FILL.block,
+    // block は枠の中に置かれるブロック、handBlock は手に持つブロック（置くと block に変わる）。前の版の設定は同じものにする
+    block,
+    handBlock: FILL_BLOCKS.includes(fill.handBlock) ? fill.handBlock : block,
     skyY: int(fill.skyY, DEFAULT_FILL.skyY, -60, 300),
     reach: int(fill.reach, DEFAULT_FILL.reach, 1, 64),
     placeSpeed: FILL_PLACE_SPEEDS.includes(fill.placeSpeed) ? fill.placeSpeed : DEFAULT_FILL.placeSpeed,
     breakSpeed: FILL_BREAK_SPEEDS.includes(fill.breakSpeed) ? fill.breakSpeed : DEFAULT_FILL.breakSpeed,
+    // 枠に出したモブが消えるまでの秒数（0 なら消えない）
+    mobLifetime: int(fill.mobLifetime, DEFAULT_FILL.mobLifetime, 0, 600),
+    // モブに攻撃される（クリエイティブでも埋め立て中だけサバイバル・飛べる）
+    mobsAttack: typeof fill.mobsAttack === 'boolean' ? fill.mobsAttack : DEFAULT_FILL.mobsAttack,
   };
 }
 
@@ -80,7 +106,31 @@ export function parseConfig(raw) {
   }
   const rules = raw.rules.map((rule, i) => validateRule(rule, i + 1));
 
-  return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules, fill: parseFill(raw.fill) };
+  return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules, fill: parseFill(raw.fill), world: parseWorld(raw.world),
+    presets: parsePresets(raw.presets) };
+}
+
+/** 自分で保存したプリセット（[{name, rules}]）。壊れているものは捨てる */
+export function parsePresets(raw) {
+  if (!Array.isArray(raw)) return [];
+  const presets = [];
+  for (const preset of raw) {
+    try {
+      presets.push(parsePreset(preset));
+    } catch {
+      // 読めないプリセットは捨てる
+    }
+    if (presets.length >= MAX_USER_PRESETS) break;
+  }
+  return presets;
+}
+
+export function parsePreset(preset) {
+  const name = String(preset?.name ?? '').trim();
+  if (!name || name.length > MAX_PRESET_NAME) {
+    throw new ConfigError(`プリセットの名前は1〜${MAX_PRESET_NAME}文字にしてください`);
+  }
+  return { name, rules: parseConfig({ rules: preset.rules }).rules };
 }
 
 function validateRule(rule, number) {

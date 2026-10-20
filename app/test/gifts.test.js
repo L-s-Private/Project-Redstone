@@ -50,4 +50,6 @@ test('フォローの送り主を読める', () => {
 test('いいねはまとめて届いた回数を読む', () => {
   assert.deepEqual(normalizeLike({ likeCount: 15, totalLikeCount: 3000, user: { nickname: 'はなこ' } }), { kind: 'like', count: 15, from: 'はなこ' });
   assert.equal(normalizeLike({}).count, 0);
+  // いまのライブラリ（tiktok-live-proto v3）は count と total
+  assert.deepEqual(normalizeLike({ count: 7, total: '3000', user: { nickname: 'はなこ' } }), { kind: 'like', count: 7, from: 'はなこ' });
 });

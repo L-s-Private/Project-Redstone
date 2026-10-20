@@ -1,11 +1,15 @@
 import { EventEmitter } from 'node:events';
 import { Dispatcher } from './dispatcher.js';
 import { ModClient } from './modClient.js';
-import { parseFill } from './config.js';
+import { parseFill, parseWorld, parsePreset } from './config.js';
+import { BUILTIN_PRESETS, MAX_USER_PRESETS } from './presets.js';
 import { describeEvent } from './rules.js';
+import { giftTable, Ranking } from './overlayData.js';
 import { TikTokSource } from './tiktok.js';
 
 const MAX_LOGS = 200;
+/** ランキングは、変わってからこれだけ待ってまとめて保存する（ギフトが続いても書きすぎないように） */
+const RANKING_SAVE_DELAY_MS = 1000;
 
 const SKIP_MESSAGES = {
   no_rule: '対応する妨害がないので無視しました',
@@ -20,10 +24,20 @@ const ACTION_NAMES = {
   fill_shrink: '枠を縮める',
   fill_help: 'お助けブロック',
   fill_set: 'テスト: 一気に埋める',
+  jail: '逮捕',
+  freeze: '操作禁止',
+  fill_layer: '一段埋め',
+  fill_clear: '全消し',
+  lightning: '雷',
+  levitate: '浮遊',
+  night: '夜にする',
+  fill_raise: '枠を高くする',
 };
 
 // 回数を見せない妨害
-const SINGLE_ACTIONS = new Set(['message']);
+const SINGLE_ACTIONS = new Set(['message', 'fill_clear']);
+// 数が秒の妨害
+const SECONDS_ACTIONS = new Set(['jail', 'freeze', 'levitate', 'night']);
 const MAX_RECENT_GIFTS = 20;
 const PLACE_SPEED_NAMES = { normal: 'ふつう', fast: '速い', fastest: 'とても速い' };
 const BREAK_SPEED_NAMES = { normal: 'ふつう', fast: '速い', fastest: 'とても速い' };
@@ -37,7 +51,7 @@ export function testButtons(rules) {
     } else if (rule.likes !== undefined) {
       buttons.set(`いいね${rule.likes}`, { kind: 'like', count: rule.likes });
     } else if (rule.minDiamonds !== undefined) {
-      buttons.set(`💎${rule.minDiamonds}`, { kind: 'gift', giftName: `${rule.minDiamonds}ダイヤのギフト`, diamonds: rule.minDiamonds, count: 1 });
+      buttons.set(`🪙${rule.minDiamonds}`, { kind: 'gift', giftName: `${rule.minDiamonds}コインのギフト`, diamonds: rule.minDiamonds, count: 1 });
     } else if (rule.event !== undefined) {
       buttons.set(rule.event === 'follow' ? 'フォロー' : 'シェア', { kind: rule.event });
     }
@@ -58,7 +72,10 @@ const MOB_NAMES = {
 export function describeAction(action) {
   if (action.type === 'fill_set') return action.percent === 0 ? 'テスト: 枠の中を空にする' : `テスト: ${action.percent}% まで埋める`;
   const name = action.type === 'mob' ? MOB_NAMES[action.mob ?? 'zombie'] : ACTION_NAMES[action.type];
-  return SINGLE_ACTIONS.has(action.type) ? name : `${name} ×${action.count}`;
+  if (SINGLE_ACTIONS.has(action.type)) return name;
+  if (SECONDS_ACTIONS.has(action.type)) return `${name} ${action.count}秒`;
+  if (action.type === 'fill_layer' || action.type === 'fill_raise') return `${name} ×${action.count}段`;
+  return `${name} ×${action.count}`;
 }
 
 /**
@@ -67,10 +84,14 @@ export function describeAction(action) {
  * イベント:
  *   'log'   {time, level, text}   level = info | ok | warn | error | gift
  *   'state' Engine#state と同じ形
- *   'alert' {who, action, icon, giftImage}  妨害を出したとき（オーバーレイ用）。icon はマイクラのアイコン名（mcIcons.js）
+ *   'alert' {who, action, icon, giftImage, giftName, count}  妨害を出したとき（オーバーレイ用）。icon はマイクラのアイコン名（mcIcons.js）
  */
 export class Engine extends EventEmitter {
-  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '' }) {
+  /**
+   * ranking: 保存しておいたランキング（同じ配信の途中で起動し直したとき続きから数える）
+   * saveRanking: ランキングが変わったときに保存する
+   */
+  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', ranking = {}, saveRanking = async () => {} }) {
     super();
     this.config = config;
     this.version = version;
@@ -83,6 +104,14 @@ export class Engine extends EventEmitter {
     this.mock = false;
     // 実際に届いたギフト（設定画面で「最近届いたギフト」として出す）
     this.recentGifts = [];
+    // ギフトランキング（配信画面に出す）。配信ごとに数える
+    this.ranking = new Ranking(ranking);
+    this.writeRanking = saveRanking;
+    this.rankingTimer = null;
+    this.rankingWrite = Promise.resolve();
+    // 画面用に作ったもの（ルールやギフト一覧が変わったときだけ作り直す）
+    this.cache = {};
+    this.statePending = false;
 
     // 埋め立ての進み具合でも status は届くので、接続の変化だけログに出す
     let previous = { connected: false, players: null };
@@ -94,6 +123,8 @@ export class Engine extends EventEmitter {
           this.log('warn', 'マイクラにつながりましたが、ワールドに入っていません');
         } else if (players !== null) {
           this.log('ok', 'マイクラ（MOD）につながりました。妨害を受け付けています');
+          // 昼に固定などのワールドの設定は、ワールドに入るたびに入れ直す
+          this.sendWorld();
         }
         previous = { connected, players };
       }
@@ -101,11 +132,47 @@ export class Engine extends EventEmitter {
     });
     this.tiktok.on('status', () => this.emitState());
     this.tiktok.on('log', ({ level, text }) => this.log(level, text));
+    this.tiktok.on('live', ({ roomId }) => {
+      if (!this.ranking.startStream(roomId)) return;
+      this.log('info', '新しい配信です。ギフトランキングを0から数えます');
+      this.saveRanking();
+      this.emitState();
+    });
     this.tiktok.on('event', (raw) => {
       const event = this.withGiftInfo(raw);
-      if (event.kind === 'gift') this.rememberGift(event);
+      if (event.kind === 'gift') {
+        this.rememberGift(event);
+        // ランキングは本物のギフトだけ（テスト送信は数えない）
+        if (this.ranking.add(event.from, (event.diamonds ?? 0) * (event.count ?? 1))) this.saveRanking();
+      }
       this.handleEvent(event);
     });
+  }
+
+  /** ランキングを少し後でまとめて保存する */
+  saveRanking() {
+    if (this.rankingTimer) return;
+    this.rankingTimer = setTimeout(() => this.flushRanking(), RANKING_SAVE_DELAY_MS);
+    this.rankingTimer.unref?.();
+  }
+
+  /** 保存を待たずに、今のランキングを保存する（終了するとき） */
+  flushRanking() {
+    if (!this.rankingTimer) return this.rankingWrite;
+    clearTimeout(this.rankingTimer);
+    this.rankingTimer = null;
+    const data = this.ranking.toJSON();
+    this.rankingWrite = this.rankingWrite.then(() => this.writeRanking(data)).catch(() => {});
+    return this.rankingWrite;
+  }
+
+  /** ルールやギフト一覧が変わったときだけ作り直す */
+  cached(key, deps, make) {
+    const entry = this.cache[key];
+    if (entry && entry.deps.length === deps.length && entry.deps.every((d, i) => d === deps[i])) return entry.value;
+    const value = make();
+    this.cache[key] = { deps, value };
+    return value;
   }
 
   get state() {
@@ -118,10 +185,16 @@ export class Engine extends EventEmitter {
       mod: this.client.status,
       fill: this.client.status.fill ?? null,
       fillSettings: this.config.fill ?? parseFill(),
+      worldSettings: this.config.world ?? parseWorld(),
       stats: { ...this.dispatcher.stats },
       rules: this.config.rules,
-      testButtons: testButtons(this.config.rules),
+      presets: { builtin: BUILTIN_PRESETS, mine: this.config.presets ?? [] },
+      testButtons: this.cached('testButtons', [this.config.rules], () => testButtons(this.config.rules)),
       recentGifts: this.recentGifts,
+      // 配信画面（オーバーレイ）用
+      giftTable: this.cached('giftTable', [this.config.rules, this.giftCatalog?.version], () =>
+        giftTable(this.config.rules, (name) => this.giftCatalog?.find({ giftName: name }) ?? null, describeAction)),
+      ranking: this.ranking.top(),
       giftCatalogVersion: this.giftCatalog?.version ?? 0,
     };
   }
@@ -136,6 +209,21 @@ export class Engine extends EventEmitter {
   }
 
   /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。 */
+  /** 今のルールを、自分のプリセットとして保存する（同じ名前なら上書き） */
+  savePreset(name) {
+    const preset = parsePreset({ name, rules: this.config.rules });
+    const mine = (this.config.presets ?? []).filter((p) => p.name !== preset.name);
+    if (mine.length >= MAX_USER_PRESETS) throw new Error(`プリセットは${MAX_USER_PRESETS}個まで保存できます`);
+    this.config.presets = [...mine, preset];
+    this.log('info', `今の妨害の設定を、プリセット「${preset.name}」として保存しました`);
+    this.emitState();
+  }
+
+  deletePreset(name) {
+    this.config.presets = (this.config.presets ?? []).filter((p) => p.name !== name);
+    this.emitState();
+  }
+
   setRules(rules) {
     this.config.rules = rules;
     this.dispatcher.setRules(rules);
@@ -191,8 +279,34 @@ export class Engine extends EventEmitter {
     const response = await this.client.send({ type: 'fill_start', ...fill });
     if (!response.ok) throw new Error(response.error);
     this.config.fill = fill;
-    this.log('ok', `埋め立てを始めました（${fill.rounds}ラウンド・幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}・置く速さ${PLACE_SPEED_NAMES[fill.placeSpeed]}・壊す速さ${BREAK_SPEED_NAMES[fill.breakSpeed]}）`);
+    this.log('ok', `埋め立てを始めました（${fill.rounds}ラウンド・幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}・置く速さ${PLACE_SPEED_NAMES[fill.placeSpeed]}・壊す速さ${BREAK_SPEED_NAMES[fill.breakSpeed]}・モブに${fill.mobsAttack ? '攻撃される' : '攻撃されない'}・モブは${fill.mobLifetime ? `${fill.mobLifetime}秒で消える` : '消えない'}）`);
     this.emitState();
+  }
+
+  /**
+   * ワールドの設定（昼に固定・天気など）を変える。マイクラにつながっていれば、すぐ入れる。
+   * @returns {Promise<boolean>} マイクラに入れられたか（つながっていなければ、つながったときに入れる）
+   */
+  async setWorld(settings) {
+    this.config.world = parseWorld({ ...this.config.world, ...settings });
+    this.emitState();
+    return this.sendWorld();
+  }
+
+  async sendWorld() {
+    if (!this.client.status.connected || !this.client.status.players) return false;
+    const world = this.config.world ?? parseWorld();
+    try {
+      const response = await this.client.send({ type: 'world', ...world });
+      if (!response.ok) throw new Error(response.error);
+      const times = { normal: '進む', day: '昼で止める', night: '夜で止める' };
+      const weathers = { normal: '変わる', clear: '晴れで止める', rain: '雨で止める' };
+      this.log('info', `ワールドの設定: 時間は${times[world.time]}・天気は${weathers[world.weather]}・モブが自然に${world.mobSpawning ? '湧く' : '湧かない'}・やられたら持ち物が${world.keepInventory ? '残る' : '落ちる'}`);
+      return true;
+    } catch (e) {
+      this.log('error', `ワールドの設定を入れられませんでした: ${e.message}`);
+      return false;
+    }
   }
 
   async stopFill() {
@@ -222,14 +336,20 @@ export class Engine extends EventEmitter {
   }
 
   async handleEvent(raw) {
-    if (raw.kind === 'like') return this.handleLikes(raw);
-    // テスト送信のギフトにも日本語名と絵を足す
-    const event = this.withGiftInfo(raw);
-    this.log('gift', describeEvent(event), event.image ? { giftImage: event.image } : {});
-    const result = await this.dispatcher.handle(event);
-    this.logResult(event, result);
-    this.emitState();
-    return result;
+    try {
+      if (raw.kind === 'like') return await this.handleLikes(raw);
+      // テスト送信のギフトにも日本語名と絵を足す
+      const event = this.withGiftInfo(raw);
+      this.log('gift', describeEvent(event), event.image ? { giftImage: event.image } : {});
+      const result = await this.dispatcher.handle(event);
+      this.logResult(event, result);
+      this.emitState();
+      return result;
+    } catch (e) {
+      // 1つのギフトの失敗で、ほかのギフトを止めない
+      this.log('error', `ギフトを処理できませんでした: ${e.message}`);
+      return { status: 'failed', error: e.message };
+    }
   }
 
   logResult(event, result) {
@@ -239,7 +359,8 @@ export class Engine extends EventEmitter {
       // オーバーレイに出す「誰が」
       const who = event.kind === 'like' ? `いいね${result.likes}回` : event.kind === 'manual' ? '配信者' : `${event.from || '誰か'}さん`;
       const giftImage = event.kind === 'gift' ? event.image ?? '' : '';
-      this.emit('alert', { who, action: describeAction(result.action), icon, giftImage });
+      const giftName = event.kind === 'gift' ? event.giftNameJa || event.giftName || '' : '';
+      this.emit('alert', { who, action: describeAction(result.action), icon, giftImage, giftName, count: event.kind === 'gift' ? event.count : 1 });
     } else if (result.status === 'failed') {
       this.log('error', `  → 出せませんでした: ${result.error}`);
     } else {
@@ -256,6 +377,14 @@ export class Engine extends EventEmitter {
     }
     if (results.length) this.emitState();
     return results;
+  }
+
+  /** ギフトランキングを0に戻す */
+  resetRanking() {
+    this.ranking.reset();
+    this.saveRanking();
+    this.log('info', 'ギフトランキングをリセットしました');
+    this.emitState();
   }
 
   pause() {
@@ -281,7 +410,7 @@ export class Engine extends EventEmitter {
 
   async shutdown() {
     this.client.stop();
-    await this.tiktok.stop();
+    await Promise.all([this.tiktok.stop(), this.flushRanking()]);
   }
 
   /** extra は画面で絵を出すための giftName・icon */
@@ -292,7 +421,16 @@ export class Engine extends EventEmitter {
     this.emit('log', entry);
   }
 
+  /**
+   * 状態が変わったことを知らせる。いいねや進み具合で何度も続けて呼ばれるので、
+   * 同じ処理の中で何回呼ばれても、知らせるのは最後に1回だけにする（画面とオーバーレイに送りすぎない）
+   */
   emitState() {
-    this.emit('state', this.state);
+    if (this.statePending) return;
+    this.statePending = true;
+    queueMicrotask(() => {
+      this.statePending = false;
+      this.emit('state', this.state);
+    });
   }
 }

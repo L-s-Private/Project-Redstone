@@ -1,8 +1,8 @@
 // TikTok のギフト一覧（日本語名・英語名・ダイヤ数・公式の絵）。設定画面でギフトを絵で選べるようにする。
 // 一覧は TikTok の公開の窓口（LIVE のギフト欄が使うもの）から取り、取れないとき（オフラインなど）に備えてファイルにも残す。
 // 配信中のギフトは英語名で届くことがあるので、ギフトの ID で日本語名と結び付ける。
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { writeFileSafely } from './files.js';
 
 const GIFT_LIST_URL = 'https://webcast.tiktok.com/webcast/gift/list/?aid=1988&app_name=tiktok_web&device_platform=web_pc';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
@@ -81,19 +81,37 @@ export class GiftCatalog {
     return parseGiftList(await res.json());
   }
 
-  /** ID → 名前（英語・日本語のどちらでも）の順で探す */
+  /** ID → 名前（英語・日本語のどちらでも）の順で探す。ギフトが届くたびに呼ぶので、一覧から作った索引で引く */
   find({ giftId, giftName } = {}) {
+    const index = this.index();
     if (giftId) {
-      const byId = this.gifts.find((g) => g.id === String(giftId));
+      const byId = index.byId.get(String(giftId));
       if (byId) return byId;
     }
     if (!giftName) return null;
     const name = String(giftName).toLowerCase();
-    return this.gifts.find((g) => g.nameJa.toLowerCase() === name) ?? this.gifts.find((g) => g.name.toLowerCase() === name) ?? null;
+    return index.byNameJa.get(name) ?? index.byName.get(name) ?? null;
+  }
+
+  /** 一覧が入れ替わったら作り直す（同じ名前なら一覧で先のもの） */
+  index() {
+    if (this.indexed?.gifts !== this.gifts) {
+      const byId = new Map();
+      const byNameJa = new Map();
+      const byName = new Map();
+      for (const gift of this.gifts) {
+        if (!byId.has(gift.id)) byId.set(gift.id, gift);
+        const ja = gift.nameJa.toLowerCase();
+        if (!byNameJa.has(ja)) byNameJa.set(ja, gift);
+        const en = gift.name.toLowerCase();
+        if (!byName.has(en)) byName.set(en, gift);
+      }
+      this.indexed = { gifts: this.gifts, byId, byNameJa, byName };
+    }
+    return this.indexed;
   }
 
   async save() {
-    await mkdir(dirname(this.path), { recursive: true });
-    await writeFile(this.path, `${JSON.stringify({ fetchedAt: this.fetchedAt, gifts: this.gifts })}\n`, 'utf8');
+    await writeFileSafely(this.path, `${JSON.stringify({ fetchedAt: this.fetchedAt, gifts: this.gifts })}\n`);
   }
 }

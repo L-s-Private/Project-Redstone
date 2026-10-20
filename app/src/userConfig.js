@@ -1,9 +1,10 @@
 // 画面版の設定ファイル。exe の横ではなく、ユーザーごとのフォルダ（Windows なら %APPDATA%\ProjectRedstone）に置く。
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import example from '../config.example.json' with { type: 'json' };
 import { ConfigError, parseConfig } from './config.js';
+import { writeFileSafely } from './files.js';
 
 export function configDir(env = process.env, home = homedir()) {
   return env.APPDATA ? join(env.APPDATA, 'ProjectRedstone') : join(home, '.config', 'project-redstone');
@@ -33,7 +34,8 @@ export async function loadUserConfig(dir = configDir()) {
 }
 
 // v0.4 まであった妨害。根拠がなかったため v0.5 で削除した
-const REMOVED_ACTIONS = new Set(['bury', 'lightning', 'launch', 'heal']);
+// （lightning は v0.12 で、埋め立て用の雷として入れ直した）。time_add・time_sub は制限時間と一緒に v0.17 で削除した
+const REMOVED_ACTIONS = new Set(['bury', 'launch', 'heal', 'time_add', 'time_sub']);
 
 /** 削除した妨害のルールを取り除く。全部なくなったら設定例のルールに戻す。@returns 取り除いた数 */
 function dropRemovedRules(raw) {
@@ -43,11 +45,17 @@ function dropRemovedRules(raw) {
     .map((rule) => (rule && typeof rule === 'object' ? (({ block, ...rest }) => rest)(rule) : rule));
   const removed = raw.rules.length - kept.length;
   raw.rules = kept.length > 0 ? kept : example.rules;
+  // 自分で保存したプリセットからも取り除く
+  if (Array.isArray(raw.presets)) {
+    for (const preset of raw.presets) {
+      if (Array.isArray(preset?.rules)) preset.rules = preset.rules.filter((rule) => !REMOVED_ACTIONS.has(rule?.action));
+    }
+  }
   return removed;
 }
 
+/** 保存の途中でアプリが落ちても、設定ファイルが壊れないように書く */
 export async function saveUserConfig(path, config) {
-  await mkdir(join(path, '..'), { recursive: true });
-  const { tiktokUsername, mod, rules, fill } = config;
-  await writeFile(path, `${JSON.stringify({ tiktokUsername, mod, fill, rules }, null, 2)}\n`, 'utf8');
+  const { tiktokUsername, mod, rules, fill, world, presets } = config;
+  await writeFileSafely(path, `${JSON.stringify({ tiktokUsername, mod, fill, world, rules, presets }, null, 2)}\n`);
 }

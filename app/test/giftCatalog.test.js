@@ -80,3 +80,13 @@ test('ID・日本語名・英語名のどれでも探せる', async () => {
   assert.equal(catalog.find({ giftName: '知らないギフト' }), null);
   assert.equal(catalog.find(), null);
 });
+
+test('find は一覧が入れ替わったら新しい一覧から探す（索引を作り直す）', () => {
+  const catalog = new GiftCatalog({ path: 'unused' });
+  catalog.gifts = [{ id: '1', name: 'Rose', nameJa: 'バラ', diamonds: 1, image: '' }];
+  assert.equal(catalog.find({ giftName: 'rose' })?.id, '1');
+  catalog.gifts = [{ id: '2', name: 'Rose', nameJa: 'ローズ', diamonds: 1, image: '' }];
+  assert.equal(catalog.find({ giftName: 'Rose' })?.id, '2');
+  assert.equal(catalog.find({ giftName: 'バラ' }), null);
+  assert.equal(catalog.find({ giftId: 2 })?.nameJa, 'ローズ');
+});

@@ -92,3 +92,20 @@ test('IDを変えたら前の接続を切り、前の接続のイベントは無
   await source.stop();
   assert.equal(source.status.state, 'idle');
 });
+
+test('つながったら、どの配信か（roomId）を知らせる', async () => {
+  const { made, createConnection } = fakeConnections('ok');
+  const source = new TikTokSource({
+    createConnection: async (username) => {
+      const result = await createConnection(username);
+      result.connection.connect = async () => ({ roomId: '7300' });
+      return result;
+    },
+  });
+  const lives = [];
+  source.on('live', (l) => lives.push(l));
+  await source.start('taro');
+  assert.deepEqual(lives, [{ roomId: '7300' }]);
+  assert.equal(made.length, 1);
+  await source.stop();
+});

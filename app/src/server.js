@@ -2,7 +2,9 @@
 // 同じPCからしか開けないよう 127.0.0.1 にだけ待ち受け、ほかのサイトからの操作（CSRF・DNSリバインディング）も断る。
 import http from 'node:http';
 import { ConfigError, MOBS, parseConfig } from './config.js';
+import { MAX_COUNT_BY_TYPE } from './rules.js';
 import { OVERLAY_HTML } from './ui/overlay.js';
+import { OVERLAY_PAGES } from './ui/overlays.js';
 import { PANEL_HTML } from './ui/panel.js';
 
 export const DEFAULT_UI_PORT = 25600;
@@ -54,18 +56,36 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       engine.setRules(rules);
       await saveConfig(engine.config);
     },
-    'POST /api/fill/start': async (body) => {
-      const { width, height, countdown, rounds, wall, block, skyY, reach, placeSpeed, breakSpeed } = body;
+    'POST /api/ranking/reset': () => engine.resetRanking(),
+    'POST /api/presets/save': async (body) => {
       try {
-        await engine.startFill({ width, height, countdown, rounds, wall, block, skyY, reach, placeSpeed, breakSpeed });
+        engine.savePreset(body.name);
       } catch (e) {
         return { status: 400, error: e.message };
       }
       await saveConfig(engine.config);
     },
+    'POST /api/presets/delete': async (body) => {
+      engine.deletePreset(String(body.name ?? ''));
+      await saveConfig(engine.config);
+    },
+    'POST /api/fill/start': async (body) => {
+      const { width, height, countdown, rounds, wall, block, handBlock, skyY, reach, placeSpeed, breakSpeed, mobsAttack, mobLifetime } = body;
+      try {
+        await engine.startFill({ width, height, countdown, rounds, wall, block, handBlock, skyY, reach, placeSpeed, breakSpeed, mobsAttack, mobLifetime });
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+      await saveConfig(engine.config);
+    },
+    'POST /api/world': async (body) => {
+      const applied = await engine.setWorld(body);
+      await saveConfig(engine.config);
+      return { applied };
+    },
     'POST /api/action': async (body) => {
       // 画面のボタン（配信タブ・テストタブ）から出せるもの
-      const counts = { tnt: [1, 20], mob: [1, 10], fill_expand: [1, 5], fill_shrink: [1, 5], fill_help: [1, 64] };
+      const counts = Object.fromEntries(Object.entries(MAX_COUNT_BY_TYPE).filter(([type]) => type !== 'message').map(([type, max]) => [type, [1, max]]));
       let action;
       if (body.type === 'fill_set') {
         // テスト用: 枠の中を指定の割合まで一気に埋める（0 なら空にする）
@@ -120,12 +140,17 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     const route = `${req.method} ${url.pathname}`;
 
     if (route === 'GET /') return sendHtml(res, PANEL_HTML);
-    if (route === 'GET /overlay') return sendHtml(res, OVERLAY_HTML);
+    // 配信画面の部品（ギフト通知・ギフト表・ラウンド・ランキング）。
+    // LIVE Studio のリンク欄は「.html のような、点＋英字」がない URL をはねる（127.0.0.1 だけだと通らない）ので、末尾 .html でも開ける。
+    // また LIVE Studio は貼られた URL を一度読んで確かめるので、表示用のこのページだけはほかのアプリからも読めるようにする
+    if (route === 'GET /overlay' || route === 'GET /overlay.html') return sendHtml(res, OVERLAY_HTML, { readable: true });
+    const widget = route.match(/^GET \/overlay\/([a-z]+)(?:\.html)?$/);
+    if (widget && Object.hasOwn(OVERLAY_PAGES, widget[1])) return sendHtml(res, OVERLAY_PAGES[widget[1]], { frameable: true, readable: true });
     if (route === 'GET /favicon.ico') {
       res.writeHead(204);
       return res.end();
     }
-    const icon = route.match(/^GET \/icons\/mc\/([a-z_]+)\.png$/);
+    const icon = route.match(/^GET \/icons\/mc\/([a-z0-9_]+)\.png$/);
     if (icon) {
       const png = await icons?.get(icon[1]).catch(() => null);
       if (!png) return send(res, 404, { error: '見つかりません' });
@@ -168,7 +193,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     try {
       const result = await action(body);
       if (result?.error) return send(res, result.status, { error: result.error });
-      return send(res, 200, { ok: true, state: engine.state, ...(result?.setup ? { setup: result.setup } : {}) });
+      return send(res, 200, { ok: true, state: engine.state, ...(result?.setup ? { setup: result.setup } : {}), ...(result?.applied !== undefined ? { applied: result.applied } : {}) });
     } catch (e) {
       return send(res, 500, { error: e.message });
     }
@@ -241,12 +266,17 @@ function send(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-function sendHtml(res, html) {
+/**
+ * frameable: 操作画面の「配信画面」でプレビューするため、同じアプリの中でだけ枠に入れてよい（配信画面の部品だけ）
+ * readable: ほかのアプリ（LIVE Studio）が中身を読んでよい（表示だけのページ）
+ */
+function sendHtml(res, html, { frameable = false, readable = false } = {}) {
   res.writeHead(200, {
+    ...(readable ? { 'Access-Control-Allow-Origin': '*' } : {}),
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
     // ギフトの絵は TikTok の画像サーバーから直接読む
-    'Content-Security-Policy': "default-src 'self'; img-src 'self' https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
+    'Content-Security-Policy': `default-src 'self'; img-src 'self' https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors ${frameable ? "'self'" : "'none'"}`,
   });
   res.end(html);
 }

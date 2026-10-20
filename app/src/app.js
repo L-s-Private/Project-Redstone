@@ -1,9 +1,10 @@
 // アプリ本体の起動（設定の読み込み・中核・操作画面のサーバー）。
 // デスクトップ版（electron/main.js）と、開発用のブラウザ版（gui.js）の両方から使う。
-import { appendFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { loadBundledMod } from './bundledMod.js';
 import { Engine } from './engine.js';
+import { writeFileSafely } from './files.js';
 import { GiftCatalog } from './giftCatalog.js';
 import { createIconSource } from './mcIcons.js';
 import { createUiServer, DEFAULT_UI_PORT } from './server.js';
@@ -24,7 +25,17 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const logFile = join(dirname(configPath), 'app.log');
 
   const giftCatalog = new GiftCatalog({ path: join(dirname(configPath), 'gifts.json') });
-  const engine = new Engine({ config, version: pkg.version, giftCatalog });
+  // ギフトランキングは配信ごと。配信の途中で起動し直しても続きから数えるよう、ファイルに残す
+  const rankingFile = join(dirname(configPath), 'ranking.json');
+  const ranking = await readFile(rankingFile, 'utf8').then(JSON.parse).catch(() => ({}));
+  const engine = new Engine({
+    config, version: pkg.version, giftCatalog, ranking,
+    saveRanking: (data) => writeFileSafely(rankingFile, `${JSON.stringify(data)}\n`),
+  });
+  // 思わぬエラーで、配信中にアプリごと止まらないようにする（ログに残して続ける）
+  const onUnexpected = (e) => engine.log('error', `思わぬエラーが起きました（続けて動きます）: ${e?.stack ?? e}`);
+  process.on('uncaughtException', onUnexpected);
+  process.on('unhandledRejection', onUnexpected);
   engine.on('log', (entry) => {
     onLog(entry);
     // 困ったときに送ってもらえるよう、ファイルにも残す
@@ -70,6 +81,8 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
     engine,
     configPath,
     shutdown: async () => {
+      process.off('uncaughtException', onUnexpected);
+      process.off('unhandledRejection', onUnexpected);
       await engine.shutdown();
       await ui.close();
     },

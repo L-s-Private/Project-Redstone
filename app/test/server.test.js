@@ -49,7 +49,7 @@ function request(port, { method = 'GET', path = '/', headers = {}, body } = {}) 
       let text = '';
       res.setEncoding('utf8');
       res.on('data', (c) => (text += c));
-      res.on('end', () => resolve({ status: res.statusCode, text, json: () => JSON.parse(text) }));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, text, json: () => JSON.parse(text) }));
     });
     req.on('error', reject);
     if (body !== undefined) req.write(body);
@@ -193,7 +193,7 @@ test('ルールを検査してから保存する', async () => {
 
 test('テスト送信でダイヤ数も指定できる', async () => {
   await withServer(async ({ engine, port }) => {
-    await json(port, '/api/test', { kind: 'gift', giftName: '100ダイヤのギフト', diamonds: 100 });
+    await json(port, '/api/test', { kind: 'gift', giftName: '100コインのギフト', diamonds: 100 });
     assert.equal(engine.calls[0].diamonds, 100);
   });
 });
@@ -207,8 +207,9 @@ test('埋め立ての開始・終了を伝え、断られたら理由を返す',
     };
     assert.equal((await json(port, '/api/fill/start', { width: 15, block: 'diamond_block', junk: 1 })).status, 200);
     assert.deepEqual(calls, [{
-      width: 15, height: undefined, countdown: undefined, rounds: undefined, wall: undefined, block: 'diamond_block', skyY: undefined, reach: undefined,
-      placeSpeed: undefined, breakSpeed: undefined,
+      width: 15, height: undefined, countdown: undefined, rounds: undefined, wall: undefined, block: 'diamond_block', handBlock: undefined,
+      skyY: undefined, reach: undefined, placeSpeed: undefined, breakSpeed: undefined, mobsAttack: undefined,
+      mobLifetime: undefined,
     }]);
     assert.equal(saved.length, 1, '始めたら設定を保存する');
     const stop = await json(port, '/api/fill/stop', {});
@@ -242,5 +243,73 @@ test('テストタブの操作: 一気に埋める・モブを出す（決まっ
       { type: 'fill_set', percent: 0, from: '' },
       { type: 'mob', count: 10, from: '', mob: 'creeper' },
     ]);
+  });
+});
+
+test('プリセットの保存・削除を伝え、断られたら理由を返す', async () => {
+  await withServer(async ({ engine, saved, port }) => {
+    const calls = [];
+    engine.savePreset = (name) => {
+      if (!name) throw new Error('プリセットの名前は1〜20文字にしてください');
+      calls.push(['save', name]);
+    };
+    engine.deletePreset = (name) => calls.push(['delete', name]);
+    assert.equal((await json(port, '/api/presets/save', { name: 'いつもの' })).status, 200);
+    assert.equal((await json(port, '/api/presets/delete', { name: 'いつもの' })).status, 200);
+    const bad = await json(port, '/api/presets/save', { name: '' });
+    assert.equal(bad.status, 400);
+    assert.match(bad.json().error, /名前/);
+    assert.deepEqual(calls, [['save', 'いつもの'], ['delete', 'いつもの']]);
+    assert.equal(saved.length, 2);
+  });
+});
+
+test('テストのボタンから新しい妨害も出せる', async () => {
+  await withServer(async ({ engine, port }) => {
+    const sent = [];
+    engine.manualAction = async (action) => (sent.push(action), { status: 'sent' });
+    assert.equal((await json(port, '/api/action', { type: 'jail', count: 999 })).status, 200);
+    assert.equal((await json(port, '/api/action', { type: 'fill_clear' })).status, 200);
+    assert.equal((await json(port, '/api/action', { type: 'message' })).status, 400);
+    assert.deepEqual(sent.map((a) => [a.type, a.count]), [['jail', 60], ['fill_clear', 1]]);
+  });
+});
+
+test('配信画面の部品は部品ごとの URL で開け、知らない部品は 404', async () => {
+  await withServer(async ({ port }) => {
+    for (const id of ['alerts', 'gifts', 'round', 'ranking']) {
+      const res = await request(port, { path: `/overlay/${id}` });
+      assert.equal(res.status, 200, id);
+      assert.match(res.text, /<!doctype html>/);
+    }
+    assert.equal((await request(port, { path: '/overlay/unknown' })).status, 404);
+    assert.equal((await request(port, { path: '/overlay/toString' })).status, 404);
+    assert.equal((await request(port, { path: '/overlay' })).status, 200, '前からの URL も使える');
+    // LIVE Studio のリンク欄に通る形（末尾 .html）。LIVE Studio が確かめに読めるよう、ほかのアプリからも読める
+    for (const path of ['/overlay/alerts.html', '/overlay.html']) {
+      const res = await request(port, { path });
+      assert.equal(res.status, 200, path);
+      assert.equal(res.headers['access-control-allow-origin'], '*', path);
+    }
+    assert.equal((await request(port, { path: '/overlay/unknown.html' })).status, 404);
+    assert.equal((await request(port, { path: '/' })).headers['access-control-allow-origin'], undefined, '操作画面は読ませない');
+  });
+});
+
+test('ランキングのリセットを伝える', async () => {
+  await withServer(async ({ engine, port }) => {
+    let reset = 0;
+    engine.resetRanking = () => reset++;
+    assert.equal((await json(port, '/api/ranking/reset', {})).status, 200);
+    assert.equal(reset, 1);
+  });
+});
+
+test('配信画面の部品だけ、同じアプリの中でなら枠に入れられる（操作画面は入れさせない）', async () => {
+  await withServer(async ({ port }) => {
+    const widget = await request(port, { path: '/overlay/gifts' });
+    assert.match(widget.headers['content-security-policy'], /frame-ancestors 'self'/);
+    const panel = await request(port, { path: '/' });
+    assert.match(panel.headers['content-security-policy'], /frame-ancestors 'none'/);
   });
 });

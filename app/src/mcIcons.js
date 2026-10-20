@@ -14,6 +14,12 @@ export const ICON_TEXTURES = Object.fromEntries([
     'quartz_block_top', 'quartz_block_side', 'glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock'].map((n) => [n, `block/${n}`]),
   ...['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'].map((m) => [`${m}_spawn_egg`, `item/${m}_spawn_egg`]),
   ['oak_sign', 'item/oak_sign'],
+  // モブは体のテクスチャから顔を切り出して出す（ui/mcIconScript.js）
+  ...[['zombie', 'zombie/zombie'], ['skeleton', 'skeleton/skeleton'], ['creeper', 'creeper/creeper'], ['spider', 'spider/spider'],
+    ['witch', 'witch/witch'], ['silverfish', 'silverfish/silverfish'], ['pig', 'pig/pig_temperate']].map(([m, t]) => [`entity_${m}`, `entity/${t}`]),
+  // v0.12 で足した妨害のアイコン
+  ...['iron_bars', 'packed_ice', 'lightning_rod', 'ladder', 'scaffolding_top', 'scaffolding_side', 'piston_top', 'piston_side'].map((n) => [n, `block/${n}`]),
+  ...['barrier', 'shulker_shell', 'clock_00', 'clock_32', 'trident'].map((n) => [n, `item/${n}`]),
 ]);
 
 /** マイクラ本体の jar の候補。ランチャーで一度でも起動していれば 1つ目がある（2つ目は開発用） */

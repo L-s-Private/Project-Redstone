@@ -73,10 +73,17 @@ test('画面で描くアイコンのテクスチャが、すべて読めるも�
   const icons = new Function(`${MC_ICON_JS}; return MC_ICONS;`)();
   for (const name of ['tnt', 'zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig', 'fill_expand', 'fill_shrink', 'fill_help', 'message',
     'amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block', 'quartz_block',
-    'glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock']) {
+    'glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock',
+    'jail', 'freeze', 'fill_layer', 'fill_clear', 'lightning', 'levitate', 'night', 'fill_raise']) {
     assert.ok(icons[name], `${name} のアイコンがある`);
   }
   for (const def of Object.values(icons)) {
-    for (const texture of def.cube ?? [def.item]) assert.ok(ICON_TEXTURES[texture], texture);
+    for (const texture of def.cube ?? (def.face ? [def.face[0]] : [def.item])) assert.ok(ICON_TEXTURES[texture], texture);
   }
+  // モブは顔（体のテクスチャから切り出す）。シルバーフィッシュだけは顔が小さすぎるのでスポーンエッグ
+  for (const mob of ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'pig']) {
+    assert.ok(icons[mob].face, `${mob} は顔`);
+    assert.match(ICON_TEXTURES[icons[mob].face[0]], /^entity\//);
+  }
+  assert.equal(icons.silverfish.item, 'silverfish_spawn_egg');
 });

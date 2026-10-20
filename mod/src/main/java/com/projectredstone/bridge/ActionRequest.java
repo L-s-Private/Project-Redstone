@@ -14,17 +14,36 @@ import java.util.Set;
  */
 public record ActionRequest(String id, Type type, int count, String from, String label, String mob,
                             int width, int height, int countdown, String wall, String block, int skyY, int reach,
-                            String placeSpeed, int percent, int rounds, String breakSpeed) {
+                            String placeSpeed, int percent, int rounds, String breakSpeed, String handBlock,
+                            boolean mobsAttack, String time, String weather, boolean mobSpawning, boolean keepInventory,
+                            int mobLifetime) {
 
-    public enum Type { PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET }
+    public enum Type {
+        PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET, WORLD,
+        JAIL, FREEZE, FILL_LAYER, FILL_CLEAR, LIGHTNING, LEVITATE, NIGHT, FILL_RAISE
+    }
 
-    /** 1回の要求で出せる数の上限。配信中の事故とサーバー負荷を防ぐ。 */
-    public static final Map<Type, Integer> MAX_COUNT = Map.of(
-            Type.TNT, 20,
-            Type.MOB, 10,
-            Type.FILL_EXPAND, 5,
-            Type.FILL_SHRINK, 5,
-            Type.FILL_HELP, 64);
+    /**
+     * 1回の要求で出せる数の上限。配信中の事故とサーバー負荷を防ぐ。
+     * count の意味は種類による: 逮捕・操作禁止・浮遊・夜は秒、一段埋め・枠を高くするは段、ほかは個数
+     */
+    public static final Map<Type, Integer> MAX_COUNT = Map.ofEntries(
+            Map.entry(Type.TNT, 20),
+            Map.entry(Type.MOB, 10),
+            Map.entry(Type.FILL_EXPAND, 5),
+            Map.entry(Type.FILL_SHRINK, 5),
+            Map.entry(Type.FILL_HELP, 64),
+            Map.entry(Type.JAIL, 60),
+            Map.entry(Type.FREEZE, 30),
+            Map.entry(Type.FILL_LAYER, 5),
+            Map.entry(Type.LIGHTNING, 10),
+            Map.entry(Type.LEVITATE, 15),
+            Map.entry(Type.NIGHT, 300),
+            Map.entry(Type.FILL_RAISE, 5));
+
+    /** 埋め立て中でないと使えない種類 */
+    public static final Set<Type> NEEDS_FILL_GAME = Set.of(Type.FILL_EXPAND, Type.FILL_SHRINK, Type.FILL_HELP, Type.FILL_SET, Type.FILL_STOP,
+            Type.JAIL, Type.FILL_LAYER, Type.FILL_CLEAR, Type.FILL_RAISE);
 
     public static final Set<String> ALLOWED_MOBS = Set.of("zombie", "skeleton", "creeper", "spider", "witch", "silverfish", "pig");
 
@@ -59,6 +78,14 @@ public record ActionRequest(String id, Type type, int count, String from, String
     /** 何ラウンドでおしまいにするか */
     public static final int DEFAULT_ROUNDS = 10;
     public static final int MAX_ROUNDS = 99;
+    /** 枠に出したモブが消えるまでの秒数（0 なら消えない） */
+    public static final int DEFAULT_MOB_LIFETIME = 30;
+    public static final int MAX_MOB_LIFETIME = 600;
+
+    /** world: 時間の進み方。normal は進む（バニラ）、day・night はその時間で止める */
+    public static final Set<String> ALLOWED_TIMES = Set.of("normal", "day", "night");
+    /** world: 天気。normal は変わる（バニラ）、clear・rain はその天気で止める */
+    public static final Set<String> ALLOWED_WEATHERS = Set.of("normal", "clear", "rain");
 
     static final int MAX_FROM_LENGTH = 32;
     static final int MAX_LABEL_LENGTH = 100;
@@ -106,9 +133,14 @@ public record ActionRequest(String id, Type type, int count, String from, String
         if (!ALLOWED_WALLS.contains(wall)) {
             throw new InvalidRequestException("未対応の枠の素材です: " + wall);
         }
+        // block は枠の中に実際に置かれるブロック（お助けもこれ）。handBlock は手に持つブロックで、置くと block に変わる
         String block = optString(json, "block", DEFAULT_BLOCK);
         if (!ALLOWED_BLOCKS.contains(block)) {
             throw new InvalidRequestException("未対応のブロックです: " + block);
+        }
+        String handBlock = optString(json, "handBlock", block);
+        if (!ALLOWED_BLOCKS.contains(handBlock)) {
+            throw new InvalidRequestException("未対応の手に持つブロックです: " + handBlock);
         }
         int skyY = optInt(json, "skyY", DEFAULT_SKY_Y);
         int reach = Math.max(1, Math.min(MAX_REACH, optInt(json, "reach", DEFAULT_REACH)));
@@ -124,9 +156,24 @@ public record ActionRequest(String id, Type type, int count, String from, String
         int rounds = Math.max(1, Math.min(MAX_ROUNDS, optInt(json, "rounds", DEFAULT_ROUNDS)));
         // fill_set（デバッグ用）: 埋める割合 0〜100
         int percent = Math.max(0, Math.min(100, optInt(json, "percent", 100)));
+        // クリエイティブのままでもモブに攻撃されるよう、埋め立て中はサバイバル（飛べる）にする
+        boolean mobsAttack = optBoolean(json, "mobsAttack", true);
+
+        String time = optString(json, "time", "normal");
+        if (!ALLOWED_TIMES.contains(time)) {
+            throw new InvalidRequestException("未対応の時間の設定です: " + time);
+        }
+        String weather = optString(json, "weather", "normal");
+        if (!ALLOWED_WEATHERS.contains(weather)) {
+            throw new InvalidRequestException("未対応の天気の設定です: " + weather);
+        }
+        boolean mobSpawning = optBoolean(json, "mobSpawning", true);
+        boolean keepInventory = optBoolean(json, "keepInventory", false);
+        int mobLifetime = Math.max(0, Math.min(MAX_MOB_LIFETIME, optInt(json, "mobLifetime", DEFAULT_MOB_LIFETIME)));
 
         return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach, placeSpeed, percent,
-                rounds, breakSpeed);
+                rounds, breakSpeed, handBlock, mobsAttack, time, weather, mobSpawning, keepInventory,
+                mobLifetime);
     }
 
     /** 押しっぱなしで次のブロックを置けるまでの tick 数 */
@@ -154,6 +201,15 @@ public record ActionRequest(String id, Type type, int count, String from, String
             case "fill_shrink" -> Type.FILL_SHRINK;
             case "fill_help" -> Type.FILL_HELP;
             case "fill_set" -> Type.FILL_SET;
+            case "world" -> Type.WORLD;
+            case "jail" -> Type.JAIL;
+            case "freeze" -> Type.FREEZE;
+            case "fill_layer" -> Type.FILL_LAYER;
+            case "fill_clear" -> Type.FILL_CLEAR;
+            case "lightning" -> Type.LIGHTNING;
+            case "levitate" -> Type.LEVITATE;
+            case "night" -> Type.NIGHT;
+            case "fill_raise" -> Type.FILL_RAISE;
             default -> throw new InvalidRequestException("未対応の type です: " + raw);
         };
     }
@@ -167,6 +223,17 @@ public record ActionRequest(String id, Type type, int count, String from, String
             throw new InvalidRequestException(key + " は文字列にしてください");
         }
         return value.getAsString();
+    }
+
+    private static boolean optBoolean(JsonObject json, String key, boolean fallback) throws InvalidRequestException {
+        JsonElement value = json.get(key);
+        if (value == null || value.isJsonNull()) {
+            return fallback;
+        }
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
+            throw new InvalidRequestException(key + " は true か false にしてください");
+        }
+        return value.getAsBoolean();
     }
 
     private static int optInt(JsonObject json, String key, int fallback) throws InvalidRequestException {

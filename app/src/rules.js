@@ -1,12 +1,19 @@
-// ギフトやフォローを、どの妨害にするか決める。config.json の rules を上から順に見て、最初に合ったものを使う。
+// ギフトやフォローを、どの妨害にするか決める。並び順には頼らない:
+// 名前（か ID）で決めたギフトがいちばん先。なければ「コイン数で」のうち、いちばん大きい数のもの。同じなら上のもの。
 // いいねのルール（likes）だけは別扱いで、いいねが指定回数たまるたびに出す（dispatcher.js）。
 
-export const ACTION_TYPES = ['tnt', 'mob', 'message', 'fill_expand', 'fill_shrink', 'fill_help'];
+export const ACTION_TYPES = ['tnt', 'mob', 'message', 'fill_expand', 'fill_shrink', 'fill_help',
+  'jail', 'freeze', 'fill_layer', 'fill_clear', 'lightning', 'levitate', 'night', 'fill_raise'];
 export const SOCIAL_EVENTS = ['follow', 'share'];
 
 // MOD 側の上限（docs/protocol.md）。ここでも丸めて、ログの数が実際に出る数と合うようにする
-const MAX_COUNT_BY_TYPE = { tnt: 20, mob: 10, message: 1, fill_expand: 5, fill_shrink: 5, fill_help: 64 };
+// 逮捕・操作禁止・浮遊・夜の count は秒、一段埋め・枠を高くするは段
+export const MAX_COUNT_BY_TYPE = {
+  tnt: 20, mob: 10, message: 1, fill_expand: 5, fill_shrink: 5, fill_help: 64,
+  jail: 60, freeze: 30, fill_layer: 5, fill_clear: 1, lightning: 10, levitate: 15, night: 300, fill_raise: 5,
+};
 
+// ギフトの値段（minDiamonds・diamonds）は、視聴者が払うコインの数。TikTok の diamond_count がそのまま入る
 export function matches(rule, event) {
   if (rule.event !== undefined) {
     return event.kind === rule.event;
@@ -30,7 +37,20 @@ export function matches(rule, event) {
 
 /** @returns {number} 合ったルールの番号。なければ -1 */
 export function findRuleIndex(rules, event) {
-  return rules.findIndex((rule) => matches(rule, event));
+  let best = -1;
+  rules.forEach((rule, i) => {
+    if (!matches(rule, event)) return;
+    if (best === -1) {
+      best = i;
+      return;
+    }
+    const current = rules[best];
+    // コイン数のルールより、名前で決めたルール。コイン数どうしなら大きい数
+    if (current.minDiamonds !== undefined && (rule.minDiamonds === undefined || rule.minDiamonds > current.minDiamonds)) {
+      best = i;
+    }
+  });
+  return best;
 }
 
 /**

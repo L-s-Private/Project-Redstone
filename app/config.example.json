@@ -3,10 +3,16 @@
   "mod": { "host": "127.0.0.1", "port": 25599 },
   "rules": [
     { "gift": "バラ", "action": "mob", "mob": "zombie", "count": 1 },
-    { "gift": "Rose", "action": "mob", "mob": "zombie", "count": 1 },
     { "gift": "GG", "action": "mob", "mob": "skeleton", "count": 1 },
-    { "gift": "花火", "action": "tnt", "count": 1 },
-    { "likes": 1000, "action": "fill_help", "count": 10 },
-    { "likes": 10000, "action": "tnt", "count": 5 }
+    { "gift": "香水", "action": "mob", "mob": "pig", "count": 10 },
+    { "gift": "クラッカー", "action": "mob", "mob": "zombie", "count": 10 },
+    { "gift": "ハートミー", "action": "message", "label": "チーム参加ありがとう！", "cooldownSec": 10 },
+    { "minDiamonds": 1000, "action": "tnt", "count": 20 },
+    { "minDiamonds": 100, "action": "tnt", "count": 5 },
+    { "minDiamonds": 30, "action": "fill_expand", "count": 1 },
+    { "minDiamonds": 1, "action": "tnt", "count": 1 },
+    { "likes": 100, "action": "mob", "mob": "pig", "count": 3 },
+    { "event": "follow", "action": "message", "label": "フォローありがとう！", "cooldownSec": 10 },
+    { "event": "share", "action": "message", "label": "シェアありがとう！", "cooldownSec": 10 }
   ]
 }

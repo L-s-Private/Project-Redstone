@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { ACTION_TYPES, SOCIAL_EVENTS } from './rules.js';
-import { MAX_PRESET_NAME, MAX_USER_PRESETS } from './presets.js';
+import { MAX_PRESET_NAME } from './presets.js';
+import { MAX_RULES, MAX_USER_PRESETS } from './plan.js';
 
 export const DEFAULT_MOD_PORT = 25599;
 
@@ -8,7 +9,6 @@ const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event'];
 // MOD が出せるもの（docs/protocol.md）
 export const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
 const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec'];
-const MAX_RULES = 50;
 const MAX_LABEL_LENGTH = 100;
 
 // 埋め立ての設定（MOD の docs/protocol.md と同じ値）

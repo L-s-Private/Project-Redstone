@@ -53,6 +53,5 @@ export const BUILTIN_PRESETS = [
   },
 ];
 
-/** 自分で保存できるプリセットの数と、名前の長さの上限 */
-export const MAX_USER_PRESETS = 20;
+/** プリセットの名前の長さの上限（保存できる数はプランで決まる。plan.js） */
 export const MAX_PRESET_NAME = 20;

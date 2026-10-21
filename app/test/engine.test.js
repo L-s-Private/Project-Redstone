@@ -314,3 +314,14 @@ test('マイクラに入っている MOD の版がアプリ用と違えば知ら
   assert.equal(errors.length, 1);
   assert.match(errors[0].text, /古い版.*v0\.16\.1/);
 });
+
+test('無料版の上限: プリセットとルールを増やすときだけ断り、今ある設定は消さない', () => {
+  const { engine } = setup({ presets: [{ name: 'A', rules: [{ gift: 'Rose', action: 'tnt' }] }] }, { plan: 'free' });
+  assert.throws(() => engine.savePreset('B'), /1個まで/);
+  engine.savePreset('A');
+  assert.equal(engine.config.presets.length, 1);
+  const many = Array.from({ length: 13 }, () => ({ minDiamonds: 1, action: 'tnt' }));
+  assert.throws(() => engine.setRules(many), /12件まで/);
+  assert.equal(engine.config.rules.length, 1, '断ったときは前のルールのまま');
+  assert.equal(engine.state.plan.id, 'free');
+});

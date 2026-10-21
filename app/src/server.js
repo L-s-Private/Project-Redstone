@@ -53,7 +53,11 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
         if (e instanceof ConfigError) return { status: 400, error: e.message };
         throw e;
       }
-      engine.setRules(rules);
+      try {
+        engine.setRules(rules);
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
       await saveConfig(engine.config);
     },
     'POST /api/ranking/reset': () => engine.resetRanking(),

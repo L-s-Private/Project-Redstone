@@ -2,7 +2,8 @@ import { EventEmitter } from 'node:events';
 import { Dispatcher } from './dispatcher.js';
 import { ModClient } from './modClient.js';
 import { parseFill, parseWorld, parsePreset } from './config.js';
-import { BUILTIN_PRESETS, MAX_USER_PRESETS } from './presets.js';
+import { BUILTIN_PRESETS } from './presets.js';
+import { checkPresetSave, checkRules, CURRENT_PLAN, planOf } from './plan.js';
 import { describeEvent } from './rules.js';
 import { giftTable, Ranking } from './overlayData.js';
 import { TikTokSource } from './tiktok.js';
@@ -96,10 +97,12 @@ export class Engine extends EventEmitter {
    * ranking: 保存しておいたランキング（同じ配信の途中で起動し直したとき続きから数える）
    * saveRanking: ランキングが変わったときに保存する
    * modVersion: アプリに入っている MOD の版。マイクラに入っている MOD と違えば知らせる（わからなければ空）
+   * plan: 無料版か有料版か（plan.js）
    */
-  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {} }) {
+  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {}, plan = CURRENT_PLAN }) {
     super();
     this.config = config;
+    this.plan = plan;
     this.version = version;
     this.modVersion = modVersion;
     this.giftCatalog = giftCatalog;
@@ -203,6 +206,7 @@ export class Engine extends EventEmitter {
       stats: { ...this.dispatcher.stats },
       rules: this.config.rules,
       presets: { builtin: BUILTIN_PRESETS, mine: this.config.presets ?? [] },
+      plan: planOf(this.plan),
       testButtons: this.cached('testButtons', [this.config.rules], () => testButtons(this.config.rules)),
       recentGifts: this.recentGifts,
       // 配信画面（オーバーレイ）用
@@ -222,12 +226,12 @@ export class Engine extends EventEmitter {
     return { ...event, giftId: event.giftId || gift.id, giftNameJa: gift.nameJa, image: event.image || gift.image };
   }
 
-  /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。 */
   /** 今のルールを、自分のプリセットとして保存する（同じ名前なら上書き） */
   savePreset(name) {
     const preset = parsePreset({ name, rules: this.config.rules });
+    const problem = checkPresetSave(this.plan, this.config.presets ?? [], preset.name);
+    if (problem) throw new Error(problem);
     const mine = (this.config.presets ?? []).filter((p) => p.name !== preset.name);
-    if (mine.length >= MAX_USER_PRESETS) throw new Error(`プリセットは${MAX_USER_PRESETS}個まで保存できます`);
     this.config.presets = [...mine, preset];
     this.log('info', `今の妨害の設定を、プリセット「${preset.name}」として保存しました`);
     this.emitState();
@@ -238,7 +242,10 @@ export class Engine extends EventEmitter {
     this.emitState();
   }
 
+  /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。プランの上限で断るときは Error を投げる */
   setRules(rules) {
+    const problem = checkRules(this.plan, rules, this.config.rules.length);
+    if (problem) throw new Error(problem);
     this.config.rules = rules;
     this.dispatcher.setRules(rules);
     this.log('ok', `妨害の設定を保存しました（ルール ${rules.length}件）`);

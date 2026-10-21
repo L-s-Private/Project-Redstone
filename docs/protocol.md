@@ -11,7 +11,7 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
 | `id` | 文字列 | 応答と対応づけるためのID（任意） |
-| `type` | 文字列 | `ping` / `tnt` / `mob` / `message` / `fill_start` / `fill_stop` / `fill_expand` / `fill_shrink` / `fill_help` / `fill_set` / `world` / `jail` / `freeze` / `fill_layer` / `fill_clear` / `lightning` / `levitate` / `night` / `fill_raise` |
+| `type` | 文字列 | `ping` / `tnt` / `mob` / `message` / `fill_start` / `fill_stop` / `fill_expand` / `fill_shrink` / `fill_help` / `fill_set` / `world` / `jail` / `freeze` / `fill_layer` / `fill_clear` / `lightning` / `levitate` / `night` / `fill_raise` / `stop_all` |
 | `count` | 数値 | 回数。種類ごとの上限で丸める（`tnt` 20、`mob` 10、`fill_expand`・`fill_shrink` 5マス、`fill_help` 64個、`jail` 60秒、`freeze` 30秒、`fill_layer` 5段、`fill_clear` 1、`lightning` 10回、`levitate` 15秒、`night` 300秒、`fill_raise` 5段） |
 | `from` | 文字列 | ギフトを送った人の表示名（画面表示用、最大32文字） |
 | `label` | 文字列 | 画面に出す文言（最大100文字）。`message` では本文 |
@@ -57,6 +57,7 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 - `fill_layer`（一段埋め）: 空いているマスがあるいちばん下の段から、`count` 段をまるごと `block` で埋める（お助け）。
 - `fill_clear`（全消し）: 枠の中を全部空にする。
 - `fill_raise`: 枠を `count` 段高くする（30段まで）。次のラウンドでは元の高さに戻し、高くした分の壁と中を消す。カウントダウン中に高くしたら埋め立て中に戻る。
+- `stop_all`（全妨害ストップ）: 起きている妨害をすべて止める。ギフトで出した TNT とモブ（印 `project_redstone` が付いたもの）をすべてのワールドから消し、逮捕・操作禁止・浮遊を解き、夜を元の時刻に戻し、予約した効果音を消す。逮捕していたプレイヤーは枠の上に戻す。埋め立ては続ける。アプリは「全妨害ストップ」を押したとき、一時停止中でも送る。
 - `fill_set`: テスト用。中を下の段から `percent`% まで埋め、残りを空にする（0 なら空にする）。クリア後でも100%未満にすれば埋め立て中に戻る。
 
 やられて生き返ったプレイヤーは、埋め立て中なら枠の上に戻す（逮捕中なら牢屋）。クリアまでのカウントダウンは最後の5秒ほどだんだん遅くなる（残り5・4秒は1.5秒、3秒は2秒、2秒は2.5秒、1秒は3秒かかる。`countdownSecondsLeft` は表示どおりの数）。
@@ -79,10 +80,19 @@ MOD はマイクラにもともとある音を、プレイヤーの位置で鳴�
 {"id":"44","ok":true,"players":1}
 ```
 
-`ping` の応答には、ワールドにいるプレイヤー数 `players` と、埋め立ての状況 `fill` が入る（始まっていなければ `null`）。
+妨害の応答は、マイクラの中で実際に出し終わってから返す。何も起きなかったときは `ok:false` と理由を返す（アプリは「失敗」と数える）:
+
+- プレイヤーがいない
+- `tnt`: 枠の中の爆発していない TNT が上限（80個）で、1個も出せなかった
+- `mob`: 1体も出せなかった
+- `jail`: プレイヤーが枠と別のワールドにいる
+- 実行中にエラーが起きた
+- 5秒たっても出し終わらない（`"マイクラが応答しないので、出しませんでした"`）。このときは、あとから遅れて出ることはない
+
+`ping` の応答には、ワールドにいるプレイヤー数 `players`、MOD の版 `version`（0.16.2 から。アプリは自分に入っている MOD と違えば知らせる）、埋め立ての状況 `fill` が入る（始まっていなければ `null`）。
 
 ```json
-{"id":"7","ok":true,"players":1,"fill":{"phase":"filling","filled":512,"total":1089,"percent":47,"width":11,"height":9,"countdownSecondsLeft":0,"countdownSeconds":10,"round":1,"rounds":10}}
+{"id":"7","ok":true,"players":1,"version":"0.16.2","fill":{"phase":"filling","filled":512,"total":1089,"percent":47,"width":11,"height":9,"countdownSecondsLeft":0,"countdownSeconds":10,"round":1,"rounds":10}}
 ```
 
 `phase` は `filling`（埋めている途中）/ `countdown`（埋めきってカウントダウン中）/ `cleared`（全ラウンドクリア）。`round` はクリアしたラウンドの数、`rounds` はラウンド数。

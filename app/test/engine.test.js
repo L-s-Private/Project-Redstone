@@ -98,7 +98,16 @@ test('一時停止・全妨害ストップ', async () => {
   assert.equal(client.sent.length, 0);
   assert.equal(alerts.length, 0);
   engine.resume();
-  assert.equal(engine.stopAll(), 2);
+  assert.equal(await engine.stopAll(), 2);
+  assert.equal(engine.state.paused, true);
+  assert.deepEqual(client.sent, [{ type: 'stop_all' }], '一時停止中でも、マイクラの中の妨害を止める命令は送る');
+});
+
+test('全妨害ストップは、マイクラにつながっていなければ待ち行列を消すだけ', async () => {
+  const { engine, client } = setup();
+  client.status = { connected: false, players: null };
+  assert.equal(await engine.stopAll(), 2);
+  assert.equal(client.sent.length, 0);
   assert.equal(engine.state.paused, true);
 });
 
@@ -280,4 +289,28 @@ test('ギフトの処理で思わぬエラーが起きても、止まらずに�
   const result = await engine.handleEvent({ kind: 'gift', giftName: 'Rose', diamonds: 1, count: 1, from: 'a' });
   assert.equal(result.status, 'failed');
   assert.ok(logs.some((l) => l.level === 'error' && l.text.includes('こわれた')));
+});
+
+test('テスト送信はログに印を付け、本物のいいねのたまり具合に足さない', async () => {
+  const { engine, client, logs } = setup({ rules: [{ likes: 100, action: 'fill_help', count: 1 }] });
+  await engine.handleEvent({ kind: 'gift', giftName: 'Rose', diamonds: 1, count: 1, from: 'テスト', test: true });
+  assert.ok(logs.some((l) => l.text.startsWith('（テスト）') && l.text.includes('Rose')));
+  await engine.handleEvent({ kind: 'like', count: 150, from: 'テスト', test: true });
+  assert.ok(logs.some((l) => l.text === '（テスト）いいね 100回'));
+  client.sent.length = 0;
+  // テストの残り50回は持ち越さないので、本物の60回ではまだ出ない
+  await engine.handleEvent({ kind: 'like', count: 60, from: 'たろう' });
+  assert.equal(client.sent.length, 0);
+});
+
+test('マイクラに入っている MOD の版がアプリ用と違えば知らせる（1回だけ）', () => {
+  const { engine, client, logs } = setup({}, { modVersion: '0.16.1' });
+  client.emit('status', { connected: true, players: 1, version: '0.16.1' });
+  assert.equal(logs.filter((l) => l.level === 'error').length, 0);
+  client.emit('status', { connected: false, players: null, version: null });
+  client.emit('status', { connected: true, players: 1, version: null });
+  client.emit('status', { connected: true, players: 1, version: null });
+  const errors = logs.filter((l) => l.level === 'error');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].text, /古い版.*v0\.16\.1/);
 });

@@ -17,6 +17,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.item.PrimedTnt;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -49,18 +50,30 @@ public final class ActionExecutor {
     private ActionExecutor() {
     }
 
-    public static void execute(MinecraftServer server, ActionRequest request) {
+    /**
+     * 妨害を出す。
+     * @return ゲームの中に何も起きなかったときは、その理由（アプリに「失敗」として返す）。出せたら null
+     */
+    public static String execute(MinecraftServer server, ActionRequest request) {
         List<ServerPlayer> players = server.getPlayerList().getPlayers();
         if (players.isEmpty()) {
-            return;
+            return "ワールドにプレイヤーがいません";
         }
         // シングルプレイでは最初のプレイヤーが配信者本人
         ServerPlayer player = players.get(0);
         ServerLevel level = (ServerLevel) player.level();
 
         switch (request.type()) {
-            case TNT -> spawnTnt(level, player, request.count());
-            case MOB -> spawnMobs(level, player, MOBS.get(request.mob()), request.count());
+            case TNT -> {
+                if (spawnTnt(level, player, request.count()) == 0) {
+                    return "枠の中の TNT が多すぎるので出しませんでした（爆発していない TNT は" + FillGameManager.MAX_TNT + "個まで）";
+                }
+            }
+            case MOB -> {
+                if (spawnMobs(level, player, MOBS.get(request.mob()), request.count()) == 0) {
+                    return "モブを出せませんでした";
+                }
+            }
             case FILL_START -> FillGameManager.start(player, request);
             case FILL_STOP -> FillGameManager.stop(server);
             case FILL_EXPAND -> FillGameManager.resize(request.count());
@@ -68,7 +81,11 @@ public final class ActionExecutor {
             case FILL_HELP -> FillGameManager.help(request.count());
             case FILL_SET -> FillGameManager.setFillPercent(request.percent());
             case WORLD -> WorldSettings.apply(server, request);
-            case JAIL -> FillGameManager.jail(player, request.count());
+            case JAIL -> {
+                if (!FillGameManager.jail(player, request.count())) {
+                    return "枠と別のワールドにいるので、逮捕できませんでした";
+                }
+            }
             case FREEZE -> FillGameManager.freeze(player, request.count());
             case FILL_LAYER -> FillGameManager.fillLayers(request.count());
             case FILL_CLEAR -> FillGameManager.clearAll();
@@ -76,17 +93,26 @@ public final class ActionExecutor {
             case LEVITATE -> player.addEffect(new MobEffectInstance(MobEffects.LEVITATION, request.count() * 20, 0), null);
             case NIGHT -> FillGameManager.night(server, request.count());
             case FILL_RAISE -> FillGameManager.raise(request.count());
+            case STOP_ALL -> {
+                stopAll(server);
+                return null;
+            }
             case MESSAGE, PING -> {
             }
         }
         Sounds.forAction(server, request.type());
         announce(player, request);
+        return null;
     }
 
-    /** 埋め立て中は枠の真上から落とし、枠の中のブロックだけを壊す。そうでなければプレイヤーの周りに出す。 */
-    private static void spawnTnt(ServerLevel level, ServerPlayer player, int count) {
+    /**
+     * 埋め立て中は枠の真上から落とし、枠の中のブロックだけを壊す。そうでなければプレイヤーの周りに出す。
+     * @return 実際に出した数
+     */
+    private static int spawnTnt(ServerLevel level, ServerPlayer player, int count) {
         RandomSource random = level.getRandom();
         List<double[]> inFrame = FillGameManager.tntPositions(count);
+        int spawned = 0;
         for (int i = 0; i < count; i++) {
             // 枠にまだ爆発していない TNT が多すぎるときは、それ以上落とさない（重くなるため）
             if (inFrame != null && !FillGameManager.canDropTnt()) {
@@ -106,20 +132,48 @@ public final class ActionExecutor {
             }
             PrimedTnt tnt = new PrimedTnt(level, x, y, z, null);
             tnt.setFuse(TNT_FUSE_TICKS + random.nextInt(20));
+            tnt.addTag(SPAWNED_TAG);
             level.addFreshEntity(tnt);
+            spawned++;
             if (inFrame != null) {
                 FillGameManager.trackTnt(tnt);
             }
         }
+        return spawned;
     }
 
-    /** ギフトで出したモブに付ける印（昼でも燃えないようにする。mixin/MobSunBurnMixin） */
+    /**
+     * 全妨害ストップ: 起きている妨害をすべて止める。ギフトで出した TNT とモブを消し、逮捕・操作禁止・浮遊を解き、夜を元の時刻に戻す。
+     * 埋め立てそのものは続ける
+     */
+    private static void stopAll(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            List<Entity> spawned = new ArrayList<>();
+            for (Entity entity : level.getAllEntities()) {
+                if (entity.entityTags().contains(SPAWNED_TAG)) {
+                    spawned.add(entity);
+                }
+            }
+            spawned.forEach(Entity::discard);
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.removeEffect(MobEffects.LEVITATION);
+        }
+        FillGameManager.stopEffects(server);
+        Sounds.reset();
+    }
+
+    /** ギフトで出したモブと TNT に付ける印（モブは昼でも燃えないようにする。mixin/MobSunBurnMixin。全妨害ストップで消す目印にもする） */
     public static final String SPAWNED_TAG = "project_redstone";
 
-    /** 埋め立て中は枠の中（埋めたブロックの上）に出す。そうでなければプレイヤーの周りに出す。 */
-    private static void spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
+    /**
+     * 埋め立て中は枠の中（埋めたブロックの上）に出す。そうでなければプレイヤーの周りに出す。
+     * @return 実際に出した数
+     */
+    private static int spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
         RandomSource random = level.getRandom();
         List<double[]> inFrame = FillGameManager.mobPositions(count);
+        int spawned = 0;
         for (int i = 0; i < count; i++) {
             BlockPos pos = inFrame != null
                     ? BlockPos.containing(inFrame.get(i)[0], inFrame.get(i)[1], inFrame.get(i)[2])
@@ -127,11 +181,13 @@ public final class ActionExecutor {
             Entity mob = type.spawn(level, pos, EntitySpawnReason.EVENT);
             if (mob != null) {
                 mob.addTag(SPAWNED_TAG);
+                spawned++;
             }
             if (mob != null && inFrame != null) {
                 FillGameManager.trackMob(mob);
             }
         }
+        return spawned;
     }
 
     /** 雷。埋め立て中は枠の中の地上に落とし、落ちた所のブロックを少し壊す。見た目だけの雷なので火事にはならない */
@@ -177,7 +233,7 @@ public final class ActionExecutor {
             case LEVITATE -> "浮遊 " + request.count() + "秒";
             case NIGHT -> "夜になった！ " + request.count() + "秒";
             case FILL_RAISE -> "枠が " + request.count() + " 段高くなった！";
-            case FILL_START, FILL_STOP, MESSAGE, PING, WORLD -> "";
+            case FILL_START, FILL_STOP, MESSAGE, PING, WORLD, STOP_ALL -> "";
         };
     }
 }

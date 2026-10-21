@@ -42,6 +42,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -258,6 +259,30 @@ public final class FillGameManager {
         cueStatus = null;
     }
 
+    /**
+     * 全妨害ストップ（TNT とモブは ActionExecutor が消したあと）: 逮捕・操作禁止を解き、夜を元の時刻に戻す。
+     * 埋め立ては続け、逮捕していたプレイヤーは枠に戻す
+     */
+    public static void stopEffects(MinecraftServer server) {
+        trackedTnt.clear();
+        trackedMobs.clear();
+        mobExpiresAt.clear();
+        if (nightUntil > 0) {
+            nightUntil = 0;
+            WorldSettings.run(server, "time set " + Math.floorMod(timeBeforeNight, 24000L));
+        }
+        Set<UUID> jailed = new HashSet<>(jailedUntil.keySet());
+        jailedUntil.clear();
+        frozen.clear();
+        removeJail();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            applyReach(player);
+            if (jailed.contains(player.getUUID()) && game != null && player.level() == world.level()) {
+                moveIntoFrame(player);
+            }
+        }
+    }
+
     public static void resize(int delta) {
         if (game == null) {
             return;
@@ -294,7 +319,7 @@ public final class FillGameManager {
      */
     private static final int MAX_MOBS = 60;
     /** 枠に落としておける（まだ爆発していない）TNT の数。超えた分は出さない */
-    private static final int MAX_TNT = 80;
+    public static final int MAX_TNT = 80;
 
     /** まだ TNT を落とせるか（多すぎると重くなるため） */
     public static boolean canDropTnt() {
@@ -363,10 +388,10 @@ public final class FillGameManager {
 
     // ---- 時間で解ける妨害 ----
 
-    /** 逮捕: 枠の真上の空中に牢屋（床はガラス）を作って入れ、seconds 秒たったら枠に戻す。続けて来たら時間を延ばす */
-    public static void jail(ServerPlayer player, int seconds) {
+    /** 逮捕: 枠の真上の空中に牢屋（床はガラス）を作って入れ、seconds 秒たったら枠に戻す。続けて来たら時間を延ばす。入れられなかったら false */
+    public static boolean jail(ServerPlayer player, int seconds) {
         if (game == null || player.level() != world.level()) {
-            return;
+            return false;
         }
         long base = Math.max(serverTicks, jailedUntil.getOrDefault(player.getUUID(), 0L));
         jailedUntil.put(player.getUUID(), base + seconds * 20L);
@@ -377,6 +402,7 @@ public final class FillGameManager {
         player.teleportTo(jailCell.getX() + 0.5, jailCell.getY(), jailCell.getZ() + 0.5);
         player.resetFallDistance();
         applyReach(player);
+        return true;
     }
 
     /** 操作禁止: seconds 秒、その場から動けず、ブロックにも手が届かない。埋め立て中でなくても使える */

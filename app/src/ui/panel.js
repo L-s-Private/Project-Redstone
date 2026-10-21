@@ -691,6 +691,27 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <p class="lead">ギフト通知・ギフト表・ラウンド・ランキングを、部品ごとに LIVE Studio に貼れます。</p>
         <button data-goto="tabOverlay">配信画面の部品を見る</button>
       </section>
+      <section class="card">
+        <h2>対応している環境</h2>
+        <ul class="hint" style="margin: 6px 0 0; padding-left: 20px; line-height: 1.8;">
+          <li>Windows 10 / 11</li>
+          <li>Minecraft Java版 26.3（統合版は使えません）</li>
+          <li>Fabric Loader 0.19.5 以上と Fabric API（「まとめて導入する」で入ります）</li>
+          <li>シングルプレイのワールド（最初に入ったプレイヤーを配信者として扱います）</li>
+          <li>配信画面の部品は、同じ PC の TikTok LIVE Studio で使います（127.0.0.1 の URL はほかの PC からは開けません）</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h2>データの扱い</h2>
+        <ul class="hint" style="margin: 6px 0 0; padding-left: 20px; line-height: 1.8;">
+          <li>TikTok のパスワードやログインは使いません。入れるのは TikTok ID だけです</li>
+          <li>TikTok LIVE には、非公式のしくみ（tiktok-live-connector）でつなぎます。つなぐとき、TikTok ID が外部のサービス Euler Stream（eulerstream.com）に送られます</li>
+          <li>ギフトの一覧は TikTok から、マイクラの準備に使うものは Fabric と Modrinth から取ってきます</li>
+          <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、ログ（視聴者の名前と届いたギフト）</li>
+          <li>これらを作者などに送ることはありません</li>
+          <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\\ProjectRedstone</code> を消してください。設定・ログ・ランキングがすべて消えます</li>
+        </ul>
+      </section>
     </div>
   </div>
 </main>
@@ -1510,6 +1531,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
     if (!name) {
       $('presetName').classList.add('invalid');
       return;
+    }
+    if (state.presets.mine.some((p) => p.name === name)) {
+      const ok = await askConfirm({ title: '「' + name + '」を上書きしますか？', text: '同じ名前のプリセットがあります。中身が今のルールに置き換わります。', ok: '上書きする' });
+      if (!ok) return;
     }
     // 保存していない変更があれば、先にルールを保存する（プリセットには保存したルールが入る）
     if (rulesDirty && !(await saveRules(rows))) return;

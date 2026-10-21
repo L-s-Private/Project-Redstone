@@ -20,7 +20,7 @@ public record ActionRequest(String id, Type type, int count, String from, String
 
     public enum Type {
         PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET, WORLD,
-        JAIL, FREEZE, FILL_LAYER, FILL_CLEAR, LIGHTNING, LEVITATE, NIGHT, FILL_RAISE
+        JAIL, FREEZE, FILL_LAYER, FILL_CLEAR, LIGHTNING, LEVITATE, NIGHT, FILL_RAISE, STOP_ALL
     }
 
     /**
@@ -210,6 +210,7 @@ public record ActionRequest(String id, Type type, int count, String from, String
             case "levitate" -> Type.LEVITATE;
             case "night" -> Type.NIGHT;
             case "fill_raise" -> Type.FILL_RAISE;
+            case "stop_all" -> Type.STOP_ALL;
             default -> throw new InvalidRequestException("未対応の type です: " + raw);
         };
     }

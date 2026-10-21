@@ -96,8 +96,8 @@ test('ボタン操作をエンジンに伝える', async () => {
       'pause',
       'resume',
       'stop',
-      { kind: 'gift', giftId: '', giftName: 'Rose', diamonds: 0, count: 100, from: 'テスト' },
-      { kind: 'follow', from: 'テスト' },
+      { kind: 'gift', giftId: '', giftName: 'Rose', diamonds: 0, count: 100, from: 'テスト', test: true },
+      { kind: 'follow', from: 'テスト', test: true },
     ]);
     assert.equal((await json(port, '/api/test', { kind: 'gift' })).status, 400);
   });
@@ -221,7 +221,7 @@ test('埋め立ての開始・終了を伝え、断られたら理由を返す',
 test('テスト送信でいいねも送れる', async () => {
   await withServer(async ({ engine, port }) => {
     await json(port, '/api/test', { kind: 'like', count: 1000 });
-    assert.deepEqual(engine.calls, [{ kind: 'like', count: 1000, from: 'テスト' }]);
+    assert.deepEqual(engine.calls, [{ kind: 'like', count: 1000, from: 'テスト', test: true }]);
   });
 });
 

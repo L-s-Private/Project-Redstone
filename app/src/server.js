@@ -222,16 +222,17 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
   };
 }
 
+/** テスト送信の中身。test: true を付け、本物のイベントと見分ける（ログの印・いいねのたまり具合） */
 function testEvent(body) {
   const from = 'テスト';
-  if (body.kind === 'follow' || body.kind === 'share') return { kind: body.kind, from };
-  if (body.kind === 'like') return { kind: 'like', count: Math.min(100000, Math.max(1, Math.floor(Number(body.count)) || 1)), from };
+  if (body.kind === 'follow' || body.kind === 'share') return { kind: body.kind, from, test: true };
+  if (body.kind === 'like') return { kind: 'like', count: Math.min(100000, Math.max(1, Math.floor(Number(body.count)) || 1)), from, test: true };
   if (body.kind !== 'gift') return null;
   const giftName = String(body.giftName ?? '').trim().slice(0, 64);
   const count = Math.min(100, Math.max(1, Math.floor(Number(body.count)) || 1));
   const diamonds = Math.min(100000, Math.max(0, Math.floor(Number(body.diamonds)) || 0));
   if (!giftName) return null;
-  return { kind: 'gift', giftId: '', giftName, diamonds, count, from };
+  return { kind: 'gift', giftId: '', giftName, diamonds, count, from, test: true };
 }
 
 function readJson(req) {

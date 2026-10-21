@@ -29,11 +29,13 @@ export class Dispatcher {
    */
   async handleLikes(event) {
     const results = [];
+    // テスト送信のいいねは、本物のいいねのたまり具合に足さない
+    const progress = event.test ? new Map() : this.likeProgress;
     for (const [index, rule] of this.rules.entries()) {
       if (rule.likes === undefined) continue;
-      const total = (this.likeProgress.get(index) ?? 0) + event.count;
+      const total = (progress.get(index) ?? 0) + event.count;
       const times = Math.floor(total / rule.likes);
-      this.likeProgress.set(index, total % rule.likes);
+      progress.set(index, total % rule.likes);
       if (times === 0) continue;
       this.stats.received++;
       const likes = times * rule.likes;

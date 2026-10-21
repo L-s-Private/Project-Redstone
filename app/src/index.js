@@ -50,7 +50,7 @@ async function main() {
         engine.resume();
         break;
       case 'stop':
-        engine.stopAll();
+        engine.stopAll().catch((e) => log.error(e.message));
         break;
       case 'fill_start':
         engine.startFill({ width: 11, height: 9, countdown: 10 }).catch((e) => log.error(e.message));

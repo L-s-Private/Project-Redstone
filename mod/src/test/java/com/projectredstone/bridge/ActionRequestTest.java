@@ -90,6 +90,12 @@ class ActionRequestTest {
     }
 
     @Test
+    void parsesStopAll() throws Exception {
+        assertEquals(ActionRequest.Type.STOP_ALL, ActionRequest.parse("{\"type\":\"stop_all\"}").type());
+        assertFalse(ActionRequest.NEEDS_FILL_GAME.contains(ActionRequest.Type.STOP_ALL), "埋め立て中でなくても止められる");
+    }
+
+    @Test
     void mobLifetimeDefaultsTo30SecondsAndIsClamped() throws Exception {
         assertEquals(30, ActionRequest.parse("{\"type\":\"fill_start\"}").mobLifetime());
         assertEquals(0, ActionRequest.parse("{\"type\":\"fill_start\",\"mobLifetime\":0}").mobLifetime(), "0 なら消えない");

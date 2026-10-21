@@ -9,6 +9,7 @@ import com.projectredstone.bridge.ActionRequest;
 import com.projectredstone.bridge.BridgeServer;
 import com.projectredstone.bridge.InvalidRequestException;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -22,6 +23,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ワールドが開いている間だけ、アプリ用の待ち受けを立てる。
@@ -30,6 +36,11 @@ import java.io.IOException;
 public class RedstoneMod implements ModInitializer {
 
     public static final int PORT = 25599;
+    /** 妨害を出し終わるまで待つ秒数。これを過ぎたら出さずに「失敗」と答える（アプリの待ち時間 15 秒より短く） */
+    private static final int EXECUTE_TIMEOUT_SECONDS = 5;
+    /** この MOD の版（アプリが、入っている MOD が古くないか確かめるのに使う） */
+    private static final String VERSION = FabricLoader.getInstance().getModContainer("project_redstone")
+            .map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse("");
 
     private static final Logger LOGGER = LoggerFactory.getLogger("project-redstone");
 
@@ -96,6 +107,7 @@ public class RedstoneMod implements ModInitializer {
         if (request.type() == ActionRequest.Type.PING) {
             JsonObject status = new JsonObject();
             status.addProperty("players", players);
+            status.addProperty("version", VERSION);
             status.add("fill", fillStatus());
             return status;
         }
@@ -105,14 +117,40 @@ public class RedstoneMod implements ModInitializer {
         if (ActionRequest.NEEDS_FILL_GAME.contains(request.type()) && !FillGameManager.running()) {
             throw new InvalidRequestException("埋め立てが始まっていません");
         }
+        // ゲームの中で本当に出せたかを確かめてから答える（出なかったものを「出した」と数えないため）
+        CompletableFuture<String> result = new CompletableFuture<>();
+        // 時間切れで「出せなかった」と答えたあとに、遅れて出ないようにする（どちらか先に取った方だけが進む）
+        AtomicBoolean claimed = new AtomicBoolean();
         server.execute(() -> {
+            if (!claimed.compareAndSet(false, true)) {
+                return;
+            }
             // 妨害1つの失敗で、マイクラが止まらないようにする（ログに残して次へ）
             try {
-                ActionExecutor.execute(server, request);
+                result.complete(ActionExecutor.execute(server, request));
             } catch (RuntimeException e) {
                 LOGGER.error("妨害を出せませんでした: {}", request.type(), e);
+                result.complete("マイクラの中でエラーが起きて、出せませんでした");
             }
         });
+        String problem;
+        try {
+            problem = result.get(EXECUTE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            if (claimed.compareAndSet(false, true)) {
+                throw new InvalidRequestException("マイクラが応答しないので、出しませんでした");
+            }
+            // ちょうど始まったところなので、終わるのを待つ
+            problem = result.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new InvalidRequestException("マイクラが終了中です");
+        } catch (ExecutionException e) {
+            throw new InvalidRequestException("マイクラの中でエラーが起きて、出せませんでした");
+        }
+        if (problem != null) {
+            throw new InvalidRequestException(problem);
+        }
         return null;
     }
 

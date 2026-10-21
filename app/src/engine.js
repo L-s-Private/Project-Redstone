@@ -59,6 +59,11 @@ export function testButtons(rules) {
   return [...buttons].map(([label, body]) => ({ label, body }));
 }
 
+/** テスト送信のログには印を付けて、本物の視聴者からのものと見分けられるようにする */
+function testMark(event) {
+  return event.test ? '（テスト）' : '';
+}
+
 const MOB_NAMES = {
   zombie: 'ゾンビ',
   skeleton: 'スケルトン',
@@ -90,11 +95,13 @@ export class Engine extends EventEmitter {
   /**
    * ranking: 保存しておいたランキング（同じ配信の途中で起動し直したとき続きから数える）
    * saveRanking: ランキングが変わったときに保存する
+   * modVersion: アプリに入っている MOD の版。マイクラに入っている MOD と違えば知らせる（わからなければ空）
    */
-  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', ranking = {}, saveRanking = async () => {} }) {
+  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {} }) {
     super();
     this.config = config;
     this.version = version;
+    this.modVersion = modVersion;
     this.giftCatalog = giftCatalog;
     this.now = now;
     this.client = client ?? new ModClient(config.mod);
@@ -115,7 +122,14 @@ export class Engine extends EventEmitter {
 
     // 埋め立ての進み具合でも status は届くので、接続の変化だけログに出す
     let previous = { connected: false, players: null };
-    this.client.on('status', ({ connected, players }) => {
+    let warnedVersion;
+    this.client.on('status', ({ connected, players, version }) => {
+      if (!connected) warnedVersion = undefined;
+      // 古い MOD は版を知らせない（version が null）。その場合も「合わない」とする
+      if (connected && players !== null && this.modVersion && version !== this.modVersion && warnedVersion !== version) {
+        warnedVersion = version;
+        this.log('error', `マイクラに入っている MOD（${version ? `v${version}` : '古い版'}）が、このアプリ用の MOD（v${this.modVersion}）と違います。マイクラを閉じてアプリを起動し直すと入れ替わります`);
+      }
       if (connected !== previous.connected || players !== previous.players) {
         if (!connected) {
           this.log('warn', 'マイクラ（MOD）との接続が切れました。つなぎ直します…');
@@ -340,7 +354,7 @@ export class Engine extends EventEmitter {
       if (raw.kind === 'like') return await this.handleLikes(raw);
       // テスト送信のギフトにも日本語名と絵を足す
       const event = this.withGiftInfo(raw);
-      this.log('gift', describeEvent(event), event.image ? { giftImage: event.image } : {});
+      this.log('gift', testMark(event) + describeEvent(event), event.image ? { giftImage: event.image } : {});
       const result = await this.dispatcher.handle(event);
       this.logResult(event, result);
       this.emitState();
@@ -372,7 +386,7 @@ export class Engine extends EventEmitter {
   async handleLikes(event) {
     const results = await this.dispatcher.handleLikes(event);
     for (const result of results) {
-      this.log('gift', `いいね ${result.likes}回`);
+      this.log('gift', `${testMark(event)}いいね ${result.likes}回`);
       this.logResult(event, result);
     }
     if (results.length) this.emitState();
@@ -399,12 +413,24 @@ export class Engine extends EventEmitter {
     this.emitState();
   }
 
-  /** 全妨害ストップ: 待ち行列の妨害を取り消して一時停止する。 */
-  stopAll() {
+  /**
+   * 全妨害ストップ: 待ち行列の妨害を取り消して一時停止し、マイクラの中で起きている妨害も止める
+   * （TNT とモブを消し、逮捕・操作禁止・浮遊を解き、夜を元に戻す。埋め立ては続ける）
+   * @returns {Promise<number>} 取り消した待ち行列の数
+   */
+  async stopAll() {
     this.dispatcher.paused = true;
     const cleared = this.client.clear();
     this.log('warn', `全妨害ストップ: 待ち行列の ${cleared}件を取り消し、一時停止しました`);
     this.emitState();
+    if (!this.client.status.connected || !this.client.status.players) return cleared;
+    try {
+      const response = await this.client.send({ type: 'stop_all' });
+      if (!response.ok) throw new Error(response.error);
+      this.log('warn', 'マイクラの中の妨害も止めました（TNT・モブを消し、逮捕・操作禁止・浮遊・夜を解除）');
+    } catch (e) {
+      this.log('error', `マイクラの中の妨害を止められませんでした: ${e.message}`);
+    }
     return cleared;
   }
 

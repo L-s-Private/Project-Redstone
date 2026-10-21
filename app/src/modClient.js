@@ -23,6 +23,8 @@ export class ModClient extends EventEmitter {
     this.connected = false;
     this.players = null;
     this.fill = null;
+    // マイクラに入っている MOD の版（ping で分かる。古い MOD には無い）
+    this.version = null;
     this.nextId = 1;
     this.queue = [];
     this.inFlight = new Map();
@@ -45,7 +47,7 @@ export class ModClient extends EventEmitter {
   }
 
   get status() {
-    return { connected: this.connected, players: this.players, fill: this.fill };
+    return { connected: this.connected, players: this.players, fill: this.fill, version: this.version };
   }
 
   /** @returns {Promise<{ok: boolean, error?: string}>} */
@@ -109,6 +111,7 @@ export class ModClient extends EventEmitter {
       this.connected = false;
       this.players = null;
       this.fill = null;
+      this.version = null;
       for (const entry of this.inFlight.values()) {
         clearTimeout(entry.timer);
         entry.reject(new Error('MODとの接続が切れました'));
@@ -154,9 +157,11 @@ export class ModClient extends EventEmitter {
     try {
       const response = await this.send({ type: 'ping' });
       const fill = response.fill ?? null;
-      if (response.ok && (this.players !== response.players || JSON.stringify(this.fill) !== JSON.stringify(fill))) {
+      const version = response.version ?? null;
+      if (response.ok && (this.players !== response.players || this.version !== version || JSON.stringify(this.fill) !== JSON.stringify(fill))) {
         this.players = response.players;
         this.fill = fill;
+        this.version = version;
         this.emitStatus();
       }
     } catch {

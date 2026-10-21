@@ -28,8 +28,10 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   // ギフトランキングは配信ごと。配信の途中で起動し直しても続きから数えるよう、ファイルに残す
   const rankingFile = join(dirname(configPath), 'ranking.json');
   const ranking = await readFile(rankingFile, 'utf8').then(JSON.parse).catch(() => ({}));
+  const bundledMod = await loadBundledMod();
   const engine = new Engine({
     config, version: pkg.version, giftCatalog, ranking,
+    modVersion: bundledMod?.fileName.match(/^project-redstone-(.+)\.jar$/)?.[1] ?? '',
     saveRanking: (data) => writeFileSafely(rankingFile, `${JSON.stringify(data)}\n`),
   });
   // 思わぬエラーで、配信中にアプリごと止まらないようにする（ログに残して続ける）
@@ -43,7 +45,6 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
     appendFile(logFile, `${time} [${entry.level}] ${entry.text}\n`).catch(() => {});
   });
 
-  const bundledMod = await loadBundledMod();
   const dir = process.env.REDSTONE_MINECRAFT_DIR ?? minecraftDir();
   let installing = null;
   const setup = {

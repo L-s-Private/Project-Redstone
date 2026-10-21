@@ -37,8 +37,8 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const history = await readFile(historyFile, 'utf8').then(JSON.parse).catch(() => ({}));
   const bundledMod = await loadBundledMod();
   // 有料版のライセンス。販売前（Polar の組織 ID が空）は使わない
-  const { organizationId, api } = licenseConfig();
-  const license = organizationId ? new License({ path: join(dirname(configPath), 'license.json'), organizationId, api }) : null;
+  const { organizationId, api, checkoutUrl, portalUrl } = licenseConfig();
+  const license = organizationId ? new License({ path: join(dirname(configPath), 'license.json'), organizationId, api, checkoutUrl, portalUrl }) : null;
   await license?.load();
   const engine = new Engine({
     license,

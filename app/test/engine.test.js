@@ -429,3 +429,19 @@ test('妨害の設定の履歴: はじめの設定を残し、保存するたび
   assert.deepEqual([list.full, list.total, list.entries.length], [false, 5, 3]);
   assert.throws(() => free.engine.historyRules(free.engine.history.entries[0].id), /見つかりません/, '見えない古いものは戻せない');
 });
+
+test('販売を始めたら（組織 ID あり）、キーがなければ無料版の上限が効く。上限を超えた設定は消さない', async () => {
+  const { License } = await import('../src/license.js');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const license = new License({ path: join(tmpdir(), `redstone-nokey-${process.pid}.json`), organizationId: 'org', fetch: async () => { throw new Error('offline'); } });
+  const rules = Array.from({ length: 13 }, (_, i) => ({ likes: i + 1, action: 'tnt' }));
+  const { engine } = setup({ rules, presets: [{ name: 'a', rules: [] }] }, { license });
+  assert.equal(engine.state.plan.id, 'free');
+  assert.equal(engine.config.rules.length, 13, '上限を超えていても消さない');
+  assert.throws(() => engine.setRules([...rules, { likes: 99, action: 'tnt' }]), /12件まで/, '増やすことはできない');
+  assert.throws(() => engine.savePreset('b'), /1個まで/);
+  assert.throws(() => engine.exportSettings(), /Creator Plus/);
+  assert.equal(engine.analyticsList().full, false);
+  assert.equal(engine.historyList().full, false);
+});

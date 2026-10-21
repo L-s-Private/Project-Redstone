@@ -110,3 +110,10 @@ test('解除すると Polar に知らせ、Polar に届かなくてもこの PC 
   await license.load();
   assert.equal(license.status().state, 'none', 'ファイルも消えている');
 });
+
+test('購入ページ・契約のページは、販売を始めたら画面に出す。https のページだけ', () => {
+  const license = new License({ path: 'x', organizationId: 'org', checkoutUrl: 'https://buy.polar.sh/polar_cl_x', portalUrl: 'javascript:alert(1)' });
+  assert.deepEqual(license.status(), { enabled: true, state: 'none', checkoutUrl: 'https://buy.polar.sh/polar_cl_x', portalUrl: '' });
+  assert.deepEqual(new License({ path: 'x', organizationId: '' , checkoutUrl: 'https://x' }).status(), { enabled: false, state: 'disabled' }, '販売前は出さない');
+  assert.equal(licenseConfig({ REDSTONE_POLAR_ORG: 'o', REDSTONE_POLAR_CHECKOUT: 'https://sandbox.polar.sh/x' }).checkoutUrl, 'https://sandbox.polar.sh/x');
+});

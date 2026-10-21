@@ -16,16 +16,24 @@ export const POLAR_API = 'https://api.polar.sh';
 export const POLAR_SANDBOX_API = 'https://sandbox-api.polar.sh';
 /** 販売を始めたら、Polar の組織 ID をここに入れる（空のあいだはライセンスを使わない） */
 export const POLAR_ORGANIZATION_ID = '';
+/** 購入ページ（Polar の Checkout Link）と、買った人が契約を確かめる・解約するページ（Polar のカスタマーポータル） */
+export const POLAR_CHECKOUT_URL = '';
+export const POLAR_PORTAL_URL = '';
 
 export const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** 開発中に Polar のテスト環境（sandbox）で試すときは、環境変数で組織 ID を渡す */
+/** 開発中に Polar のテスト環境（sandbox）で試すときは、環境変数で組織 ID（と購入ページ・ポータルの URL）を渡す */
 export function licenseConfig(env = process.env) {
   if (env.REDSTONE_POLAR_ORG) {
-    return { organizationId: env.REDSTONE_POLAR_ORG, api: env.REDSTONE_POLAR_SANDBOX === '0' ? POLAR_API : POLAR_SANDBOX_API };
+    return {
+      organizationId: env.REDSTONE_POLAR_ORG,
+      api: env.REDSTONE_POLAR_SANDBOX === '0' ? POLAR_API : POLAR_SANDBOX_API,
+      checkoutUrl: env.REDSTONE_POLAR_CHECKOUT ?? '',
+      portalUrl: env.REDSTONE_POLAR_PORTAL ?? '',
+    };
   }
-  return { organizationId: POLAR_ORGANIZATION_ID, api: POLAR_API };
+  return { organizationId: POLAR_ORGANIZATION_ID, api: POLAR_API, checkoutUrl: POLAR_CHECKOUT_URL, portalUrl: POLAR_PORTAL_URL };
 }
 
 /**
@@ -40,10 +48,12 @@ export class License extends EventEmitter {
    * @param {typeof fetch} [options.fetch]
    * @param {() => number} [options.now]
    * @param {string} [options.label] Polar の管理画面に出る、この PC の名前
+   * @param {string} [options.checkoutUrl] 購入ページ（画面の「有料版を買う」）
+   * @param {string} [options.portalUrl] 契約の確認・解約のページ
    */
-  constructor({ path, organizationId, api = POLAR_API, fetch = globalThis.fetch, now = Date.now, label = hostname() }) {
+  constructor({ path, organizationId, api = POLAR_API, fetch = globalThis.fetch, now = Date.now, label = hostname(), checkoutUrl = '', portalUrl = '' }) {
     super();
-    Object.assign(this, { path, organizationId, api, fetchImpl: fetch, now, label });
+    Object.assign(this, { path, organizationId, api, fetchImpl: fetch, now, label, checkoutUrl: httpsOnly(checkoutUrl), portalUrl: httpsOnly(portalUrl) });
     // {key, displayKey, activationId, tiktok, lastValidatedAt, expiresAt, revoked}
     this.saved = null;
     this.timer = null;
@@ -76,9 +86,10 @@ export class License extends EventEmitter {
    */
   status() {
     if (!this.enabled) return { enabled: false, state: 'disabled' };
+    const links = { checkoutUrl: this.checkoutUrl, portalUrl: this.portalUrl };
     const s = this.saved;
-    if (!s) return { enabled: true, state: 'none' };
-    const base = { enabled: true, displayKey: s.displayKey, tiktok: s.tiktok, lastValidatedAt: s.lastValidatedAt };
+    if (!s) return { enabled: true, state: 'none', ...links };
+    const base = { enabled: true, ...links, displayKey: s.displayKey, tiktok: s.tiktok, lastValidatedAt: s.lastValidatedAt };
     if (s.revoked || (s.expiresAt && Date.parse(s.expiresAt) <= this.now())) return { ...base, state: 'expired' };
     const graceUntil = s.lastValidatedAt + OFFLINE_GRACE_MS;
     if (s.offline) return this.now() < graceUntil ? { ...base, state: 'offline', graceUntil } : { ...base, state: 'expired', offline: true };
@@ -177,6 +188,11 @@ export class License extends EventEmitter {
     }
     return { ok: res.ok, status: res.status, body: parsed };
   }
+}
+
+/** 画面からいつものブラウザで開くので、https のページだけにする */
+function httpsOnly(url) {
+  return /^https:\/\/[^\s]+$/.test(String(url ?? '')) ? String(url) : '';
 }
 
 function normalize(username) {

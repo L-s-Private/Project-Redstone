@@ -386,6 +386,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .gift-grid button:hover { background: var(--raised); border-color: var(--line); }
   .gift-grid small { color: var(--faint); font-variant-numeric: tabular-nums; }
 
+  /* ---- プラン（販売を始めるまでは出さない） ---- */
+  .plan-badge { font-size: 11px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 10px; color: var(--muted); }
+  .plan-badge.plus { color: var(--text); border-color: var(--text); }
+  .plan-chip { margin-top: 6px; align-self: flex-start; font-size: 11px; padding: 2px 10px; height: auto; color: var(--muted); background: transparent; border-color: var(--line); }
+  .plan-chip.plus { color: var(--text); }
+  .plus-link { margin-left: 6px; padding: 0; height: auto; border: 0; background: none; color: var(--text); text-decoration: underline; font-size: inherit; }
+
   /* ---- 妨害の設定の履歴 ---- */
   .history-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: min(60vh, 520px); overflow-y: auto; }
   .history-list > li { padding: 12px 2px; border-bottom: 1px solid var(--line-soft); }
@@ -457,6 +464,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <span class="chip"><span class="dot" id="tiktokDot"></span>TikTok<span id="tiktokText">—</span></span>
     <span class="chip"><span class="dot" id="modDot"></span>マイクラ<span id="modText">—</span></span>
     <span class="version" id="appVersion"></span>
+    <button class="plan-chip" id="planChip" data-goto="tabSetup" title="有料版について" hidden></button>
   </div>
 </aside>
 
@@ -811,8 +819,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <button data-goto="tabOverlay">配信画面の部品を見る</button>
       </section>
       <section class="card" id="licenseCard" hidden>
-        <h2>有料版（Creator Plus）</h2>
+        <div class="card-head"><h2>有料版（Creator Plus）</h2><span class="plan-badge" id="planBadge"></span></div>
         <p class="lead" id="licenseText"></p>
+        <div class="row" id="licenseLinks" style="margin-bottom: 12px;">
+          <a class="button next" id="licenseBuy" target="_blank" rel="noopener" hidden>有料版を買う（月額980円）</a>
+          <a class="button ghost" id="licensePortal" target="_blank" rel="noopener" hidden>契約の確認・解約</a>
+        </div>
+        <p class="hint" id="licenseCompare" style="margin: 0 0 14px;"></p>
         <form id="licenseForm">
           <label for="licenseKey">ライセンスキー</label>
           <div class="row">
@@ -841,7 +854,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <li>ギフトの一覧は TikTok から、マイクラの準備に使うものは Fabric と Modrinth から取ってきます</li>
           <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、妨害の設定の変更の履歴（30件）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、配信ごとの分析（直近30日分。視聴者の名前とコイン数を含む）、ログ（視聴者の名前と届いたギフト）</li>
           <li>これらを作者などに送ることはありません</li>
-          <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\\ProjectRedstone</code> を消してください。設定・ログ・ランキング・分析がすべて消えます</li>
+          <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\ProjectRedstone</code> を消してください。設定・ログ・ランキング・分析がすべて消えます</li>
         </ul>
       </section>
     </div>
@@ -1303,6 +1316,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   const MAX_CHOICES = ${MAX_CHOICES};
   const MAX_WEIGHT = ${MAX_WEIGHT};
   const PLUS_NAME = ${JSON.stringify(PLANS.plus.name)};
+  const PLANS_INFO = ${JSON.stringify(PLANS)};
   const TRIGGERS = [['gift', 'ギフト'], ['minDiamonds', 'コイン数で'], ['likes', 'いいね'], ['follow', 'フォロー'], ['share', 'シェア']];
   /** 一覧のグループ（きっかけの種類ごと） */
   const RULE_GROUPS = [
@@ -1626,7 +1640,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const details = [];
     // 出やすさ・同じものを続けない・何ラウンド目からは有料版の機能（今ある設定は消さずに見せる）
     const advanced = !!state.plan?.advancedRules;
-    const plusNote = () => (advanced ? [] : [el('span', 'plus-note', '（' + PLUS_NAME + ' の機能）')]);
+    const plusNote = () => (advanced ? [] : [el('span', 'plus-note', '（' + PLUS_NAME + ' の機能）', ...plusLink())]);
     if (row.random) {
       const total = row.choices.reduce((sum, c) => sum + (Number(c.weight) || 0), 0);
       const list = el('div', 'choices', ...row.choices.map((c) => {
@@ -1755,8 +1769,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('streamEmpty').hidden = streams.length > 0;
     $('streamList').hidden = streams.length === 0;
     $('statsPlusNote').hidden = full;
-    $('statsPlusNote').textContent = '30日分の一覧と、くわしい中身（流れのグラフ・内訳）は ' + PLUS_NAME + ' の機能です。無料版では直近の配信のまとめだけ見られます'
-      + (total > 1 ? '（記録は続けているので、ほかに ' + (total - 1) + '回分あります）' : '');
+    $('statsPlusNote').replaceChildren('30日分の一覧と、くわしい中身（流れのグラフ・内訳）は ' + PLUS_NAME + ' の機能です。無料版では直近の配信のまとめだけ見られます'
+      + (total > 1 ? '（記録は続けているので、ほかに ' + (total - 1) + '回分あります）' : ''), ...plusLink());
     const head = el('tr', '', ...['日時', '長さ', 'コイン', 'ギフト', 'いいね', 'フォロー', '妨害', '失敗'].map((t) => el('th', '', t)));
     const rows = streams.map((st) => {
       const tr = el('tr', st.id === selectedStream ? 'selected' : '',
@@ -1943,7 +1957,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       return;
     }
     $('historyPlusNote').hidden = data.full;
-    $('historyPlusNote').textContent = '無料版では新しい3件まで見られます。30件までさかのぼるのは ' + PLUS_NAME + ' の機能です';
+    $('historyPlusNote').replaceChildren('無料版では新しい3件まで見られます。30件までさかのぼるのは ' + PLUS_NAME + ' の機能です', ...plusLink());
     const when = (t) => new Date(t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
     $('historyList').replaceChildren(...data.entries.map((entry, i) => {
       const head = el('div', 'history-head', el('b', '', when(entry.time)), el('span', 'grow', entry.reasonText + '・ルール ' + entry.count + '件'));
@@ -2076,6 +2090,32 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('licenseText').textContent = text;
     $('licenseForm').hidden = lic.state !== 'none';
     $('licenseDeactivate').hidden = lic.state === 'none';
+    const plus = state.plan?.id === 'plus';
+    $('planBadge').textContent = plus ? '今は有料版' : '今は無料版';
+    $('planBadge').classList.toggle('plus', plus);
+    $('planChip').hidden = false;
+    $('planChip').textContent = plus ? PLUS_NAME : '無料版';
+    $('planChip').classList.toggle('plus', plus);
+    // 買う: 無料版で動いているとき。契約の確認・解約: キーを入れたことがあるとき
+    $('licenseBuy').hidden = plus || !lic.checkoutUrl;
+    if (lic.checkoutUrl) $('licenseBuy').href = lic.checkoutUrl;
+    $('licensePortal').hidden = lic.state === 'none' || !lic.portalUrl;
+    if (lic.portalUrl) $('licensePortal').href = lic.portalUrl;
+    $('licenseLinks').hidden = $('licenseBuy').hidden && $('licensePortal').hidden;
+    $('licenseCompare').textContent = '有料版でできること: 自分のプリセット' + PLANS_INFO.plus.userPresets + '個（無料版は' + PLANS_INFO.free.userPresets + '個）・ルール' + PLANS_INFO.plus.rulesPerPreset
+      + '件（無料版は' + PLANS_INFO.free.rulesPerPreset + '件）・設定の書き出しと読み込み・配信画面の見た目・ランダムの出やすさと何ラウンド目から・30日分の分析・30件の変更の履歴。一時停止・全妨害ストップ・テストは無料版でも同じように使えます。';
+  }
+
+  /** 有料版の機能の案内に付ける「有料版について」（販売を始めるまでは出さない） */
+  function plusLink() {
+    if (!state?.license?.enabled) return [];
+    const b = Object.assign(el('button', 'plus-link', '有料版について'), { type: 'button' });
+    b.addEventListener('click', () => {
+      document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+      showTab('tabSetup');
+      $('licenseCard').scrollIntoView({ block: 'center' });
+    });
+    return [b];
   }
   $('licenseForm').addEventListener('submit', async (e) => {
     e.preventDefault();

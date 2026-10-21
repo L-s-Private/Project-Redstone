@@ -3,7 +3,7 @@ import { Dispatcher } from './dispatcher.js';
 import { ModClient } from './modClient.js';
 import { DEFAULT_OVERLAY_STYLE, parseFill, parseOverlayStyle, parseWorld, parsePreset } from './config.js';
 import { BUILTIN_PRESETS, MAX_PRESET_NAME } from './presets.js';
-import { checkFeature, checkPresetSave, checkRules, CURRENT_PLAN, planOf } from './plan.js';
+import { checkFeature, checkPresetSave, checkAdvancedRules, checkRules, CURRENT_PLAN, planOf } from './plan.js';
 import { describeEvent } from './rules.js';
 import { giftTable, Ranking } from './overlayData.js';
 import { TikTokSource } from './tiktok.js';
@@ -126,7 +126,7 @@ export class Engine extends EventEmitter {
     this.now = now;
     this.client = client ?? new ModClient(config.mod);
     this.tiktok = tiktok ?? new TikTokSource();
-    this.dispatcher = new Dispatcher({ rules: config.rules, client: this.client, now });
+    this.dispatcher = new Dispatcher({ rules: config.rules, client: this.client, now, game: () => this.client.status?.fill ?? null });
     this.logs = [];
     this.mock = false;
     // 実際に届いたギフト（設定画面で「最近届いたギフト」として出す）
@@ -348,7 +348,7 @@ export class Engine extends EventEmitter {
 
   /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。プランの上限で断るときは Error を投げる */
   setRules(rules) {
-    const problem = checkRules(this.plan, rules, this.config.rules.length);
+    const problem = checkRules(this.plan, rules, this.config.rules.length) ?? checkAdvancedRules(this.plan, rules, this.config.rules);
     if (problem) throw new Error(problem);
     this.config.rules = rules;
     this.dispatcher.setRules(rules);
@@ -480,7 +480,7 @@ export class Engine extends EventEmitter {
   logResult(event, result) {
     if (result.status === 'sent') {
       const icon = result.action.type === 'mob' ? (result.action.mob ?? 'zombie') : result.action.type;
-      this.log('ok', `  → ${describeAction(result.action)} を出しました`, { icon });
+      this.log('ok', `  → ${result.random ? 'ランダムで ' : ''}${describeAction(result.action)} を出しました`, { icon });
       // オーバーレイに出す「誰が」
       const who = event.kind === 'like' ? `いいね${result.likes}回` : event.kind === 'manual' ? '配信者' : `${event.from || '誰か'}さん`;
       const giftImage = event.kind === 'gift' ? event.image ?? '' : '';

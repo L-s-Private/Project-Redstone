@@ -104,3 +104,15 @@ test('入っているプリセットは、いったん無し（初めてのル�
   const { BUILTIN_PRESETS } = await import('../src/presets.js');
   assert.deepEqual(BUILTIN_PRESETS, []);
 });
+
+test('ランダムと条件のルールを読む。おかしいものは理由つきで断る', async () => {
+  const { parseConfig } = await import('../src/config.js');
+  const rule = { gift: 'バラ', action: 'random', choices: [{ action: 'tnt', count: 2, weight: 3, extra: 1 }, { action: 'mob', mob: 'pig' }], noRepeat: true, when: 'filling', minRound: 2 };
+  assert.deepEqual(parseConfig({ rules: [rule] }).rules[0], { ...rule, choices: [{ action: 'tnt', count: 2, weight: 3 }, { action: 'mob', mob: 'pig' }] });
+  assert.throws(() => parseConfig({ rules: [{ ...rule, choices: [{ action: 'tnt' }] }] }), /2〜6個/);
+  assert.throws(() => parseConfig({ rules: [{ ...rule, choices: [{ action: 'tnt' }, { action: 'message' }] }] }), /2番目/);
+  assert.throws(() => parseConfig({ rules: [{ ...rule, choices: [{ action: 'tnt', weight: 11 }, { action: 'night' }] }] }), /出やすさ/);
+  assert.throws(() => parseConfig({ rules: [{ ...rule, when: 'always' }] }), /when/);
+  assert.throws(() => parseConfig({ rules: [{ ...rule, minRound: 0 }] }), /ラウンド/);
+  assert.deepEqual(parseConfig({ rules: [{ gift: 'バラ', action: 'tnt', choices: [], noRepeat: true }] }).rules[0], { gift: 'バラ', action: 'tnt' }, 'ランダムでなければ候補は捨てる');
+});

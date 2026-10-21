@@ -5,8 +5,9 @@
 
 export const PLANS = {
   // importExport: 設定をファイルに書き出す・読み込む / overlayStyle: 配信画面の部品の見た目を変える
-  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12, importExport: false, overlayStyle: false },
-  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50, importExport: true, overlayStyle: true },
+  // advancedRules: ランダムの出やすさ・同じものを続けない・何ラウンド目から（ランダムと「いつ出すか」は無料版でも使える）
+  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12, importExport: false, overlayStyle: false, advancedRules: false },
+  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50, importExport: true, overlayStyle: true, advancedRules: true },
 };
 
 /**
@@ -49,4 +50,21 @@ export function checkRules(planId, rules, previousCount) {
   const plan = planOf(planId);
   if (rules.length <= plan.rulesPerPreset || rules.length <= previousCount) return null;
   return `${plan.name}で使えるルールは${plan.rulesPerPreset}件までです（今は${rules.length}件）。ルールを減らしてから保存してください`;
+}
+
+/** 有料版の細かい設定（advancedRules）を使っているルールか */
+export function usesAdvancedRule(rule) {
+  return rule.minRound !== undefined || rule.noRepeat === true || (rule.choices ?? []).some((c) => (c.weight ?? 1) !== 1);
+}
+
+/**
+ * 有料版の細かい設定を使ったルールを保存してよいか。今あるものは残せるが、増やすことはできない。
+ * @param {object[]} previousRules 今保存されているルール
+ * @returns {string | null} 断るときの理由
+ */
+export function checkAdvancedRules(planId, rules, previousRules) {
+  if (planOf(planId).advancedRules) return null;
+  const count = (list) => list.filter(usesAdvancedRule).length;
+  if (count(rules) <= count(previousRules)) return null;
+  return `ランダムの出やすさ・同じものを続けない・何ラウンド目から は ${PLANS.plus.name} の機能です`;
 }

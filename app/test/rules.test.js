@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildAction, describeEvent, findRuleIndex } from '../src/rules.js';
+import { buildAction, describeEvent, findRuleIndex, pickChoice } from '../src/rules.js';
 
 const gift = (giftName, extra = {}) => ({ kind: 'gift', giftId: '1', giftName, diamonds: 1, count: 1, from: 'たろう', ...extra });
 
@@ -56,4 +56,27 @@ test('新しい妨害も上限で止める（秒・段）', () => {
   assert.equal(buildAction({ gift: 'x', action: 'jail', count: 30 }, gift('x', { count: 5 })).count, 60);
   assert.equal(buildAction({ gift: 'x', action: 'fill_clear' }, gift('x', { count: 5 })).count, 1);
   assert.equal(buildAction({ gift: 'x', action: 'fill_layer', count: 1 }, gift('x', { count: 9 })).count, 5);
+});
+
+test('条件のあるルールは、埋め立ての状況が合うときだけ当てはまり、合えば条件のないルールより先', () => {
+  const list = [
+    { gift: 'rose', action: 'mob', mob: 'zombie' },
+    { gift: 'rose', action: 'tnt', when: 'countdown' },
+    { minDiamonds: 1, action: 'lightning', when: 'filling', minRound: 3 },
+  ];
+  const filling = (round) => ({ phase: 'filling', round });
+  assert.equal(findRuleIndex(list, gift('Rose')), 0, '埋め立てが始まっていなければ条件のないルール');
+  assert.equal(findRuleIndex(list, gift('Rose'), { phase: 'countdown', round: 0 }), 1);
+  assert.equal(findRuleIndex(list, gift('Rose'), filling(1)), 0, '3ラウンド目より前');
+  assert.equal(findRuleIndex(list, gift('Rose'), filling(2)), 2, '3ラウンド目（クリア2回）からは条件つきが先');
+  assert.equal(findRuleIndex(list, gift('Rose'), { phase: 'cleared', round: 10 }), 0, '全部クリアしたら条件は合わない');
+});
+
+test('ランダム: 重みで抽選し、noRepeat なら同じものを続けない', () => {
+  const rule = { gift: 'rose', action: 'random', choices: [{ action: 'tnt', count: 2 }, { action: 'mob', mob: 'pig', weight: 3 }] };
+  assert.equal(pickChoice(rule, undefined, () => 0.2), 0, '重み 1:3 なので 0〜0.25 は1つ目');
+  assert.equal(pickChoice(rule, undefined, () => 0.3), 1);
+  assert.equal(pickChoice({ ...rule, noRepeat: true }, 1, () => 0.99), 0, '前に出したものは選ばない');
+  assert.deepEqual(buildAction({ ...rule, label: 'どれかな', maxCount: 3 }, gift('Rose', { count: 5 }), rule.choices[0]),
+    { type: 'tnt', count: 3, from: 'たろう', label: 'どれかな' });
 });

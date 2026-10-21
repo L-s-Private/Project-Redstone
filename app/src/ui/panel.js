@@ -1,6 +1,7 @@
 // 操作画面。exe に入れるため、HTML ごと文字列で持つ。
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
-import { MAX_COUNT_BY_TYPE } from '../rules.js';
+import { MAX_CHOICES, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
+import { PLANS } from '../plan.js';
 import { OVERLAY_WIDGETS } from './overlays.js';
 
 export const PANEL_HTML = String.raw`<!doctype html>
@@ -293,6 +294,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .editor-details { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: end; }
   .editor-details label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--faint); min-width: 0; }
   .editor-details label input:not([type=number]) { width: 100%; }
+  .editor-details .wide { grid-column: 1 / -1; }
+  .choices { display: flex; flex-direction: column; gap: 6px; }
+  .choice { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); }
+  .choice .name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12px; color: var(--text); min-width: 120px; }
+  .choice .mc { --s: 20px; }
+  .choice .odds { margin-left: auto; color: var(--faint); font-size: 11px; white-space: nowrap; }
+  .editor-details .check-line { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; font-size: 12px; color: var(--muted); }
+  .editor-details label.check-line input[type=checkbox] { width: 16px; height: 16px; flex: none; margin: 0; }
+  .action-tiles button:disabled { opacity: .35; cursor: not-allowed; }
+  .plus-note { font-size: 11px; color: var(--faint); }
   .form-error { color: var(--warn); font-size: 12px; margin: 0; }
 
   /* ---- 配信画面（オーバーレイ） ---- */
@@ -1192,6 +1203,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   ];
   const ACTION_INFO = Object.fromEntries(ACTION_GROUPS.flatMap(([, list]) => list.map(([key, name, unit, def, desc]) => [key, { name, unit, def, desc }])));
   const MAX_COUNT = ${JSON.stringify(MAX_COUNT_BY_TYPE)};
+  /** ランダムの候補の数と出やすさの上限（rules.js と同じ） */
+  const MAX_CHOICES = ${MAX_CHOICES};
+  const MAX_WEIGHT = ${MAX_WEIGHT};
+  const PLUS_NAME = ${JSON.stringify(PLANS.plus.name)};
   const TRIGGERS = [['gift', 'ギフト'], ['minDiamonds', 'コイン数で'], ['likes', 'いいね'], ['follow', 'フォロー'], ['share', 'シェア']];
   /** 一覧のグループ（きっかけの種類ごと） */
   const RULE_GROUPS = [
@@ -1207,12 +1222,20 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   const actionKey = (row) => (row.action === 'mob' ? 'mob:' + row.mob : row.action);
   const hasCount = (action) => !!ACTION_INFO[action === 'mob' ? 'mob:zombie' : action]?.unit;
+  const WHEN_OPTIONS = [['', 'いつでも'], ['filling', '埋めている途中だけ'], ['countdown', 'カウントダウン中だけ']];
+  const choiceKey = (c) => (c.action === 'mob' ? 'mob:' + (c.mob ?? 'zombie') : c.action);
+  const iconOf = (key) => (key.startsWith('mob:') ? key.slice(4) : key);
 
   function toRow(rule) {
     const trigger = rule.event ?? (rule.gift !== undefined ? 'gift' : rule.likes !== undefined ? 'likes' : rule.minDiamonds !== undefined ? 'minDiamonds' : 'giftId');
     const value = rule.gift ?? rule.likes ?? rule.minDiamonds ?? rule.giftId ?? '';
-    return { trigger, value: String(value), action: rule.action, mob: rule.mob ?? 'zombie',
-      label: rule.label ?? '', count: rule.count ?? 1, cooldownSec: rule.cooldownSec ?? 0, maxCount: rule.maxCount };
+    // ランダムのルールは、1つ目の候補を「1つ決める」に戻したときの妨害にしておく
+    const random = rule.action === 'random';
+    const single = random ? rule.choices[0] : rule;
+    return { trigger, value: String(value), action: single.action, mob: single.mob ?? 'zombie',
+      label: rule.label ?? '', count: single.count ?? 1, cooldownSec: rule.cooldownSec ?? 0, maxCount: rule.maxCount,
+      random, choices: (rule.choices ?? []).map((c) => ({ key: choiceKey(c), count: c.count ?? 1, weight: c.weight ?? 1 })),
+      noRepeat: rule.noRepeat ?? false, when: rule.when ?? '', minRound: rule.minRound ? String(rule.minRound) : '' };
   }
 
   function toRule(row) {
@@ -1222,9 +1245,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
     else if (row.trigger === 'likes') rule.likes = Number(row.value);
     else if (row.trigger === 'giftId') rule.giftId = row.value.trim();
     else rule.gift = row.value;
-    rule.action = row.action;
-    if (row.action === 'mob') rule.mob = row.mob;
-    if (hasCount(row.action)) rule.count = Number(row.count);
+    if (row.random) {
+      rule.action = 'random';
+      rule.choices = row.choices.map((c) => {
+        const [action, mob] = c.key.split(':');
+        const choice = { action };
+        if (mob) choice.mob = mob;
+        if (hasCount(action)) choice.count = Number(c.count);
+        if (Number(c.weight) !== 1) choice.weight = Number(c.weight);
+        return choice;
+      });
+      if (row.noRepeat) rule.noRepeat = true;
+    } else {
+      rule.action = row.action;
+      if (row.action === 'mob') rule.mob = row.mob;
+      if (hasCount(row.action)) rule.count = Number(row.count);
+    }
+    if (row.when) rule.when = row.when;
+    if (row.minRound) rule.minRound = Number(row.minRound);
     if (row.label) rule.label = row.label;
     if (Number(row.cooldownSec) > 0) rule.cooldownSec = Number(row.cooldownSec);
     if (row.maxCount !== undefined) rule.maxCount = row.maxCount;
@@ -1326,8 +1364,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
     return box;
   }
 
-  /** 一覧の右側: 出す妨害（絵・名前・数） */
+  /** 一覧の右側: 出す妨害（絵・名前・数）。ランダムは候補の名前を並べる */
   function actionSummary(row) {
+    if (row.random) {
+      const names = row.choices.map((c) => ACTION_INFO[c.key]?.name ?? c.key).join('・');
+      return el('div', 'rule-then', mcIcon(iconOf(row.choices[0].key), 22), el('span', '', 'ランダム', el('small', '', ' ' + names)));
+    }
     const info = ACTION_INFO[actionKey(row)];
     const text = el('span', '', info?.name ?? row.action);
     if (info?.unit) text.append(el('small', '', (info.unit === '秒' ? ' ' : ' ×') + row.count + info.unit));
@@ -1359,7 +1401,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const arrow = el('span', 'rule-arrow');
     arrow.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11M9 4l4 4-4 4"/></svg>';
     const label = el('span', 'rule-label' + (row.label ? '' : ' empty'), row.label ? '「' + row.label + '」' : '');
-    const tag = Number(row.cooldownSec) > 0 ? el('span', 'rule-tag', '待ち ' + row.cooldownSec + '秒') : el('span');
+    const tags = [
+      row.minRound ? row.minRound + 'ラウンド目から' : '',
+      row.when === 'filling' ? '埋め立て中' : row.when === 'countdown' ? 'カウントダウン中' : '',
+      Number(row.cooldownSec) > 0 ? '待ち ' + row.cooldownSec + '秒' : '',
+    ].filter(Boolean);
+    const tag = tags.length ? el('span', 'rule-tag', tags.join('・')) : el('span');
     const del = Object.assign(el('button', 'icon-only del', '✕'), { type: 'button', title: 'このルールを削除' });
     del.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1424,12 +1471,48 @@ export const PANEL_HTML = String.raw`<!doctype html>
       value.replaceChildren(row.trigger === 'follow' ? 'フォローされたら' : 'シェアされたら');
     }
 
-    // ② 出す妨害
+    // ② 出す妨害（1つ決める / ランダム）
     const selected = actionKey(row);
-    $('editorActions').replaceChildren(...ACTION_GROUPS.map(([title, list]) => el('div', 'action-group', el('span', '', title),
+    const mode = el('div', 'segmented');
+    for (const [random, text] of [[false, '1つ決める'], [true, 'ランダム（いくつかから1つ）']]) {
+      const b = Object.assign(el('button', row.random === random ? 'selected' : '', text), { type: 'button' });
+      b.addEventListener('click', () => {
+        if (row.random === random) return;
+        row.random = random;
+        // ランダムにしたら、今の妨害を1つ目の候補にする。戻したら、1つ目の候補を出す妨害にする
+        if (random && row.choices.length === 0 && row.action !== 'message') row.choices = [{ key: selected, count: row.count, weight: 1 }];
+        if (!random && row.choices.length) {
+          const [action, mob] = row.choices[0].key.split(':');
+          Object.assign(row, { action, count: row.choices[0].count }, mob ? { mob } : {});
+        }
+        $('editorError').textContent = '';
+        renderEditor();
+      });
+      mode.append(b);
+    }
+    const chosen = (key) => (row.random ? row.choices.some((c) => c.key === key) : key === selected);
+    $('editorActions').replaceChildren(mode, ...ACTION_GROUPS.map(([title, list]) => el('div', 'action-group', el('span', '', title),
       el('div', 'action-tiles', ...list.map(([key, name, , def]) => {
-        const b = Object.assign(el('button', key === selected ? 'selected' : '', mcIcon(key.startsWith('mob:') ? key.slice(4) : key, 20), name), { type: 'button' });
+        const b = Object.assign(el('button', chosen(key) ? 'selected' : '', mcIcon(iconOf(key), 20), name), { type: 'button' });
+        // メッセージだけは出す文が要るので、ランダムの候補にはしない
+        if (row.random && key === 'message') {
+          b.disabled = true;
+          b.title = 'メッセージだけは、ランダムの候補にできません';
+        }
         b.addEventListener('click', () => {
+          if (row.random) {
+            if (chosen(key)) {
+              row.choices = row.choices.filter((c) => c.key !== key);
+            } else if (row.choices.length >= MAX_CHOICES) {
+              $('editorError').textContent = 'ランダムの候補は' + MAX_CHOICES + '個までです';
+              return;
+            } else {
+              row.choices.push({ key, count: def || 1, weight: 1 });
+            }
+            $('editorError').textContent = '';
+            renderEditor();
+            return;
+          }
           const [action, mob] = key.split(':');
           if (key !== selected && def) row.count = def;
           row.action = action;
@@ -1438,12 +1521,47 @@ export const PANEL_HTML = String.raw`<!doctype html>
         });
         return b;
       })))));
-    const info = ACTION_INFO[selected];
-    $('editorActionDesc').textContent = info?.desc ?? '枠の中の地上に出る（埋め立て中でなければ、プレイヤーのまわり）';
+    const info = row.random ? null : ACTION_INFO[selected];
+    $('editorActionDesc').textContent = row.random
+      ? '選んだ妨害（2〜' + MAX_CHOICES + '個）の中から、毎回1つを抽選して出します。押すと候補に入れる・外すができます'
+      : info?.desc ?? '枠の中の地上に出る（埋め立て中でなければ、プレイヤーのまわり）';
 
     // ③ 細かい設定
     const details = [];
-    if (info?.unit) {
+    // 出やすさ・同じものを続けない・何ラウンド目からは有料版の機能（今ある設定は消さずに見せる）
+    const advanced = !!state.plan?.advancedRules;
+    const plusNote = () => (advanced ? [] : [el('span', 'plus-note', '（' + PLUS_NAME + ' の機能）')]);
+    if (row.random) {
+      const total = row.choices.reduce((sum, c) => sum + (Number(c.weight) || 0), 0);
+      const list = el('div', 'choices', ...row.choices.map((c) => {
+        const [action] = c.key.split(':');
+        const cInfo = ACTION_INFO[c.key];
+        const line = el('div', 'choice', el('span', 'name', mcIcon(iconOf(c.key), 20), cInfo?.name ?? c.key));
+        if (cInfo?.unit) {
+          line.append(numberField(c.count, (v) => (c.count = v), { min: 1, max: MAX_COUNT[action], before: cInfo.unit === '秒' ? '' : '×', after: cInfo.unit, width: 64, label: '数' }));
+        }
+        const odds = el('span', 'odds', '');
+        const showOdds = () => {
+          const sum = row.choices.reduce((acc, x) => acc + (Number(x.weight) || 0), 0);
+          for (const [i, node] of [...list.querySelectorAll('.odds')].entries()) {
+            node.textContent = sum > 0 ? '約' + Math.round((Number(row.choices[i].weight) || 0) / sum * 100) + '%' : '';
+          }
+        };
+        const weight = numberField(c.weight, (v) => {
+          c.weight = v;
+          showOdds();
+        }, { min: 1, max: MAX_WEIGHT, before: '出やすさ', width: 52, label: '出やすさ（1〜' + MAX_WEIGHT + '）' });
+        weight.querySelector('input').disabled = !advanced;
+        odds.textContent = total > 0 ? '約' + Math.round((Number(c.weight) || 0) / total * 100) + '%' : '';
+        line.append(weight, odds);
+        return line;
+      }));
+      details.push(el('div', 'wide', el('label', '', '候補（数は1回あたり。出やすさは大きいほど出やすい）', ...plusNote()),
+        row.choices.length ? list : el('p', 'hint', '上の妨害を押して、候補を2つ以上選んでください')));
+      const repeat = Object.assign(document.createElement('input'), { type: 'checkbox', checked: row.noRepeat, disabled: !advanced });
+      repeat.addEventListener('change', () => (row.noRepeat = repeat.checked));
+      details.push(el('label', 'wide check-line', repeat, '同じ妨害を2回続けて出さない', ...plusNote()));
+    } else if (info?.unit) {
       const max = MAX_COUNT[row.action];
       details.push(el('label', '', '数（1回あたり・最大 ' + max + info.unit + '）',
         numberField(row.count, (v) => (row.count = v), { min: 1, max, before: info.unit === '秒' ? '' : '×', after: info.unit, width: 70, label: '数' })));
@@ -1453,6 +1571,15 @@ export const PANEL_HTML = String.raw`<!doctype html>
     details.push(el('label', '', needsLabel ? '配信画面に出す文（必須）' : '配信画面に出す文', label));
     details.push(el('label', '', '待ち時間（続けて出さない）',
       numberField(row.cooldownSec, (v) => (row.cooldownSec = v), { min: 0, after: '秒', width: 60, label: '待ち時間（秒）' })));
+    // いつ出すか（埋め立ての状況で切り替える）
+    const when = document.createElement('select');
+    for (const [value, text] of WHEN_OPTIONS) when.append(Object.assign(document.createElement('option'), { value, textContent: text, selected: row.when === value }));
+    when.addEventListener('change', () => (row.when = when.value));
+    details.push(el('label', '', 'いつ出すか', when));
+    const round = numberField(row.minRound, (v) => (row.minRound = v), { min: 1, max: 99, after: 'ラウンド目から', width: 60, label: '何ラウンド目から' });
+    Object.assign(round.querySelector('input'), { placeholder: '最初', disabled: !advanced });
+    details.push(el('label', '', '何ラウンド目から（空なら最初から）', round, ...plusNote()));
+    details.push(el('p', 'hint wide', '「いつ出すか」や「何ラウンド目から」を決めたルールは、それに合うときだけ使われ、同じきっかけの「いつでも」のルールより先になります（例: バラは普段ゾンビ、カウントダウン中だけ TNT）。埋め立てをしていないときは使われません。'));
     $('editorDetails').replaceChildren(...details);
   }
 
@@ -1462,12 +1589,28 @@ export const PANEL_HTML = String.raw`<!doctype html>
     if (row.trigger === 'giftId' && !row.value.trim()) return 'ギフトID を入れてください';
     if (row.trigger === 'minDiamonds' && !(Number(row.value) >= 1)) return 'コイン数は1以上にしてください';
     if (row.trigger === 'likes' && !(Number.isInteger(Number(row.value)) && Number(row.value) >= 1)) return 'いいねの回数は1以上の整数にしてください';
-    if (hasCount(row.action)) {
+    if (row.random) {
+      if (row.choices.length < 2) return 'ランダムにするときは、妨害を2つ以上選んでください';
+      for (const c of row.choices) {
+        const [action] = c.key.split(':');
+        if (hasCount(action)) {
+          const count = Number(c.count);
+          if (!(Number.isInteger(count) && count >= 1)) return '数は1以上の整数にしてください';
+          if (count > MAX_COUNT[action]) c.count = MAX_COUNT[action];
+        }
+        const weight = Number(c.weight);
+        if (!(Number.isInteger(weight) && weight >= 1 && weight <= MAX_WEIGHT)) return '出やすさは1〜' + MAX_WEIGHT + 'の整数にしてください';
+      }
+    } else if (hasCount(row.action)) {
       const count = Number(row.count);
       if (!(Number.isInteger(count) && count >= 1)) return '数は1以上の整数にしてください';
       if (count > MAX_COUNT[row.action]) row.count = MAX_COUNT[row.action];
     }
-    if (row.action === 'message' && !row.label.trim()) return '出す文を入れてください';
+    const minRound = Number(row.minRound);
+    if (row.minRound !== '' && !(Number.isInteger(minRound) && minRound >= 1 && minRound <= 99)) {
+      return '何ラウンド目からは、1〜99の整数にしてください（空なら最初から）';
+    }
+    if (!row.random && row.action === 'message' && !row.label.trim()) return '出す文を入れてください';
     if (!(Number(row.cooldownSec) >= 0)) return '待ち時間は0以上にしてください';
     return '';
   }

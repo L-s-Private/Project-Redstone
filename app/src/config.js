@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { ACTION_TYPES, SOCIAL_EVENTS } from './rules.js';
+import { ACTION_TYPES, MAX_CHOICES, MAX_WEIGHT, RANDOM_ACTION, SOCIAL_EVENTS, WHEN_PHASES } from './rules.js';
 import { MAX_PRESET_NAME } from './presets.js';
 import { MAX_RULES, MAX_USER_PRESETS } from './plan.js';
 
@@ -8,7 +8,10 @@ export const DEFAULT_MOD_PORT = 25599;
 const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event'];
 // MOD が出せるもの（docs/protocol.md）
 export const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
-const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec'];
+const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec', 'choices', 'noRepeat', 'when', 'minRound'];
+const CHOICE_KEYS = ['action', 'count', 'mob', 'weight'];
+/** 「何ラウンド目から」の上限（埋め立てのラウンド数の上限と同じ） */
+const MAX_MIN_ROUND = 99;
 const MAX_LABEL_LENGTH = 100;
 
 // 埋め立ての設定（MOD の docs/protocol.md と同じ値）
@@ -189,8 +192,24 @@ function validateRule(rule, number) {
   if (rule.minDiamonds !== undefined && !(Number.isFinite(rule.minDiamonds) && rule.minDiamonds >= 0)) {
     throw new ConfigError(`${where}: minDiamonds は0以上の数にしてください`);
   }
-  if (!ACTION_TYPES.includes(rule.action)) {
-    throw new ConfigError(`${where}: action は ${ACTION_TYPES.join(' / ')} のどれかにしてください`);
+  if (rule.action === RANDOM_ACTION) {
+    if (!Array.isArray(rule.choices) || rule.choices.length < 2 || rule.choices.length > MAX_CHOICES) {
+      throw new ConfigError(`${where}: ランダムにするときは、出す妨害を2〜${MAX_CHOICES}個選んでください`);
+    }
+    rule = { ...rule, choices: rule.choices.map((choice, i) => validateChoice(choice, `${where}のランダムの${i + 1}番目`)) };
+  } else if (!ACTION_TYPES.includes(rule.action)) {
+    throw new ConfigError(`${where}: action は ${ACTION_TYPES.join(' / ')} / ${RANDOM_ACTION} のどれかにしてください`);
+  } else if (rule.choices !== undefined || rule.noRepeat !== undefined) {
+    rule = (({ choices, noRepeat, ...rest }) => rest)(rule);
+  }
+  if (rule.noRepeat !== undefined && typeof rule.noRepeat !== 'boolean') {
+    throw new ConfigError(`${where}: noRepeat は true か false にしてください`);
+  }
+  if (rule.when !== undefined && !WHEN_PHASES.includes(rule.when)) {
+    throw new ConfigError(`${where}: when は ${WHEN_PHASES.join(' / ')} のどれかにしてください`);
+  }
+  if (rule.minRound !== undefined && !(Number.isInteger(rule.minRound) && rule.minRound >= 1 && rule.minRound <= MAX_MIN_ROUND)) {
+    throw new ConfigError(`${where}: 何ラウンド目からは、1〜${MAX_MIN_ROUND}の整数にしてください`);
   }
   if (rule.action === 'message' && !rule.label) {
     throw new ConfigError(`${where}: action が message のときは label に表示する文を書いてください`);
@@ -208,4 +227,26 @@ function validateRule(rule, number) {
   }
   // 知らない項目は捨てる
   return Object.fromEntries(RULE_KEYS.filter((key) => rule[key] !== undefined).map((key) => [key, key === 'gift' ? rule.gift.trim() : rule[key]]));
+}
+
+/** ランダムの候補1つ（{action, count, mob, weight}） */
+function validateChoice(choice, where) {
+  if (typeof choice !== 'object' || choice === null) {
+    throw new ConfigError(`${where}が { ... } の形になっていません`);
+  }
+  // メッセージだけは出す文が要るので、ランダムの候補にはしない
+  const allowed = ACTION_TYPES.filter((type) => type !== 'message');
+  if (!allowed.includes(choice.action)) {
+    throw new ConfigError(`${where}: action は ${allowed.join(' / ')} のどれかにしてください`);
+  }
+  if (choice.mob !== undefined && !MOBS.includes(choice.mob)) {
+    throw new ConfigError(`${where}: mob は ${MOBS.join(' / ')} のどれかにしてください`);
+  }
+  if (choice.count !== undefined && !(Number.isInteger(choice.count) && choice.count >= 1)) {
+    throw new ConfigError(`${where}: count は1以上の整数にしてください`);
+  }
+  if (choice.weight !== undefined && !(Number.isInteger(choice.weight) && choice.weight >= 1 && choice.weight <= MAX_WEIGHT)) {
+    throw new ConfigError(`${where}: 出やすさ（weight）は1〜${MAX_WEIGHT}の整数にしてください`);
+  }
+  return Object.fromEntries(CHOICE_KEYS.filter((key) => choice[key] !== undefined).map((key) => [key, choice[key]]));
 }

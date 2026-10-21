@@ -29,3 +29,14 @@ test('上限の数は、仕様書の案と同じ', () => {
   assert.deepEqual([PLANS.free.userPresets, PLANS.free.rulesPerPreset], [1, 12]);
   assert.deepEqual([PLANS.plus.userPresets, PLANS.plus.rulesPerPreset], [20, 50]);
 });
+
+test('無料版: ランダムの出やすさ・同じものを続けない・何ラウンド目からは、今ある分は残せるが増やせない', async () => {
+  const { checkAdvancedRules } = await import('../src/plan.js');
+  const basic = { gift: 'バラ', action: 'random', choices: [{ action: 'tnt' }, { action: 'night' }], when: 'countdown' };
+  const advanced = { ...basic, noRepeat: true };
+  assert.equal(checkAdvancedRules('free', [basic], []), null, 'ランダムと「いつ出すか」は無料版でも使える');
+  assert.match(checkAdvancedRules('free', [advanced], [basic]), /Creator Plus/);
+  assert.match(checkAdvancedRules('free', [{ ...basic, minRound: 2 }], []), /Creator Plus/);
+  assert.equal(checkAdvancedRules('free', [advanced], [advanced]), null, '今ある分はそのまま保存できる');
+  assert.equal(checkAdvancedRules('plus', [advanced], []), null);
+});

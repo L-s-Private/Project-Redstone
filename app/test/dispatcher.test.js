@@ -56,3 +56,24 @@ test('MODが断ったときや通信失敗を失敗として数える', async ()
   assert.equal((await broken.dispatcher.handle(rose)).error, 'MODとの接続が切れました');
   assert.equal(broken.dispatcher.stats.failed, 1);
 });
+
+test('ランダムのルールは候補から1つ出し、条件のあるルールは今の埋め立ての状況で決める', async () => {
+  const sent = [];
+  let game = null;
+  const client = { async send(action) { sent.push(action); return { ok: true }; } };
+  const rules = [
+    { gift: 'Rose', action: 'random', choices: [{ action: 'tnt' }, { action: 'mob', mob: 'pig' }], noRepeat: true },
+    { gift: 'Rose', action: 'night', count: 30, when: 'countdown' },
+    { likes: 10, action: 'freeze', count: 5, when: 'filling' },
+  ];
+  const dispatcher = new Dispatcher({ rules, client, game: () => game, random: () => 0 });
+  assert.deepEqual(await dispatcher.handle(rose), { status: 'sent', action: { type: 'tnt', count: 1, from: 'たろう' }, random: true });
+  await dispatcher.handle(rose);
+  assert.equal(sent[1].type, 'mob', '同じものを続けない');
+  game = { phase: 'countdown', round: 0 };
+  await dispatcher.handle(rose);
+  assert.equal(sent[2].type, 'night');
+  assert.deepEqual(await dispatcher.handleLikes({ kind: 'like', count: 10 }), [], 'カウントダウン中は、埋め立て中だけのいいねは出さない');
+  game = { phase: 'filling', round: 0 };
+  assert.equal((await dispatcher.handleLikes({ kind: 'like', count: 10 }))[0].action.type, 'freeze');
+});

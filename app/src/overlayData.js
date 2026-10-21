@@ -1,5 +1,5 @@
 // 配信画面（オーバーレイ）に出すデータ。ギフト表（どのギフトで何が起きるか）と、ギフトランキング。
-import { MAX_COUNT_BY_TYPE } from './rules.js';
+import { MAX_COUNT_BY_TYPE, RANDOM_ACTION } from './rules.js';
 
 /** ギフト表に出す数 */
 const MAX_TABLE_ROWS = 96;
@@ -19,9 +19,21 @@ export function giftTable(rules, findGift, describe) {
   const rows = [];
   for (const rule of rules) {
     if (rule.action === 'message') continue;
-    const action = { type: rule.action, count: Math.min(rule.count ?? 1, MAX_COUNT_BY_TYPE[rule.action] ?? Infinity) };
-    if (rule.mob !== undefined) action.mob = rule.mob;
-    const row = { action: describe(action), icon: rule.action === 'mob' ? (rule.mob ?? 'zombie') : rule.action };
+    const choices = rule.action === RANDOM_ACTION ? rule.choices : [rule];
+    const names = choices.map((choice) => {
+      const action = { type: choice.action, count: Math.min(choice.count ?? 1, MAX_COUNT_BY_TYPE[choice.action] ?? Infinity) };
+      if (choice.mob !== undefined) action.mob = choice.mob;
+      return describe(action);
+    });
+    const first = choices[0];
+    const random = rule.action === RANDOM_ACTION;
+    // ランダムはカードに収まるよう、数を外して名前だけ並べる（「ランダム」は条件と同じ小さい行に出す）
+    const row = {
+      action: random ? names.map((name) => name.replace(/ ×?\d.*$/, '')).join('・') : names[0],
+      icon: first.action === 'mob' ? (first.mob ?? 'zombie') : first.action,
+    };
+    const when = [conditionText(rule), random ? 'ランダム' : ''].filter(Boolean).join('・');
+    if (when) row.when = when;
     if (rule.gift !== undefined) {
       const gift = findGift(rule.gift);
       Object.assign(row, { trigger: 'gift', label: gift?.nameJa ?? rule.gift, coins: gift?.diamonds ?? null, image: gift?.image ?? '' });
@@ -42,6 +54,15 @@ export function giftTable(rules, findGift, describe) {
     .sort((a, b) => TRIGGER_ORDER[a.row.trigger] - TRIGGER_ORDER[b.row.trigger] || value(a.row) - value(b.row) || a.i - b.i)
     .map(({ row }) => row)
     .slice(0, MAX_TABLE_ROWS);
+}
+
+/** ルールの条件を短い文にする（条件がなければ空） */
+export function conditionText(rule) {
+  const parts = [];
+  if (rule.minRound !== undefined) parts.push(`${rule.minRound}ラウンド目から`);
+  if (rule.when === 'filling') parts.push('埋め立て中');
+  if (rule.when === 'countdown') parts.push('カウントダウン中');
+  return parts.join('・');
 }
 
 /**

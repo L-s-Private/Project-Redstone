@@ -124,7 +124,7 @@ test('ほかのサイトやほかのホスト名からの操作を断る', async
 
 test('大きすぎる送信や壊れたJSONを断る', async () => {
   await withServer(async ({ port }) => {
-    const big = await request(port, { method: 'POST', path: '/api/test', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(10000) }).catch(() => ({ status: 'closed' }));
+    const big = await request(port, { method: 'POST', path: '/api/test', headers: { 'Content-Type': 'application/json' }, body: 'x'.repeat(600000) }).catch(() => ({ status: 'closed' }));
     assert.ok(big.status === 400 || big.status === 'closed');
     assert.equal((await request(port, { method: 'POST', path: '/api/test', headers: { 'Content-Type': 'application/json' }, body: '{' })).status, 400);
   });
@@ -311,5 +311,22 @@ test('配信画面の部品だけ、同じアプリの中でなら枠に入れ�
     assert.match(widget.headers['content-security-policy'], /frame-ancestors 'self'/);
     const panel = await request(port, { path: '/' });
     assert.match(panel.headers['content-security-policy'], /frame-ancestors 'none'/);
+  });
+});
+
+test('設定ファイルの書き出しはダウンロードとして返し、読み込みはエンジンに渡す', async () => {
+  await withServer(async ({ engine, port }) => {
+    engine.exportSettings = () => ({ format: 'project-redstone-settings', version: 1, exportedAt: '2026-10-21T00:00:00.000Z', rules: [], presets: [] });
+    engine.importSettings = (data) => {
+      if (!data) throw new Error('読めません');
+      return ['A'];
+    };
+    const res = await request(port, { method: 'GET', path: '/api/settings/export' });
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-disposition'], /project-redstone-2026-10-21\.json/);
+    const ok = await json(port, '/api/settings/import', { data: { x: 1 } });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.json().imported, ['A']);
+    assert.equal((await json(port, '/api/settings/import', {})).status, 400);
   });
 });

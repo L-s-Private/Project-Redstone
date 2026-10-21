@@ -2,8 +2,8 @@ import { EventEmitter } from 'node:events';
 import { Dispatcher } from './dispatcher.js';
 import { ModClient } from './modClient.js';
 import { parseFill, parseWorld, parsePreset } from './config.js';
-import { BUILTIN_PRESETS } from './presets.js';
-import { checkPresetSave, checkRules, CURRENT_PLAN, planOf } from './plan.js';
+import { BUILTIN_PRESETS, MAX_PRESET_NAME } from './presets.js';
+import { checkFeature, checkPresetSave, checkRules, CURRENT_PLAN, planOf } from './plan.js';
 import { describeEvent } from './rules.js';
 import { giftTable, Ranking } from './overlayData.js';
 import { TikTokSource } from './tiktok.js';
@@ -58,6 +58,20 @@ export function testButtons(rules) {
     }
   }
   return [...buttons].map(([label, body]) => ({ label, body }));
+}
+
+/** 設定ファイル（書き出し・読み込み）の形。中身を変えたら SETTINGS_VERSION を上げる */
+export const SETTINGS_FORMAT = 'project-redstone-settings';
+export const SETTINGS_VERSION = 1;
+
+/** 同じ名前があれば「名前 (2)」のようにする（名前の長さの上限に収める） */
+function uniqueName(name, taken) {
+  if (!taken.includes(name)) return name;
+  for (let n = 2; ; n++) {
+    const suffix = ` (${n})`;
+    const candidate = name.slice(0, MAX_PRESET_NAME - suffix.length) + suffix;
+    if (!taken.includes(candidate)) return candidate;
+  }
 }
 
 /** テスト送信のログには印を付けて、本物の視聴者からのものと見分けられるようにする */
@@ -235,6 +249,61 @@ export class Engine extends EventEmitter {
     this.config.presets = [...mine, preset];
     this.log('info', `今の妨害の設定を、プリセット「${preset.name}」として保存しました`);
     this.emitState();
+  }
+
+  /** 設定ファイル（書き出し）の中身。今のルールと自分のプリセット */
+  exportSettings() {
+    const problem = checkFeature(this.plan, 'importExport', '設定の書き出し');
+    if (problem) throw new Error(problem);
+    return {
+      format: SETTINGS_FORMAT, version: SETTINGS_VERSION, app: this.version, exportedAt: new Date(this.now()).toISOString(),
+      rules: this.config.rules, presets: this.config.presets ?? [],
+    };
+  }
+
+  /**
+   * 書き出した設定ファイルを読み込む。今のルールは変えず、すべて自分のプリセットとして足す
+   * （ファイルの「今のルール」は「読み込んだルール」という名前になる）。同じ名前があれば (2) などを付ける。
+   * 1つでも読めないもの・入りきらないときは、何も足さずに断る。
+   * @returns {string[]} 足したプリセットの名前
+   */
+  importSettings(data) {
+    const problem = checkFeature(this.plan, 'importExport', '設定の読み込み');
+    if (problem) throw new Error(problem);
+    if (data?.format !== SETTINGS_FORMAT || !Number.isInteger(data.version)) {
+      throw new Error('Project Redstone の設定ファイルではありません');
+    }
+    if (data.version > SETTINGS_VERSION) {
+      throw new Error('新しい版のアプリで書き出したファイルです。アプリを新しくしてから読み込んでください');
+    }
+    const incoming = [];
+    if (Array.isArray(data.rules) && data.rules.length > 0) incoming.push({ name: '読み込んだルール', rules: data.rules });
+    if (data.presets !== undefined && !Array.isArray(data.presets)) throw new Error('ファイルの中のプリセットが読めません');
+    incoming.push(...(data.presets ?? []));
+    if (incoming.length === 0) throw new Error('ファイルにルールもプリセットも入っていません');
+
+    const mine = [...(this.config.presets ?? [])];
+    const limit = planOf(this.plan).userPresets;
+    if (mine.length + incoming.length > limit) {
+      throw new Error(`プリセットは${limit}個まで保存できます。いま${mine.length}個あり、ファイルには${incoming.length}個入っているので入りきりません。いくつか削除してから読み込んでください`);
+    }
+    const added = [];
+    for (const [i, raw] of incoming.entries()) {
+      let preset;
+      try {
+        preset = parsePreset(raw);
+        const problem = checkRules(this.plan, preset.rules, 0);
+        if (problem) throw new Error(problem);
+      } catch (e) {
+        throw new Error(`ファイルの${i + 1}番目のプリセット「${String(raw?.name ?? '')}」が読めません: ${e.message}`);
+      }
+      preset.name = uniqueName(preset.name, [...mine, ...added].map((p) => p.name));
+      added.push(preset);
+    }
+    this.config.presets = [...mine, ...added];
+    this.log('ok', `設定ファイルから、プリセットを${added.length}個読み込みました（${added.map((p) => p.name).join('・')}）`);
+    this.emitState();
+    return added.map((p) => p.name);
   }
 
   deletePreset(name) {

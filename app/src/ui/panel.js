@@ -96,13 +96,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .card-head h2 { margin: 0 auto 0 0; }
 
   /* ---- 入力とボタン ---- */
-  button {
-    font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--line);
+  button, a.button {
+    font: inherit; text-decoration: none; color: var(--text); background: var(--raised); border: 1px solid var(--line);
     border-radius: var(--radius-sm); padding: 6px 12px; cursor: pointer; white-space: nowrap;
     display: inline-flex; align-items: center; justify-content: center; gap: 7px;
     transition: background-color .12s, border-color .12s, color .12s;
   }
-  button:hover { background: var(--hover); }
+  button:hover, a.button:hover { background: var(--hover); }
   button:disabled { opacity: .4; cursor: default; }
   .primary, .next { background: var(--invert-bg); color: var(--invert-text); border-color: var(--invert-bg); font-weight: 700; }
   .primary:hover, .next:hover { background: #ffffff; }
@@ -541,7 +541,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   </div>
   <div class="page">
     <section class="card">
-      <div class="card-head"><h2>プリセット</h2></div>
+      <div class="card-head"><h2>プリセット</h2>
+        <span id="settingsFile" hidden>
+          <a class="button ghost" id="exportSettings" href="/api/settings/export" download title="今のルールと自分のプリセットを、ファイルに保存します（別の PC に持っていけます）">ファイルに書き出す</a>
+          <button class="ghost" id="importSettings" title="書き出したファイルのプリセットを足します（今のルールは変わりません）">ファイルから読み込む</button>
+          <input type="file" id="importFile" accept=".json,application/json" hidden>
+        </span>
+      </div>
       <p class="lead">押すと、ルールがまとめて入れ替わります（「保存する」を押すまで確定しません）。</p>
       <div class="presets" id="presets"></div>
     </section>
@@ -1482,6 +1488,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   let presetsKey = '';
   function renderPresets() {
     if (!state?.presets) return;
+    $('settingsFile').hidden = !state.plan?.importExport;
     const current = JSON.stringify(sortedRules(rows));
     // 状態はいいねや進み具合のたびに届くので、変わっていなければ作り直さない
     const key = JSON.stringify(state.presets) + current;
@@ -1511,6 +1518,23 @@ export const PANEL_HTML = String.raw`<!doctype html>
     });
     $('presets').replaceChildren(...state.presets.builtin.map((p) => chip(p, p.description)), ...mine, save);
   }
+
+  // ---- 設定ファイル（書き出し・読み込み）。有料版の機能 ----
+  $('importSettings').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', async () => {
+    const file = $('importFile').files[0];
+    $('importFile').value = '';
+    if (!file) return;
+    let data;
+    try {
+      data = JSON.parse(await file.text());
+    } catch {
+      toast('ファイルを読めませんでした。書き出した .json ファイルを選んでください', 'error');
+      return;
+    }
+    const result = await post('/api/settings/import', { data }, { button: $('importSettings') });
+    if (result?.ok) toast('プリセットを' + result.imported.length + '個読み込みました（' + result.imported.join('・') + '）');
+  });
 
   async function applyPreset(preset) {
     if (rows.length > 0 && rulesKey(preset.rules) === JSON.stringify(sortedRules(rows))) return;

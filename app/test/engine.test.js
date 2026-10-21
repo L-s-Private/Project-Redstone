@@ -325,3 +325,35 @@ test('無料版の上限: プリセットとルールを増やすときだけ断
   assert.equal(engine.config.rules.length, 1, '断ったときは前のルールのまま');
   assert.equal(engine.state.plan.id, 'free');
 });
+
+test('設定ファイル: 書き出したものを読み込むと、すべて自分のプリセットとして足される（同じ名前には (2)）', () => {
+  const a = setup({ presets: [{ name: 'お祭り', rules: [{ gift: 'GG', action: 'tnt' }] }] });
+  const file = JSON.parse(JSON.stringify(a.engine.exportSettings()));
+  assert.equal(file.format, 'project-redstone-settings');
+  assert.equal(file.version, 1);
+
+  const b = setup({ presets: [{ name: 'お祭り', rules: [{ gift: 'Rose', action: 'mob' }] }] });
+  const names = b.engine.importSettings(file);
+  assert.deepEqual(names, ['読み込んだルール', 'お祭り (2)']);
+  assert.equal(b.engine.config.presets.length, 3);
+  assert.equal(b.engine.config.rules[0].gift, 'Rose', '今のルールは変えない');
+});
+
+test('設定ファイル: 違うファイル・壊れたプリセット・入りきらないときは、何も足さずに断る', () => {
+  const { engine } = setup();
+  assert.throws(() => engine.importSettings({ hello: 1 }), /設定ファイルではありません/);
+  assert.throws(() => engine.importSettings({ format: 'project-redstone-settings', version: 99, presets: [] }), /新しい版/);
+  assert.throws(
+    () => engine.importSettings({ format: 'project-redstone-settings', version: 1, presets: [{ name: 'よい', rules: [{ gift: 'GG', action: 'tnt' }] }, { name: 'こわれ', rules: [{ gift: 'GG', action: 'explode' }] }] }),
+    /2番目のプリセット「こわれ」/,
+  );
+  assert.equal((engine.config.presets ?? []).length, 0);
+  const many = Array.from({ length: 21 }, (_, i) => ({ name: `p${i}`, rules: [{ gift: 'GG', action: 'tnt' }] }));
+  assert.throws(() => engine.importSettings({ format: 'project-redstone-settings', version: 1, presets: many }), /入りきりません/);
+});
+
+test('設定ファイルは有料版の機能（無料版では断る）', () => {
+  const { engine } = setup({}, { plan: 'free' });
+  assert.throws(() => engine.exportSettings(), /Creator Plus の機能/);
+  assert.equal(engine.state.plan.importExport, false);
+});

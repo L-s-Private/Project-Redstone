@@ -9,7 +9,8 @@ import { PANEL_HTML } from './ui/panel.js';
 
 export const DEFAULT_UI_PORT = 25600;
 
-const MAX_BODY_BYTES = 32 * 1024;
+// 設定ファイルの読み込み（プリセット20個×ルール50件）が入る大きさ
+const MAX_BODY_BYTES = 512 * 1024;
 
 /**
  * @param {object} options
@@ -68,6 +69,16 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
         return { status: 400, error: e.message };
       }
       await saveConfig(engine.config);
+    },
+    'POST /api/settings/import': async (body) => {
+      let names;
+      try {
+        names = engine.importSettings(body.data);
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+      await saveConfig(engine.config);
+      return { imported: names };
     },
     'POST /api/presets/delete': async (body) => {
       engine.deletePreset(String(body.name ?? ''));
@@ -161,6 +172,22 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
       return res.end(png);
     }
+    if (route === 'GET /api/settings/export') {
+      let data;
+      try {
+        data = engine.exportSettings();
+      } catch (e) {
+        return send(res, 400, { error: e.message });
+      }
+      const day = data.exportedAt.slice(0, 10);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="project-redstone-${day}.json"`,
+        'Cache-Control': 'no-store',
+      });
+      return res.end(`${JSON.stringify(data, null, 2)}
+`);
+    }
     if (route === 'GET /api/gifts') {
       return send(res, 200, { gifts: engine.giftCatalog?.gifts ?? [] });
     }
@@ -197,7 +224,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     try {
       const result = await action(body);
       if (result?.error) return send(res, result.status, { error: result.error });
-      return send(res, 200, { ok: true, state: engine.state, ...(result?.setup ? { setup: result.setup } : {}), ...(result?.applied !== undefined ? { applied: result.applied } : {}) });
+      return send(res, 200, { ok: true, state: engine.state, ...(result?.setup ? { setup: result.setup } : {}), ...(result?.applied !== undefined ? { applied: result.applied } : {}), ...(result?.imported ? { imported: result.imported } : {}) });
     } catch (e) {
       return send(res, 500, { error: e.message });
     }

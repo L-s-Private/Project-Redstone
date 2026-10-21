@@ -4,8 +4,9 @@
 // 上限を超えた設定は消さない。新しく足すことだけを断る（仕様書 10番の5）。
 
 export const PLANS = {
-  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12 },
-  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50 },
+  // importExport: 設定をファイルに書き出す・読み込む
+  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12, importExport: false },
+  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50, importExport: true },
 };
 
 /**
@@ -31,6 +32,12 @@ export function checkPresetSave(planId, presets, name) {
   if (presets.some((p) => p.name === name)) return null;
   if (presets.length < plan.userPresets) return null;
   return `${plan.name}で保存できる自分のプリセットは${plan.userPresets}個までです。どれかを削除するか、同じ名前で上書きしてください`;
+}
+
+/** 有料版だけの機能を使えるか。使えなければ理由を返す */
+export function checkFeature(planId, feature, label) {
+  const plan = planOf(planId);
+  return plan[feature] ? null : `${label}は ${PLANS.plus.name} の機能です`;
 }
 
 /**

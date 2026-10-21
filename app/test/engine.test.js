@@ -385,3 +385,29 @@ test('配信画面の見た目: 有料版では変えた見た目、無料版で
   assert.equal(free.engine.state.savedOverlayStyle.textColor, '#00ff00', '設定は消さない');
   assert.throws(() => free.engine.setOverlayStyle({ textColor: '#000000' }), /Creator Plus の機能/);
 });
+
+test('分析: TikTok の本物のイベントと結果を配信ごとに数え、テスト送信は数えない。無料版は直近のまとめだけ', async () => {
+  const saved = [];
+  const { engine, tiktok } = setup({}, { saveAnalytics: async (data) => saved.push(data) });
+  tiktok.emit('live', { roomId: 'room1' });
+  tiktok.emit('event', rose);
+  await engine.handleEvent({ ...rose, test: true });
+  await new Promise((r) => setImmediate(r));
+  const { full, streams } = engine.analyticsList();
+  assert.equal(full, true, '無料ベータの間は全部見られる');
+  assert.equal(streams[0].gifts, 3, 'テスト送信の分は入らない');
+  assert.equal(streams[0].actions.sent, 1);
+  assert.equal(engine.analyticsDetail(streams[0].id).byAction[0].key, 'tnt');
+  await engine.shutdown();
+  assert.equal(saved.at(-1).streams[0].coins, 3, '終了するときに保存する');
+
+  const free = setup({}, { plan: 'free' });
+  free.tiktok.emit('live', { roomId: 'a' });
+  free.tiktok.emit('event', rose);
+  free.tiktok.emit('live', { roomId: 'b' });
+  free.tiktok.emit('event', rose);
+  await new Promise((r) => setImmediate(r));
+  const list = free.engine.analyticsList();
+  assert.deepEqual([list.full, list.total, list.streams.length], [false, 2, 1], '無料版は直近の配信だけ（記録は続ける）');
+  assert.throws(() => free.engine.analyticsDetail(list.streams[0].id), /Creator Plus/);
+});

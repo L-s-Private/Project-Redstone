@@ -32,6 +32,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     --warn: #d0a94f;
     --bad: #d85c55;
     --stop: #7d2621;
+    /* 分析のグラフの色（1つの数だけを出すので1色） */
+    --data: #7fa8d9;
     --radius: 8px;
     --radius-sm: 6px;
   }
@@ -383,6 +385,40 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .gift-grid button:hover { background: var(--raised); border-color: var(--line); }
   .gift-grid small { color: var(--faint); font-variant-numeric: tabular-nums; }
+
+  /* ---- 分析 ---- */
+  .stream-list { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .stream-list th { text-align: right; font-weight: 400; font-size: 11px; color: var(--faint); padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .stream-list td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+  .stream-list th:first-child, .stream-list td:first-child { text-align: left; }
+  .stream-list tbody tr { cursor: pointer; }
+  .stream-list tbody tr:hover { background: var(--raised); }
+  .stream-list tbody tr.selected { background: var(--raised); box-shadow: inset 2px 0 0 var(--text); }
+  .stream-detail { display: flex; flex-direction: column; gap: 16px; }
+  .detail-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .detail-lists { grid-template-columns: minmax(0, 1fr); } }
+  .stats.wide { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); row-gap: 12px; }
+  .chart { position: relative; margin-bottom: 14px; }
+  .chart-title { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .chart svg { display: block; width: 100%; height: 140px; overflow: visible; }
+  .chart .axis { fill: var(--faint); font-size: 10px; }
+  .chart .grid { stroke: var(--line-soft); stroke-width: 1; }
+  .chart .base { stroke: var(--line); stroke-width: 1; }
+  .chart .bar { fill: var(--data); }
+  .chart .line { fill: none; stroke: var(--data); stroke-width: 2; stroke-linejoin: round; }
+  .chart .cursor { stroke: var(--muted); stroke-width: 1; }
+  .chart .tip {
+    position: absolute; top: 0; pointer-events: none; transform: translateX(-50%);
+    background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; white-space: nowrap;
+  }
+  .chart .tip small { color: var(--muted); margin-right: 6px; }
+  .rank-list { list-style: none; margin: 0; padding: 0; font-variant-numeric: tabular-nums; }
+  .rank-list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
+  .rank-list li:last-child { border-bottom: 0; }
+  .rank-list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-list .value { color: var(--muted); }
+  .rank-list .gift-img { width: 22px; height: 22px; }
+  .rank-list .mc { --s: 20px; }
 </style>
 </head>
 <body>
@@ -397,6 +433,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>妨害の設定<span class="badge" id="rulesBadge" title="保存していない変更があります" hidden></span></button>
     <button data-tab="tabOverlay">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="4" y="1.5" width="8" height="13" rx="1.5"/><path d="M6 5h4M6 7.5h2.5"/></svg>配信画面</button>
+    <button data-tab="tabStats">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 14h12M4 11V8M8 11V3M12 11V6"/></svg>分析</button>
     <button data-tab="tabDebug">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 1.8h4M6.8 1.8v4.4L2.6 13a.8.8 0 0 0 .7 1.2h9.4a.8.8 0 0 0 .7-1.2L9.2 6.2V1.8"/><path d="M4.4 10h7.2"/></svg>テスト</button>
     <button data-tab="tabSetup">
@@ -604,6 +642,41 @@ export const PANEL_HTML = String.raw`<!doctype html>
   </div>
 </main>
 
+<main id="tabStats" hidden>
+  <div class="page-head"><h1>分析</h1><button class="ghost" id="statsReload">最新にする</button></div>
+  <div class="page">
+    <section class="card">
+      <h2>配信ごとの記録</h2>
+      <p class="lead" id="statsLead">TikTok LIVE につないだ配信ごとに、届いたギフトや出した妨害を数えています（テスト送信は数えません）。直近30日分を残します。行を押すと、くわしく見られます。</p>
+      <p class="hint" id="statsPlusNote" hidden></p>
+      <div style="overflow-x: auto;"><table class="stream-list" id="streamList"></table></div>
+      <div class="empty" id="streamEmpty" hidden><span>まだ記録がありません。TikTok LIVE につないで配信すると、ここに出ます。</span></div>
+    </section>
+    <div class="stream-detail" id="streamDetail" hidden>
+      <section class="card">
+        <div class="card-head"><h2 id="detailTitle"></h2></div>
+        <div class="stats wide" id="detailStats"></div>
+      </section>
+      <section class="card">
+        <h2>流れ（1分ごと）</h2>
+        <p class="lead">配信のどのあたりで盛り上がったかがわかります。グラフに重ねると数が出ます。</p>
+        <h3 class="chart-title">届いたコイン</h3>
+        <div class="chart" id="chartCoins"></div>
+        <h3 class="chart-title">出した妨害</h3>
+        <div class="chart" id="chartActions"></div>
+        <h3 class="chart-title">埋まった割合（%）</h3>
+        <div class="chart" id="chartFill"></div>
+      </section>
+      <div class="detail-lists">
+        <section class="card"><h2>よく届いたギフト</h2><ul class="rank-list" id="detailGifts"></ul></section>
+        <section class="card"><h2>ギフトを送ってくれた人</h2><ul class="rank-list" id="detailSupporters"></ul></section>
+        <section class="card"><h2>出した妨害</h2><ul class="rank-list" id="detailActions"></ul></section>
+        <section class="card"><h2>出なかった理由</h2><ul class="rank-list" id="detailFailures"></ul></section>
+      </div>
+    </div>
+  </div>
+</main>
+
 <main id="tabDebug" hidden>
   <div class="page-head"><h1>テスト</h1></div>
   <div class="page">
@@ -753,9 +826,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <li>TikTok のパスワードやログインは使いません。入れるのは TikTok ID だけです</li>
           <li>TikTok LIVE には、非公式のしくみ（tiktok-live-connector）でつなぎます。つなぐとき、TikTok ID が外部のサービス Euler Stream（eulerstream.com）に送られます</li>
           <li>ギフトの一覧は TikTok から、マイクラの準備に使うものは Fabric と Modrinth から取ってきます</li>
-          <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、ログ（視聴者の名前と届いたギフト）</li>
+          <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、配信ごとの分析（直近30日分。視聴者の名前とコイン数を含む）、ログ（視聴者の名前と届いたギフト）</li>
           <li>これらを作者などに送ることはありません</li>
-          <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\\ProjectRedstone</code> を消してください。設定・ログ・ランキングがすべて消えます</li>
+          <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\\ProjectRedstone</code> を消してください。設定・ログ・ランキング・分析がすべて消えます</li>
         </ul>
       </section>
     </div>
@@ -1164,6 +1237,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   function showTab(id) {
     document.querySelectorAll('nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     document.querySelectorAll('body > main').forEach((page) => (page.hidden = page.id !== id));
+    // 分析は開いたときに読み直す
+    if (id === 'tabStats') loadStreams();
     // 配信の画面に戻ったら、ログは最新を見せる
     if (id === 'tabLive' && followLog) $('log').scrollTop = $('log').scrollHeight;
     storage('redstone.tab', id);
@@ -1636,6 +1711,188 @@ export const PANEL_HTML = String.raw`<!doctype html>
   });
 
   $('addRule').addEventListener('click', () => openEditor(null));
+
+  // ---- 分析 ----
+  let selectedStream = '';
+  const fmtNum = (n) => Number(n ?? 0).toLocaleString('ja-JP');
+  const fmtDate = (t) => new Date(t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  const fmtClock = (t) => new Date(t).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  function fmtDuration(ms) {
+    const min = Math.max(1, Math.round(ms / 60000));
+    return min < 60 ? min + '分' : Math.floor(min / 60) + '時間' + (min % 60 ? (min % 60) + '分' : '');
+  }
+
+  async function loadStreams() {
+    let data;
+    try {
+      const res = await fetch('/api/analytics');
+      data = await res.json();
+    } catch {
+      return;
+    }
+    const { streams, full, total } = data;
+    $('streamEmpty').hidden = streams.length > 0;
+    $('streamList').hidden = streams.length === 0;
+    $('statsPlusNote').hidden = full;
+    $('statsPlusNote').textContent = '30日分の一覧と、くわしい中身（流れのグラフ・内訳）は ' + PLUS_NAME + ' の機能です。無料版では直近の配信のまとめだけ見られます'
+      + (total > 1 ? '（記録は続けているので、ほかに ' + (total - 1) + '回分あります）' : '');
+    const head = el('tr', '', ...['日時', '長さ', 'コイン', 'ギフト', 'いいね', 'フォロー', '妨害', '失敗'].map((t) => el('th', '', t)));
+    const rows = streams.map((st) => {
+      const tr = el('tr', st.id === selectedStream ? 'selected' : '',
+        el('td', '', fmtDate(st.startedAt)), el('td', '', fmtDuration(st.endedAt - st.startedAt)),
+        el('td', '', '🪙' + fmtNum(st.coins)), el('td', '', fmtNum(st.gifts)), el('td', '', fmtNum(st.likes)), el('td', '', fmtNum(st.follows)),
+        el('td', '', fmtNum(st.actions.sent)), el('td', '', st.failureRate + '%'));
+      if (full) {
+        tr.tabIndex = 0;
+        const open = () => showStream(st.id);
+        tr.addEventListener('click', open);
+        tr.addEventListener('keydown', (e) => e.key === 'Enter' && open());
+      } else {
+        tr.style.cursor = 'default';
+      }
+      return tr;
+    });
+    $('streamList').replaceChildren(el('thead', '', head), el('tbody', '', ...rows));
+    if (!full) $('streamDetail').hidden = true;
+    else if (selectedStream && streams.some((st) => st.id === selectedStream)) showStream(selectedStream);
+    else if (streams[0]) showStream(streams[0].id);
+  }
+
+  async function showStream(id) {
+    selectedStream = id;
+    let d;
+    try {
+      const res = await fetch('/api/analytics/' + encodeURIComponent(id));
+      d = await res.json();
+      if (!res.ok) throw new Error(d.error);
+    } catch (e) {
+      toast(e.message || '読めませんでした');
+      return;
+    }
+    // 一覧の選んだ行に印
+    const index = [...$('streamList').querySelectorAll('tbody tr')].findIndex((tr) => tr.firstChild.textContent === fmtDate(d.startedAt));
+    $('streamList').querySelectorAll('tbody tr').forEach((tr, i) => tr.classList.toggle('selected', i === index));
+    $('streamDetail').hidden = false;
+    $('detailTitle').textContent = fmtDate(d.startedAt) + ' 〜 ' + fmtClock(d.endedAt) + '（' + fmtDuration(d.endedAt - d.startedAt) + '）';
+    const stat = (label, value) => el('div', 'stat', el('small', '', label), el('b', '', value));
+    $('detailStats').replaceChildren(
+      stat('コイン', fmtNum(d.coins)), stat('ギフト', fmtNum(d.gifts)), stat('送ってくれた人', fmtNum(d.supporterCount)),
+      stat('いいね', fmtNum(d.likes)), stat('フォロー', fmtNum(d.follows)), stat('シェア', fmtNum(d.shares)),
+      stat('妨害を出した', fmtNum(d.actions.sent)), stat('失敗', fmtNum(d.actions.failed) + '（' + d.failureRate + '%）'),
+      stat('クリアしたラウンド', fmtNum(d.rounds)));
+    // 分ごとの記録（抜けている分は0）
+    const minutes = (d.timeline.at(-1)?.m ?? 0) + 1;
+    const at = new Map(d.timeline.map((b) => [b.m, b]));
+    const series = (key) => Array.from({ length: minutes }, (_, m) => at.get(m)?.[key] ?? (key === 'fill' ? null : 0));
+    const label = (m) => fmtClock(d.startedAt + m * 60000);
+    barChart($('chartCoins'), series('coins'), label, (v) => '🪙' + fmtNum(v));
+    barChart($('chartActions'), series('actions'), label, (v) => fmtNum(v) + '回');
+    lineChart($('chartFill'), series('fill'), label);
+    const item = (icon, name, value) => el('li', '', ...(icon ? [icon] : []), el('span', 'name', name), el('span', 'value', value));
+    const none = (text) => el('li', '', el('span', 'name hint', text));
+    $('detailGifts').replaceChildren(...(d.topGifts.length ? d.topGifts.map((g) => item(giftIcon(g.name), g.name, '×' + fmtNum(g.count) + '・🪙' + fmtNum(g.coins))) : [none('ギフトは届いていません')]));
+    $('detailSupporters').replaceChildren(...(d.supporters.length ? d.supporters.map((x, i) => item(null, (i + 1) + '. ' + x.name, '🪙' + fmtNum(x.coins))) : [none('まだいません')]));
+    $('detailActions').replaceChildren(...(d.byAction.length ? d.byAction.map((a) => item(mcIcon(iconOf(a.key), 20), ACTION_INFO[a.key]?.name ?? a.key, fmtNum(a.count) + '回')) : [none('出していません')]));
+    const skipped = [['cooldown', '待ち時間（クールダウン）中'], ['paused', '一時停止中'], ['no_rule', '合うルールがない']]
+      .filter(([key]) => d.actions[key] > 0).map(([key, text]) => item(null, text, fmtNum(d.actions[key]) + '回'));
+    const failures = d.failures.map((f) => item(null, '失敗: ' + f.reason, fmtNum(f.count) + '回'));
+    $('detailFailures').replaceChildren(...(failures.length + skipped.length ? [...failures, ...skipped] : [none('すべて出せました')]));
+  }
+
+  /** グラフの枠（目盛り・横軸の時刻・重ねたときの数）。draw(w, h, x) で中身を描く */
+  function chartFrame(box, values, label, format, max, draw) {
+    const width = Math.max(240, box.clientWidth || 600);
+    const height = 140;
+    const pad = { l: 36, r: 8, t: 8, b: 20 };
+    const w = width - pad.l - pad.r;
+    const h = height - pad.t - pad.b;
+    const n = values.length;
+    const x = (i) => pad.l + (n <= 1 ? w / 2 : (i + 0.5) * (w / n));
+    const y = (v) => pad.t + h - (v / max) * h;
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('role', 'img');
+    const add = (tag, attrs, text) => {
+      const node = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      svg.append(node);
+      return node;
+    };
+    // 横の目盛り（0・半分・最大）
+    for (const v of [max / 2, max]) {
+      add('line', { class: 'grid', x1: pad.l, x2: width - pad.r, y1: y(v), y2: y(v) });
+      add('text', { class: 'axis', x: pad.l - 6, y: y(v) + 3, 'text-anchor': 'end' }, fmtNum(Math.round(v)));
+    }
+    add('text', { class: 'axis', x: pad.l - 6, y: y(0) + 3, 'text-anchor': 'end' }, '0');
+    draw({ add, x, y, w, h, n, pad, height });
+    add('line', { class: 'base', x1: pad.l, x2: width - pad.r, y1: y(0), y2: y(0) });
+    // 横軸の時刻（多すぎないように間引く）
+    const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(w / 64))));
+    for (let i = 0; i < n; i += step) add('text', { class: 'axis', x: x(i), y: height - 4, 'text-anchor': 'middle' }, label(i));
+    // 重ねたときの数
+    const cursor = add('line', { class: 'cursor', y1: pad.t, y2: pad.t + h, visibility: 'hidden' });
+    const tip = el('div', 'tip');
+    tip.hidden = true;
+    svg.addEventListener('pointermove', (e) => {
+      const rect = svg.getBoundingClientRect();
+      const px = ((e.clientX - rect.left) / rect.width) * width;
+      const i = Math.min(n - 1, Math.max(0, Math.floor(((px - pad.l) / w) * n)));
+      if (values[i] === null) {
+        tip.hidden = true;
+        cursor.setAttribute('visibility', 'hidden');
+        return;
+      }
+      cursor.setAttribute('x1', x(i));
+      cursor.setAttribute('x2', x(i));
+      cursor.setAttribute('visibility', 'visible');
+      tip.replaceChildren(el('small', '', label(i)), format(values[i]));
+      tip.style.left = (x(i) / width) * 100 + '%';
+      tip.hidden = false;
+    });
+    svg.addEventListener('pointerleave', () => {
+      tip.hidden = true;
+      cursor.setAttribute('visibility', 'hidden');
+    });
+    box.replaceChildren(svg, tip);
+  }
+
+  function barChart(box, values, label, format) {
+    const max = Math.max(1, ...values) * 1.1;
+    chartFrame(box, values, label, format, max, ({ add, x, y, w, n }) => {
+      const bw = Math.max(1, Math.min(24, w / n - 2)); // 棒の間に2px あける
+      const r = bw >= 8 ? 4 : 0;
+      values.forEach((v, i) => {
+        if (!v) return;
+        const top = y(v);
+        const height = y(0) - top;
+        // 上だけ角を丸める
+        const rr = Math.min(r, height);
+        const x0 = x(i) - bw / 2;
+        add('path', { class: 'bar', d: 'M' + x0 + ',' + y(0) + 'V' + (top + rr) + 'q0,-' + rr + ' ' + rr + ',-' + rr + 'H' + (x0 + bw - rr) + 'q' + rr + ',0 ' + rr + ',' + rr + 'V' + y(0) + 'Z' });
+      });
+    });
+  }
+
+  function lineChart(box, values, label) {
+    chartFrame(box, values, label, (v) => v + '%', 100, ({ add, x, y }) => {
+      // 記録のない分（MOD につながっていなかった・埋め立てをしていなかった）は線を切る
+      let d = '';
+      let open = false;
+      values.forEach((v, i) => {
+        if (v === null) {
+          open = false;
+          return;
+        }
+        d += (open ? 'L' : 'M') + x(i) + ',' + y(v);
+        open = true;
+      });
+      if (d) add('path', { class: 'line', d });
+      else add('text', { class: 'axis', x: x(Math.floor(values.length / 2)), y: y(50), 'text-anchor': 'middle' }, 'この配信では埋め立ての記録がありません');
+    });
+  }
+  $('statsReload').addEventListener('click', () => loadStreams());
   $('revertRules').addEventListener('click', () => {
     savedRulesKey = '';
     loadRules(state.rules);

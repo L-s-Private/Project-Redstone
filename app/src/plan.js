@@ -6,8 +6,9 @@
 export const PLANS = {
   // importExport: 設定をファイルに書き出す・読み込む / overlayStyle: 配信画面の部品の見た目を変える
   // advancedRules: ランダムの出やすさ・同じものを続けない・何ラウンド目から（ランダムと「いつ出すか」は無料版でも使える）
-  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12, importExport: false, overlayStyle: false, advancedRules: false },
-  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50, importExport: true, overlayStyle: true, advancedRules: true },
+  // analytics: 30日分の配信の一覧と、配信ごとのくわしい分析（無料版は直近の配信のまとめだけ）
+  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12, importExport: false, overlayStyle: false, advancedRules: false, analytics: false },
+  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50, importExport: true, overlayStyle: true, advancedRules: true, analytics: true },
 };
 
 /**

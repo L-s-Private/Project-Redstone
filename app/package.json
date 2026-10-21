@@ -1,6 +1,6 @@
 {
   "name": "project-redstone-app",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "private": true,
   "description": "TikTok LIVE のギフトを受け取り、マイクラのMODに妨害を送るアプリ",
   "type": "module",

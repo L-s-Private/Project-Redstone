@@ -6,11 +6,14 @@ import { BUILTIN_PRESETS, MAX_PRESET_NAME } from './presets.js';
 import { checkFeature, checkPresetSave, checkAdvancedRules, checkRules, CURRENT_PLAN, planOf } from './plan.js';
 import { describeEvent } from './rules.js';
 import { giftTable, Ranking } from './overlayData.js';
+import { Analytics } from './analytics.js';
 import { TikTokSource } from './tiktok.js';
 
 const MAX_LOGS = 200;
 /** ランキングは、変わってからこれだけ待ってまとめて保存する（ギフトが続いても書きすぎないように） */
 const RANKING_SAVE_DELAY_MS = 1000;
+/** 分析は数が多いので、まとめて保存する */
+const ANALYTICS_SAVE_DELAY_MS = 5000;
 
 const SKIP_MESSAGES = {
   no_rule: '対応する妨害がないので無視しました',
@@ -113,8 +116,9 @@ export class Engine extends EventEmitter {
    * modVersion: アプリに入っている MOD の版。マイクラに入っている MOD と違えば知らせる（わからなければ空）
    * plan: 無料版か有料版か（plan.js）。license があれば、そちらで決まる
    * license: 有料版のライセンスキー（license.js）
+   * analytics / saveAnalytics: 保存しておいた配信ごとの分析（analytics.js）と、変わったときに保存する
    */
-  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {}, plan = CURRENT_PLAN, license = null }) {
+  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {}, plan = CURRENT_PLAN, license = null, analytics = {}, saveAnalytics = async () => {} }) {
     super();
     this.config = config;
     this.fixedPlan = plan;
@@ -136,6 +140,11 @@ export class Engine extends EventEmitter {
     this.writeRanking = saveRanking;
     this.rankingTimer = null;
     this.rankingWrite = Promise.resolve();
+    // 配信ごとの分析。本物のイベントだけ数える
+    this.analytics = new Analytics(analytics, now);
+    this.writeAnalytics = saveAnalytics;
+    this.analyticsTimer = null;
+    this.analyticsWrite = Promise.resolve();
     // 画面用に作ったもの（ルールやギフト一覧が変わったときだけ作り直す）
     this.cache = {};
     this.statePending = false;
@@ -143,7 +152,8 @@ export class Engine extends EventEmitter {
     // 埋め立ての進み具合でも status は届くので、接続の変化だけログに出す
     let previous = { connected: false, players: null };
     let warnedVersion;
-    this.client.on('status', ({ connected, players, version }) => {
+    this.client.on('status', ({ connected, players, version, fill }) => {
+      if (this.analytics.recordGame(fill)) this.saveAnalytics();
       if (!connected) warnedVersion = undefined;
       // 古い MOD は版を知らせない（version が null）。その場合も「合わない」とする
       if (connected && players !== null && this.modVersion && version !== this.modVersion && warnedVersion !== version) {
@@ -167,6 +177,7 @@ export class Engine extends EventEmitter {
     this.tiktok.on('status', () => this.emitState());
     this.tiktok.on('log', ({ level, text }) => this.log(level, text));
     this.tiktok.on('live', ({ roomId }) => {
+      if (this.analytics.startStream(roomId)) this.saveAnalytics();
       if (!this.ranking.startStream(roomId)) return;
       this.log('info', '新しい配信です。ギフトランキングを0から数えます');
       this.saveRanking();
@@ -179,8 +190,47 @@ export class Engine extends EventEmitter {
         // ランキングは本物のギフトだけ（テスト送信は数えない）
         if (this.ranking.add(event.from, (event.diamonds ?? 0) * (event.count ?? 1))) this.saveRanking();
       }
-      this.handleEvent(event);
+      if (this.analytics.recordEvent(event)) this.saveAnalytics();
+      this.handleEvent(event).then((result) => {
+        // いいねは、回数に届いたルールの分だけ結果が返る
+        for (const r of Array.isArray(result) ? result : [result]) this.analytics.recordResult(event, r);
+        this.saveAnalytics();
+      });
     });
+  }
+
+  /** 分析を少し後でまとめて保存する */
+  saveAnalytics() {
+    if (this.analyticsTimer) return;
+    this.analyticsTimer = setTimeout(() => this.flushAnalytics(), ANALYTICS_SAVE_DELAY_MS);
+    this.analyticsTimer.unref?.();
+  }
+
+  flushAnalytics() {
+    if (!this.analyticsTimer) return this.analyticsWrite;
+    clearTimeout(this.analyticsTimer);
+    this.analyticsTimer = null;
+    const data = this.analytics.toJSON();
+    this.analyticsWrite = this.analyticsWrite.then(() => this.writeAnalytics(data)).catch(() => {});
+    return this.analyticsWrite;
+  }
+
+  /**
+   * 配信の一覧。無料版は直近の配信のまとめだけ（記録は無料版でも続けるので、有料版にすると前の分も見られる）
+   */
+  analyticsList() {
+    const streams = this.analytics.list();
+    const full = planOf(this.plan).analytics;
+    return { full, total: streams.length, streams: full ? streams : streams.slice(0, 1) };
+  }
+
+  /** 1つの配信のくわしい中身（有料版の機能） */
+  analyticsDetail(id) {
+    const problem = checkFeature(this.plan, 'analytics', '配信のくわしい分析');
+    if (problem) throw new Error(problem);
+    const detail = this.analytics.get(id);
+    if (!detail) throw new Error('その配信の記録は見つかりません（30日より前のものは消えます）');
+    return detail;
   }
 
   /** ランキングを少し後でまとめて保存する */
@@ -547,7 +597,7 @@ export class Engine extends EventEmitter {
 
   async shutdown() {
     this.client.stop();
-    await Promise.all([this.tiktok.stop(), this.flushRanking()]);
+    await Promise.all([this.tiktok.stop(), this.flushRanking(), this.flushAnalytics()]);
   }
 
   /** extra は画面で絵を出すための giftName・icon */

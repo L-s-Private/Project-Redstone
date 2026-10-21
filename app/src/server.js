@@ -204,6 +204,18 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       return res.end(`${JSON.stringify(data, null, 2)}
 `);
     }
+    // 配信ごとの分析（一覧と、1つの配信のくわしい中身）
+    if (route === 'GET /api/analytics') {
+      return send(res, 200, engine.analyticsList());
+    }
+    const stream = route.match(/^GET \/api\/analytics\/([a-z0-9-]+)$/);
+    if (stream) {
+      try {
+        return send(res, 200, engine.analyticsDetail(stream[1]));
+      } catch (e) {
+        return send(res, 400, { error: e.message });
+      }
+    }
     if (route === 'GET /api/gifts') {
       return send(res, 200, { gifts: engine.giftCatalog?.gifts ?? [] });
     }

@@ -29,6 +29,9 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   // ギフトランキングは配信ごと。配信の途中で起動し直しても続きから数えるよう、ファイルに残す
   const rankingFile = join(dirname(configPath), 'ranking.json');
   const ranking = await readFile(rankingFile, 'utf8').then(JSON.parse).catch(() => ({}));
+  // 配信ごとの分析（直近30日分）
+  const analyticsFile = join(dirname(configPath), 'analytics.json');
+  const analytics = await readFile(analyticsFile, 'utf8').then(JSON.parse).catch(() => ({}));
   const bundledMod = await loadBundledMod();
   // 有料版のライセンス。販売前（Polar の組織 ID が空）は使わない
   const { organizationId, api } = licenseConfig();
@@ -39,6 +42,8 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
     config, version: pkg.version, giftCatalog, ranking,
     modVersion: bundledMod?.fileName.match(/^project-redstone-(.+)\.jar$/)?.[1] ?? '',
     saveRanking: (data) => writeFileSafely(rankingFile, `${JSON.stringify(data)}\n`),
+    analytics,
+    saveAnalytics: (data) => writeFileSafely(analyticsFile, `${JSON.stringify(data)}\n`),
   });
   // 思わぬエラーで、配信中にアプリごと止まらないようにする（ログに残して続ける）
   const onUnexpected = (e) => engine.log('error', `思わぬエラーが起きました（続けて動きます）: ${e?.stack ?? e}`);

@@ -697,6 +697,19 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <p class="lead">ギフト通知・ギフト表・ラウンド・ランキングを、部品ごとに LIVE Studio に貼れます。</p>
         <button data-goto="tabOverlay">配信画面の部品を見る</button>
       </section>
+      <section class="card" id="licenseCard" hidden>
+        <h2>有料版（Creator Plus）</h2>
+        <p class="lead" id="licenseText"></p>
+        <form id="licenseForm">
+          <label for="licenseKey">ライセンスキー</label>
+          <div class="row">
+            <input id="licenseKey" autocomplete="off" spellcheck="false" placeholder="購入したときにメールで届いたキー">
+            <button type="submit" class="next" id="licenseActivate">有効にする</button>
+          </div>
+          <p class="hint">キーは、いま保存している TikTok ID 用になります。使える PC は2台までです。</p>
+        </form>
+        <button class="ghost" id="licenseDeactivate" hidden>この PC で解除する</button>
+      </section>
       <section class="card">
         <h2>対応している環境</h2>
         <ul class="hint" style="margin: 6px 0 0; padding-left: 20px; line-height: 1.8;">
@@ -917,6 +930,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     renderWorldSettings(state.worldSettings);
     if (!rulesDirty) loadRules(state.rules);
     renderPresets();
+    renderLicense();
     renderRecent();
     if (!wizardChecked) {
       wizardChecked = true;
@@ -1518,6 +1532,38 @@ export const PANEL_HTML = String.raw`<!doctype html>
     });
     $('presets').replaceChildren(...state.presets.builtin.map((p) => chip(p, p.description)), ...mine, save);
   }
+
+  // ---- 有料版のライセンス（販売を始めるまでは出さない） ----
+  function renderLicense() {
+    const lic = state.license ?? { enabled: false };
+    $('licenseCard').hidden = !lic.enabled;
+    if (!lic.enabled) return;
+    const when = (t) => new Date(t).toLocaleString('ja-JP', { hour12: false });
+    const texts = {
+      none: '無料版で動いています。有料版を買うと、プリセットやルールをたくさん保存できます。',
+      active: '有効です（@' + lic.tiktok + ' 用・最後に確かめた日時 ' + (lic.lastValidatedAt ? when(lic.lastValidatedAt) : '—') + '）。',
+      offline: 'ネットにつながらず確かめられませんでした。' + (lic.graceUntil ? when(lic.graceUntil) : '') + ' までは有料版のまま使えます。',
+      expired: lic.offline
+        ? '7日以上確かめられなかったので、無料版で動いています。ネットにつなぐと戻ります。設定は消えていません。'
+        : '期限切れか解約されたため、無料版で動いています。設定は消えていません。',
+    };
+    let text = texts[lic.state] ?? '';
+    if ((lic.state === 'active' || lic.state === 'offline') && state.plan?.id !== 'plus') {
+      text = 'このキーは @' + lic.tiktok + ' 用です。今の TikTok ID（@' + (state.tiktokUsername || '未設定') + '）では無料版で動いています。';
+    }
+    $('licenseText').textContent = text;
+    $('licenseForm').hidden = lic.state !== 'none';
+    $('licenseDeactivate').hidden = lic.state === 'none';
+  }
+  $('licenseForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = await post('/api/license/activate', { key: $('licenseKey').value }, { button: $('licenseActivate'), done: '有料版を有効にしました' });
+    if (data?.ok) $('licenseKey').value = '';
+  });
+  $('licenseDeactivate').addEventListener('click', async () => {
+    const ok = await askConfirm({ title: 'この PC で解除しますか？', text: 'この PC では無料版に戻ります（設定は消えません）。キーは別の PC で使えるようになります。', ok: '解除する' });
+    if (ok) await post('/api/license/deactivate', {}, { button: $('licenseDeactivate'), done: '解除しました' });
+  });
 
   // ---- 設定ファイル（書き出し・読み込み）。有料版の機能 ----
   $('importSettings').addEventListener('click', () => $('importFile').click());

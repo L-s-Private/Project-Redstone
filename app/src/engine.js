@@ -111,12 +111,15 @@ export class Engine extends EventEmitter {
    * ranking: 保存しておいたランキング（同じ配信の途中で起動し直したとき続きから数える）
    * saveRanking: ランキングが変わったときに保存する
    * modVersion: アプリに入っている MOD の版。マイクラに入っている MOD と違えば知らせる（わからなければ空）
-   * plan: 無料版か有料版か（plan.js）
+   * plan: 無料版か有料版か（plan.js）。license があれば、そちらで決まる
+   * license: 有料版のライセンスキー（license.js）
    */
-  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {}, plan = CURRENT_PLAN }) {
+  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {}, plan = CURRENT_PLAN, license = null }) {
     super();
     this.config = config;
-    this.plan = plan;
+    this.fixedPlan = plan;
+    this.license = license;
+    this.license?.on('change', () => this.emitState());
     this.version = version;
     this.modVersion = modVersion;
     this.giftCatalog = giftCatalog;
@@ -221,6 +224,7 @@ export class Engine extends EventEmitter {
       rules: this.config.rules,
       presets: { builtin: BUILTIN_PRESETS, mine: this.config.presets ?? [] },
       plan: planOf(this.plan),
+      license: this.license?.status() ?? { enabled: false, state: 'disabled' },
       testButtons: this.cached('testButtons', [this.config.rules], () => testButtons(this.config.rules)),
       recentGifts: this.recentGifts,
       // 配信画面（オーバーレイ）用
@@ -248,6 +252,26 @@ export class Engine extends EventEmitter {
     const mine = (this.config.presets ?? []).filter((p) => p.name !== preset.name);
     this.config.presets = [...mine, preset];
     this.log('info', `今の妨害の設定を、プリセット「${preset.name}」として保存しました`);
+    this.emitState();
+  }
+
+  /** 今のプラン（plan.js の id）。ライセンスがあれば、キーの状態と TikTok ID で決まる */
+  get plan() {
+    return this.license ? this.license.plan(this.config.tiktokUsername) : this.fixedPlan;
+  }
+
+  /** ライセンスキーをこの PC で有効にする（画面から） */
+  async activateLicense(key) {
+    if (!this.license) throw new Error('有料版はまだ販売していません');
+    await this.license.activate(key, this.config.tiktokUsername);
+    this.log('ok', `有料版（${planOf('plus').name}）を有効にしました（@${this.license.status().tiktok} 用）`);
+    this.emitState();
+  }
+
+  /** この PC でのライセンスの有効化を解除する。設定はそのまま */
+  async deactivateLicense() {
+    await this.license?.deactivate();
+    this.log('info', 'この PC での有料版の有効化を解除しました。設定はそのまま残っています');
     this.emitState();
   }
 

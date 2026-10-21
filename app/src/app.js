@@ -6,6 +6,7 @@ import { loadBundledMod } from './bundledMod.js';
 import { Engine } from './engine.js';
 import { writeFileSafely } from './files.js';
 import { GiftCatalog } from './giftCatalog.js';
+import { License, licenseConfig } from './license.js';
 import { createIconSource } from './mcIcons.js';
 import { createUiServer, DEFAULT_UI_PORT } from './server.js';
 import { getSetupStatus, installAll, minecraftDir, updateModIfOutdated } from './setup.js';
@@ -29,7 +30,12 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const rankingFile = join(dirname(configPath), 'ranking.json');
   const ranking = await readFile(rankingFile, 'utf8').then(JSON.parse).catch(() => ({}));
   const bundledMod = await loadBundledMod();
+  // 有料版のライセンス。販売前（Polar の組織 ID が空）は使わない
+  const { organizationId, api } = licenseConfig();
+  const license = organizationId ? new License({ path: join(dirname(configPath), 'license.json'), organizationId, api }) : null;
+  await license?.load();
   const engine = new Engine({
+    license,
     config, version: pkg.version, giftCatalog, ranking,
     modVersion: bundledMod?.fileName.match(/^project-redstone-(.+)\.jar$/)?.[1] ?? '',
     saveRanking: (data) => writeFileSafely(rankingFile, `${JSON.stringify(data)}\n`),
@@ -68,6 +74,7 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   });
   if (removed) engine.log('warn', `前の版の妨害（砂・雷・打ち上げ・回復）のルールを ${removed}件 取り除きました`);
   engine.start({ mock });
+  license?.start();
   // ギフトの絵の一覧。取れなくても動くので待たない
   giftCatalog.load().then(
     () => engine.emitState(),
@@ -84,6 +91,7 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
     shutdown: async () => {
       process.off('uncaughtException', onUnexpected);
       process.off('unhandledRejection', onUnexpected);
+      license?.stop();
       await engine.shutdown();
       await ui.close();
     },

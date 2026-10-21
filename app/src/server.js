@@ -70,6 +70,14 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       }
       await saveConfig(engine.config);
     },
+    'POST /api/license/activate': async (body) => {
+      try {
+        await engine.activateLicense(body.key);
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+    },
+    'POST /api/license/deactivate': () => engine.deactivateLicense(),
     'POST /api/settings/import': async (body) => {
       let names;
       try {

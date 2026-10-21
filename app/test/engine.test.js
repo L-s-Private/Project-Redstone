@@ -357,3 +357,15 @@ test('設定ファイルは有料版の機能（無料版では断る）', () =>
   assert.throws(() => engine.exportSettings(), /Creator Plus の機能/);
   assert.equal(engine.state.plan.importExport, false);
 });
+
+test('ライセンスがあれば、プランはライセンスと TikTok ID で決まる', () => {
+  const license = Object.assign(new EventEmitter(), {
+    plan: (tiktok) => (tiktok === 'taro' ? 'plus' : 'free'),
+    status: () => ({ enabled: true, state: 'active', tiktok: 'taro' }),
+  });
+  const { engine } = setup({}, { license });
+  assert.equal(engine.state.plan.id, 'plus');
+  assert.equal(engine.state.license.state, 'active');
+  engine.config.tiktokUsername = 'hanako';
+  assert.equal(engine.state.plan.id, 'free');
+});

@@ -549,7 +549,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <input type="file" id="importFile" accept=".json,application/json" hidden>
         </span>
       </div>
-      <p class="lead">押すと、ルールがまとめて入れ替わります（「保存する」を押すまで確定しません）。</p>
+      <p class="lead">自分で保存したルールの組です。押すと、ルールがまとめて入れ替わります（「保存する」を押すまで確定しません）。</p>
       <div class="presets" id="presets"></div>
     </section>
     <div class="recent-strip" title="押すと、そのギフトのルールを作ります">

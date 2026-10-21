@@ -32,6 +32,9 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   // 配信ごとの分析（直近30日分）
   const analyticsFile = join(dirname(configPath), 'analytics.json');
   const analytics = await readFile(analyticsFile, 'utf8').then(JSON.parse).catch(() => ({}));
+  // 妨害の設定の履歴（保存するたび）
+  const historyFile = join(dirname(configPath), 'history.json');
+  const history = await readFile(historyFile, 'utf8').then(JSON.parse).catch(() => ({}));
   const bundledMod = await loadBundledMod();
   // 有料版のライセンス。販売前（Polar の組織 ID が空）は使わない
   const { organizationId, api } = licenseConfig();
@@ -44,6 +47,8 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
     saveRanking: (data) => writeFileSafely(rankingFile, `${JSON.stringify(data)}\n`),
     analytics,
     saveAnalytics: (data) => writeFileSafely(analyticsFile, `${JSON.stringify(data)}\n`),
+    history,
+    saveHistory: (data) => writeFileSafely(historyFile, `${JSON.stringify(data)}\n`),
   });
   // 思わぬエラーで、配信中にアプリごと止まらないようにする（ログに残して続ける）
   const onUnexpected = (e) => engine.log('error', `思わぬエラーが起きました（続けて動きます）: ${e?.stack ?? e}`);

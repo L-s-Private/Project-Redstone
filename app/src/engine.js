@@ -7,6 +7,7 @@ import { checkFeature, checkPresetSave, checkAdvancedRules, checkRules, CURRENT_
 import { describeEvent } from './rules.js';
 import { giftTable, Ranking } from './overlayData.js';
 import { Analytics } from './analytics.js';
+import { actionText, RulesHistory } from './history.js';
 import { TikTokSource } from './tiktok.js';
 
 const MAX_LOGS = 200;
@@ -14,6 +15,8 @@ const MAX_LOGS = 200;
 const RANKING_SAVE_DELAY_MS = 1000;
 /** 分析は数が多いので、まとめて保存する */
 const ANALYTICS_SAVE_DELAY_MS = 5000;
+/** 無料版で見られる、妨害の設定の履歴の数 */
+const FREE_HISTORY_ENTRIES = 3;
 
 const SKIP_MESSAGES = {
   no_rule: '対応する妨害がないので無視しました',
@@ -117,8 +120,9 @@ export class Engine extends EventEmitter {
    * plan: 無料版か有料版か（plan.js）。license があれば、そちらで決まる
    * license: 有料版のライセンスキー（license.js）
    * analytics / saveAnalytics: 保存しておいた配信ごとの分析（analytics.js）と、変わったときに保存する
+   * history / saveHistory: 保存しておいた妨害の設定の履歴（history.js）と、変わったときに保存する
    */
-  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {}, plan = CURRENT_PLAN, license = null, analytics = {}, saveAnalytics = async () => {} }) {
+  constructor({ config, client, tiktok, giftCatalog = null, now = Date.now, version = '', modVersion = '', ranking = {}, saveRanking = async () => {}, plan = CURRENT_PLAN, license = null, analytics = {}, saveAnalytics = async () => {}, history = {}, saveHistory = async () => {} }) {
     super();
     this.config = config;
     this.fixedPlan = plan;
@@ -145,6 +149,11 @@ export class Engine extends EventEmitter {
     this.writeAnalytics = saveAnalytics;
     this.analyticsTimer = null;
     this.analyticsWrite = Promise.resolve();
+    // 妨害の設定の履歴。はじめて使うときは、今のルールを「はじめの設定」として残す
+    this.history = new RulesHistory(history, now);
+    this.writeHistory = saveHistory;
+    this.historyWrite = Promise.resolve();
+    if (this.history.entries.length === 0 && this.history.record(config.rules, 'first')) this.saveHistory();
     // 画面用に作ったもの（ルールやギフト一覧が変わったときだけ作り直す）
     this.cache = {};
     this.statePending = false;
@@ -197,6 +206,28 @@ export class Engine extends EventEmitter {
         this.saveAnalytics();
       });
     });
+  }
+
+  /** 履歴を保存する（保存の順番が入れ替わらないよう、つなげて書く） */
+  saveHistory() {
+    const data = this.history.toJSON();
+    this.historyWrite = this.historyWrite.then(() => this.writeHistory(data)).catch(() => {});
+    return this.historyWrite;
+  }
+
+  /** 履歴の一覧（新しい順）。無料版は新しい3件まで（有料版は30件） */
+  historyList() {
+    const entries = this.history.list((rule) => actionText(rule, describeAction));
+    const full = planOf(this.plan).history;
+    return { full, total: entries.length, entries: full ? entries : entries.slice(0, FREE_HISTORY_ENTRIES) };
+  }
+
+  /** 履歴の1つのルール（画面で読み込んで、配信者が保存する） */
+  historyRules(id) {
+    const visible = this.historyList().entries.some((e) => e.id === id);
+    const entry = visible ? this.history.get(id) : null;
+    if (!entry) throw new Error('その履歴は見つかりません');
+    return { id: entry.id, time: entry.time, rules: entry.rules };
   }
 
   /** 分析を少し後でまとめて保存する */
@@ -396,12 +427,16 @@ export class Engine extends EventEmitter {
     this.emitState();
   }
 
-  /** ルールを入れ替える（設定画面から）。クールダウンもリセットする。プランの上限で断るときは Error を投げる */
-  setRules(rules) {
+  /**
+   * ルールを入れ替える（設定画面から）。クールダウンもリセットする。プランの上限で断るときは Error を投げる
+   * @param {string} [reason] 履歴に残すきっかけ（history.js の HISTORY_REASONS）
+   */
+  setRules(rules, reason = 'edit') {
     const problem = checkRules(this.plan, rules, this.config.rules.length) ?? checkAdvancedRules(this.plan, rules, this.config.rules);
     if (problem) throw new Error(problem);
     this.config.rules = rules;
     this.dispatcher.setRules(rules);
+    if (this.history.record(rules, reason)) this.saveHistory();
     this.log('ok', `妨害の設定を保存しました（ルール ${rules.length}件）`);
     this.emitState();
   }
@@ -597,7 +632,7 @@ export class Engine extends EventEmitter {
 
   async shutdown() {
     this.client.stop();
-    await Promise.all([this.tiktok.stop(), this.flushRanking(), this.flushAnalytics()]);
+    await Promise.all([this.tiktok.stop(), this.flushRanking(), this.flushAnalytics(), this.historyWrite]);
   }
 
   /** extra は画面で絵を出すための giftName・icon */

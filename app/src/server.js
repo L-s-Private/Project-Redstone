@@ -55,7 +55,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
         throw e;
       }
       try {
-        engine.setRules(rules);
+        engine.setRules(rules, typeof body.reason === 'string' ? body.reason : 'edit');
       } catch (e) {
         return { status: 400, error: e.message };
       }
@@ -214,6 +214,18 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
         return send(res, 200, engine.analyticsDetail(stream[1]));
       } catch (e) {
         return send(res, 400, { error: e.message });
+      }
+    }
+    // 妨害の設定の履歴（一覧と、1つの履歴のルール）
+    if (route === 'GET /api/history') {
+      return send(res, 200, engine.historyList());
+    }
+    const entry = route.match(/^GET \/api\/history\/([a-z0-9-]+)$/);
+    if (entry) {
+      try {
+        return send(res, 200, engine.historyRules(entry[1]));
+      } catch (e) {
+        return send(res, 404, { error: e.message });
       }
     }
     if (route === 'GET /api/gifts') {

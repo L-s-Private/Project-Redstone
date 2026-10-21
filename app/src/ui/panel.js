@@ -386,6 +386,18 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .gift-grid button:hover { background: var(--raised); border-color: var(--line); }
   .gift-grid small { color: var(--faint); font-variant-numeric: tabular-nums; }
 
+  /* ---- 妨害の設定の履歴 ---- */
+  .history-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: min(60vh, 520px); overflow-y: auto; }
+  .history-list > li { padding: 12px 2px; border-bottom: 1px solid var(--line-soft); }
+  .history-list > li:last-child { border-bottom: 0; }
+  .history-head { display: flex; align-items: center; gap: 10px; }
+  .history-head b { font-variant-numeric: tabular-nums; }
+  .history-head .grow { flex: 1; color: var(--muted); font-size: 12px; }
+  .history-head .now { font-size: 11px; color: var(--faint); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
+  .history-diff { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--muted); }
+  .history-diff li { padding: 1px 0; overflow-wrap: anywhere; }
+  .history-diff .mark { display: inline-block; width: 3.4em; color: var(--faint); }
+
   /* ---- 分析 ---- */
   .stream-list { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   .stream-list th { text-align: right; font-weight: 400; font-size: 11px; color: var(--faint); padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -586,6 +598,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <div class="page-head">
     <h1>妨害の設定</h1>
     <span class="dirty" id="dirty" hidden>保存していない変更があります</span>
+    <button class="lg ghost" id="openHistory" title="保存するたびに残している、前の設定を見て戻せます">変更の履歴</button>
     <button class="lg ghost" id="revertRules">元に戻す</button>
     <button class="lg next" id="saveRules">保存する</button>
   </div>
@@ -826,7 +839,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <li>TikTok のパスワードやログインは使いません。入れるのは TikTok ID だけです</li>
           <li>TikTok LIVE には、非公式のしくみ（tiktok-live-connector）でつなぎます。つなぐとき、TikTok ID が外部のサービス Euler Stream（eulerstream.com）に送られます</li>
           <li>ギフトの一覧は TikTok から、マイクラの準備に使うものは Fabric と Modrinth から取ってきます</li>
-          <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、配信ごとの分析（直近30日分。視聴者の名前とコイン数を含む）、ログ（視聴者の名前と届いたギフト）</li>
+          <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、妨害の設定の変更の履歴（30件）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、配信ごとの分析（直近30日分。視聴者の名前とコイン数を含む）、ログ（視聴者の名前と届いたギフト）</li>
           <li>これらを作者などに送ることはありません</li>
           <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\\ProjectRedstone</code> を消してください。設定・ログ・ランキング・分析がすべて消えます</li>
         </ul>
@@ -901,6 +914,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <button id="editorCancel">やめる</button>
     <button class="next" id="editorOk">決定</button>
   </div>
+</dialog>
+
+<dialog id="historyDialog" style="width: min(640px, calc(100vw - 32px));">
+  <h2>妨害の設定の変更の履歴</h2>
+  <p class="hint" style="margin: 0 0 6px;">「保存する」を押すたびに残しています（新しい順）。読み込むと、その時の設定に入れ替わります。「保存する」を押すまでは確定しません。</p>
+  <p class="hint" id="historyPlusNote" hidden></p>
+  <ul class="history-list" id="historyList"></ul>
+  <div class="wizard-actions" style="justify-content: flex-end;"><button id="historyClose">閉じる</button></div>
 </dialog>
 
 <dialog id="presetDialog" style="width: min(420px, calc(100vw - 32px));">
@@ -1893,18 +1914,81 @@ export const PANEL_HTML = String.raw`<!doctype html>
     });
   }
   $('statsReload').addEventListener('click', () => loadStreams());
+  // 履歴に残す「何で変えたか」（プリセット・履歴から読み込んだあと、そのまま保存したとき）
+  let pendingReason = 'edit';
   $('revertRules').addEventListener('click', () => {
     savedRulesKey = '';
+    pendingReason = 'edit';
     loadRules(state.rules);
   });
   async function saveRules(list) {
-    const data = await post('/api/rules', { rules: sortedRules(list) }, { button: $('saveRules'), done: '妨害の設定を保存しました' });
+    const data = await post('/api/rules', { rules: sortedRules(list), reason: pendingReason }, { button: $('saveRules'), done: '妨害の設定を保存しました' });
     if (data?.ok) {
       savedRulesKey = '';
+      pendingReason = 'edit';
       loadRules(data.state.rules);
       return true;
     }
     return false;
+  }
+
+  // ---- 妨害の設定の履歴 ----
+  $('openHistory').addEventListener('click', async () => {
+    let data;
+    try {
+      const res = await fetch('/api/history');
+      data = await res.json();
+    } catch {
+      toast('履歴を読めませんでした');
+      return;
+    }
+    $('historyPlusNote').hidden = data.full;
+    $('historyPlusNote').textContent = '無料版では新しい3件まで見られます。30件までさかのぼるのは ' + PLUS_NAME + ' の機能です';
+    const when = (t) => new Date(t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    $('historyList').replaceChildren(...data.entries.map((entry, i) => {
+      const head = el('div', 'history-head', el('b', '', when(entry.time)), el('span', 'grow', entry.reasonText + '・ルール ' + entry.count + '件'));
+      if (i === 0) {
+        head.append(el('span', 'now', '今の設定'));
+      } else {
+        const load = Object.assign(el('button', '', 'この設定を読み込む'), { type: 'button' });
+        load.addEventListener('click', () => restoreHistory(entry, when(entry.time)));
+        head.append(load);
+      }
+      const lines = [];
+      if (entry.diff) {
+        for (const [mark, list] of [['増えた', entry.diff.added], ['消えた', entry.diff.removed], ['変えた', entry.diff.changed]]) {
+          for (const text of list) lines.push(el('li', '', el('span', 'mark', mark), text));
+        }
+        if (lines.length === 0) lines.push(el('li', '', '並び順だけ変えました'));
+      } else {
+        lines.push(el('li', '', 'これより前の記録はありません'));
+      }
+      return el('li', '', head, el('ul', 'history-diff', ...lines));
+    }));
+    $('historyDialog').showModal();
+  });
+  $('historyClose').addEventListener('click', () => $('historyDialog').close());
+
+  async function restoreHistory(entry, label) {
+    if (rulesDirty) {
+      const ok = await askConfirm({ title: '保存していない変更があります', text: '読み込むと、今の画面の変更はなくなります。', ok: '読み込む' });
+      if (!ok) return;
+    }
+    let data;
+    try {
+      const res = await fetch('/api/history/' + encodeURIComponent(entry.id));
+      data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+    } catch (e) {
+      toast(e.message || '読めませんでした');
+      return;
+    }
+    rows = data.rules.map(toRow);
+    pendingReason = 'restore';
+    setDirty(true);
+    renderRows();
+    $('historyDialog').close();
+    toast(label + ' の設定を読み込みました。よければ「保存する」を押してください');
   }
   $('saveRules').addEventListener('click', () => saveRules(rows));
   // Ctrl+S で保存（妨害の設定の画面を開いているとき）
@@ -2029,6 +2113,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     });
     if (!ok) return;
     rows = preset.rules.map(toRow);
+    pendingReason = 'preset';
     setDirty(true);
     renderRows();
     toast('「' + preset.name + '」を読み込みました。よければ「保存する」を押してください');

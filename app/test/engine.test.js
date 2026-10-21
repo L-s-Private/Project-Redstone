@@ -411,3 +411,21 @@ test('分析: TikTok の本物のイベントと結果を配信ごとに数え�
   assert.deepEqual([list.full, list.total, list.streams.length], [false, 2, 1], '無料版は直近の配信だけ（記録は続ける）');
   assert.throws(() => free.engine.analyticsDetail(list.streams[0].id), /Creator Plus/);
 });
+
+test('妨害の設定の履歴: はじめの設定を残し、保存するたびに足す。無料版は新しい3件まで', async () => {
+  const saved = [];
+  const { engine } = setup({}, { saveHistory: async (data) => saved.push(data) });
+  engine.setRules([{ gift: 'Rose', action: 'tnt', count: 5 }], 'restore');
+  const { entries } = engine.historyList();
+  assert.deepEqual(entries.map((e) => e.reason), ['restore', 'first']);
+  assert.deepEqual(entries[0].diff.changed, ['Rose: TNT ×2 → TNT ×5'], '妨害の名前は画面と同じ');
+  assert.deepEqual(engine.historyRules(entries[1].id).rules, [{ gift: 'Rose', action: 'tnt', count: 2 }]);
+  await engine.shutdown();
+  assert.equal(saved.at(-1).entries.length, 2);
+
+  const free = setup({}, { plan: 'free' });
+  for (let i = 1; i <= 4; i++) free.engine.setRules([{ gift: 'Rose', action: 'tnt', count: i + 2 }]);
+  const list = free.engine.historyList();
+  assert.deepEqual([list.full, list.total, list.entries.length], [false, 5, 3]);
+  assert.throws(() => free.engine.historyRules(free.engine.history.entries[0].id), /見つかりません/, '見えない古いものは戻せない');
+});

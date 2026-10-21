@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { Dispatcher } from './dispatcher.js';
 import { ModClient } from './modClient.js';
-import { parseFill, parseWorld, parsePreset } from './config.js';
+import { DEFAULT_OVERLAY_STYLE, parseFill, parseOverlayStyle, parseWorld, parsePreset } from './config.js';
 import { BUILTIN_PRESETS, MAX_PRESET_NAME } from './presets.js';
 import { checkFeature, checkPresetSave, checkRules, CURRENT_PLAN, planOf } from './plan.js';
 import { describeEvent } from './rules.js';
@@ -225,6 +225,9 @@ export class Engine extends EventEmitter {
       presets: { builtin: BUILTIN_PRESETS, mine: this.config.presets ?? [] },
       plan: planOf(this.plan),
       license: this.license?.status() ?? { enabled: false, state: 'disabled' },
+      // 配信画面の部品の見た目。無料版では、保存してあっても既定の見た目で出す（設定は消さない）
+      overlayStyle: planOf(this.plan).overlayStyle ? this.config.overlay ?? DEFAULT_OVERLAY_STYLE : DEFAULT_OVERLAY_STYLE,
+      savedOverlayStyle: this.config.overlay ?? DEFAULT_OVERLAY_STYLE,
       testButtons: this.cached('testButtons', [this.config.rules], () => testButtons(this.config.rules)),
       recentGifts: this.recentGifts,
       // 配信画面（オーバーレイ）用
@@ -272,6 +275,14 @@ export class Engine extends EventEmitter {
   async deactivateLicense() {
     await this.license?.deactivate();
     this.log('info', 'この PC での有料版の有効化を解除しました。設定はそのまま残っています');
+    this.emitState();
+  }
+
+  /** 配信画面の部品の見た目を変える（有料版の機能）。渡した項目だけ変わる。reset なら既定に戻す */
+  setOverlayStyle(style, { reset = false } = {}) {
+    const problem = checkFeature(this.plan, 'overlayStyle', '配信画面の見た目の変更');
+    if (problem) throw new Error(problem);
+    this.config.overlay = reset ? { ...DEFAULT_OVERLAY_STYLE } : parseOverlayStyle({ ...this.config.overlay, ...style });
     this.emitState();
   }
 

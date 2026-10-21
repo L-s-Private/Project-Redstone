@@ -70,6 +70,14 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       }
       await saveConfig(engine.config);
     },
+    'POST /api/overlay/style': async (body) => {
+      try {
+        engine.setOverlayStyle(body.style ?? {}, { reset: body.reset === true });
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+      await saveConfig(engine.config);
+    },
     'POST /api/license/activate': async (body) => {
       try {
         await engine.activateLicense(body.key);

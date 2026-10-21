@@ -369,3 +369,19 @@ test('ライセンスがあれば、プランはライセンスと TikTok ID で
   engine.config.tiktokUsername = 'hanako';
   assert.equal(engine.state.plan.id, 'free');
 });
+
+test('配信画面の見た目: 有料版では変えた見た目、無料版では保存してあっても既定の見た目で出す', async () => {
+  const { DEFAULT_OVERLAY_STYLE } = await import('../src/config.js');
+  const plus = setup();
+  plus.engine.setOverlayStyle({ textColor: '#FF0000', alertSeconds: 99, font: 'unknown' });
+  assert.equal(plus.engine.state.overlayStyle.textColor, '#ff0000');
+  assert.equal(plus.engine.state.overlayStyle.alertSeconds, 15, '上限で丸める');
+  assert.equal(plus.engine.state.overlayStyle.font, 'gothic', '知らない文字の形は既定');
+  plus.engine.setOverlayStyle({}, { reset: true });
+  assert.deepEqual(plus.engine.state.overlayStyle, DEFAULT_OVERLAY_STYLE);
+
+  const free = setup({ overlay: { ...DEFAULT_OVERLAY_STYLE, textColor: '#00ff00' } }, { plan: 'free' });
+  assert.deepEqual(free.engine.state.overlayStyle, DEFAULT_OVERLAY_STYLE);
+  assert.equal(free.engine.state.savedOverlayStyle.textColor, '#00ff00', '設定は消さない');
+  assert.throws(() => free.engine.setOverlayStyle({ textColor: '#000000' }), /Creator Plus の機能/);
+});

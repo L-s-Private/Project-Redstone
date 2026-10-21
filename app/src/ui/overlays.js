@@ -1,6 +1,7 @@
 // 配信画面（オーバーレイ）の部品。LIVE Studio に「リンク」のソースとして1つずつ貼る（縦画面向け）。
 // 背景は透明。文字や絵の大きさは枠の大きさに合わせて変わる（単位 --u。page() を参照）ので、LIVE Studio で枠を大きくすればそのまま大きくなる。
 // URL の最後に #demo を付けると、試しのデータで動く（操作画面のプレビュー用）。
+import { DEFAULT_OVERLAY_STYLE, OVERLAY_FONTS } from '../config.js';
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
 
 /** 部品の一覧。size は縦画面（1080×1920）に置くときのおすすめの大きさ */
@@ -13,23 +14,31 @@ export const OVERLAY_WIDGETS = [
 
 const widgetSize = (id) => OVERLAY_WIDGETS.find((w) => w.id === id).size;
 
+/** 見た目の既定値（操作画面と同じグレー）。applyStyle で上書きする */
+const STYLE_VARS = (() => {
+  const s = DEFAULT_OVERLAY_STYLE;
+  const rgb = [1, 3, 5].map((i) => parseInt(s.panelColor.slice(i, i + 2), 16)).join(', ');
+  return `--ov-text: ${s.textColor}; --ov-accent: ${s.accentColor}; --ov-panel-rgb: ${rgb}; --ov-panel-alpha: ${s.panelOpacity / 100}; `
+    + `--ov-font: ${OVERLAY_FONTS[s.font]}; --ov-muted: color-mix(in srgb, var(--ov-text) 68%, transparent);`;
+})();
+
 const BASE_CSS = String.raw`
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
   /* 操作画面と同じグレー。ゲーム画面の上でも読めるよう、濃いグレーの面に白い文字 */
   body {
-    font: 700 calc(4.4 * var(--u))/1.3 "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
-    font-feature-settings: "palt"; color: #ededed;
+    font: 700 calc(4.4 * var(--u))/1.3 var(--ov-font);
+    font-feature-settings: "palt"; color: var(--ov-text);
   }
   .panel {
-    background: rgba(20, 20, 22, .88); border: 1px solid rgba(255, 255, 255, .13); border-radius: calc(2.6 * var(--u));
+    background: rgba(var(--ov-panel-rgb), var(--ov-panel-alpha)); border: 1px solid rgba(255, 255, 255, .13); border-radius: calc(2.6 * var(--u));
     box-shadow: 0 calc(1 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, .4);
   }
-  .muted { color: #a5a5ab; }
+  .muted { color: var(--ov-muted); }
   .num { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
   .gift-img { object-fit: contain; display: block; }
   .badge {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
-    border-radius: 22%; background: rgba(255, 255, 255, .1); color: #ededed;
+    border-radius: 22%; background: rgba(255, 255, 255, .1); color: var(--ov-text);
   }
   .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   /* 2行まで折り返す（それでも入らなければ fitText で小さくする） */
@@ -84,9 +93,25 @@ const BASE_JS = String.raw`
   /** アプリにつなぐ（つながらなければ自動でつなぎ直す） */
   function connect({ onState, onAlert }) {
     const events = new EventSource('/events');
-    events.addEventListener('snapshot', (e) => onState(JSON.parse(e.data).state));
-    events.addEventListener('state', (e) => onState(JSON.parse(e.data)));
+    const handle = (state) => {
+      applyStyle(state.overlayStyle);
+      onState(state);
+    };
+    events.addEventListener('snapshot', (e) => handle(JSON.parse(e.data).state));
+    events.addEventListener('state', (e) => handle(JSON.parse(e.data)));
     if (onAlert) events.addEventListener('alert', (e) => onAlert(JSON.parse(e.data)));
+  }
+  /** 見た目の設定（色・文字の形・通知の時間と数）を入れる */
+  function applyStyle(style) {
+    if (!style) return;
+    STYLE = style;
+    const root = document.documentElement.style;
+    const hex = style.panelColor.slice(1);
+    root.setProperty('--ov-text', style.textColor);
+    root.setProperty('--ov-accent', style.accentColor);
+    root.setProperty('--ov-panel-rgb', [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', '));
+    root.setProperty('--ov-panel-alpha', String(style.panelOpacity / 100));
+    root.setProperty('--ov-font', FONTS[style.font] ?? FONTS.gothic);
   }
 `;
 
@@ -101,15 +126,19 @@ function page({ title, size, css, body, script }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
-<style>:root { --u: min(1vw, calc(1vh * ${size[0]} / ${size[1]})); }${BASE_CSS}${MC_ICON_CSS}${css}
+<style>:root { --u: min(1vw, calc(1vh * ${size[0]} / ${size[1]})); ${STYLE_VARS} }${BASE_CSS}${MC_ICON_CSS}${css}
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 ${body}
 <script>
+const FONTS = ${JSON.stringify(OVERLAY_FONTS)};
+let STYLE = ${JSON.stringify(DEFAULT_OVERLAY_STYLE)};
 ${MC_ICON_JS}
 ${BASE_JS}
+// 試し表示（#demo）でも、見た目の設定だけは操作画面から受け取って、変えたらすぐ映す
+if (DEMO) connect({ onState: () => {} });
 ${script}
 </script>
 </body>
@@ -143,7 +172,7 @@ const ALERTS = page({
   .who { font-size: calc(4.2 * var(--u)); }
   .gift-name { font-size: calc(4.6 * var(--u)); margin-top: calc(.4 * var(--u)); }
   .gift-name .num { margin-left: calc(1 * var(--u)); }
-  .what { display: flex; align-items: center; gap: calc(2.4 * var(--u)); margin-top: calc(1.6 * var(--u)); font-size: calc(8.4 * var(--u)); line-height: 1.1; color: #fff; }
+  .what { display: flex; align-items: center; gap: calc(2.4 * var(--u)); margin-top: calc(1.6 * var(--u)); font-size: calc(8.4 * var(--u)); line-height: 1.1; color: var(--ov-text); }
   .what .mc { --s: calc(9 * var(--u)); }
   @keyframes pop { from { transform: translateY(calc(-4 * var(--u))) scale(.6); opacity: 0; filter: blur(6px); } to { transform: none; opacity: 1; filter: none; } }
   @keyframes glow { from { box-shadow: 0 0 0 calc(.6 * var(--u)) rgba(255, 255, 255, .55), 0 calc(1 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, .4); } to { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 calc(1 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, .4); } }
@@ -152,8 +181,7 @@ const ALERTS = page({
 `,
   body: '<div id="stack"></div>',
   script: String.raw`
-  const SHOW_MS = 5500;
-  const MAX_VISIBLE = 3;
+  // 出しておく時間と同時に出す数は、見た目の設定（STYLE）で変えられる
   /** 前の通知が下へずれる・消える速さ */
   const SLIDE_MS = 450;
   const EASE = 'cubic-bezier(.2, .8, .3, 1)';
@@ -196,13 +224,13 @@ const ALERTS = page({
     shown().slice(1).forEach((c, i) => {
       const offset = before.get(c) - c.getBoundingClientRect().top;
       // 3件より多い・枠の下にはみ出すものは、下へ抜けながら消す（いちばん新しいものは必ず残す）
-      if (i + 1 >= MAX_VISIBLE || c.offsetTop + c.offsetHeight > stack.clientHeight) {
+      if (i + 1 >= STYLE.alertMax || c.offsetTop + c.offsetHeight > stack.clientHeight) {
         dismiss(c, offset);
         return;
       }
       if (offset) c.animate([{ transform: 'translateY(' + offset + 'px)' }, { transform: 'none' }], { duration: SLIDE_MS, easing: EASE });
     });
-    setTimeout(() => dismiss(card), SHOW_MS);
+    setTimeout(() => dismiss(card), STYLE.alertSeconds * 1000);
   }
   if (DEMO) {
     demoGiftImages().then((images) => {
@@ -253,13 +281,13 @@ const GIFTS = page({
   .tile.gift .gift-img { width: calc(var(--t) * .4); height: calc(var(--t) * .4); }
   .tile .label { width: 100%; font-size: calc(var(--t) * .105); line-height: 1.2; margin-top: calc(var(--t) * .02); }
   .tile .label small { font-size: .8em; margin-left: .25em; font-weight: 600; }
-  .tile .arrow { color: #77777d; font-size: calc(var(--t) * .05); line-height: 1; }
+  .tile .arrow { color: var(--ov-muted); font-size: calc(var(--t) * .05); line-height: 1; }
   .tile .mc { --s: calc(var(--t) * .24); }
-  .tile .action { width: 100%; font-size: calc(var(--t) * .115); line-height: 1.15; color: #fff; margin-top: calc(var(--t) * .02); }
+  .tile .action { width: 100%; font-size: calc(var(--t) * .115); line-height: 1.15; color: var(--ov-text); margin-top: calc(var(--t) * .02); }
   #dots { display: flex; justify-content: center; gap: calc(.8 * var(--u)); margin-top: calc(1 * var(--u)); }
   #dots:empty { display: none; }
   #dots i { width: calc(.9 * var(--u)); height: calc(.9 * var(--u)); border-radius: 50%; background: rgba(255, 255, 255, .25); }
-  #dots i.on { background: #ededed; }
+  #dots i.on { background: var(--ov-text); }
 `,
   body: String.raw`<div id="box" class="panel" hidden>
   <header><h1>ギフトで妨害</h1><small class="muted">連打すると数も増える</small></header>
@@ -367,26 +395,26 @@ const ROUND = page({
   .top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: calc(4 * var(--u)); }
   .round small { display: block; font-size: calc(3.4 * var(--u)); letter-spacing: .12em; }
   .round b { font-size: calc(10 * var(--u)); line-height: 1; }
-  .round b span { font-size: calc(5.4 * var(--u)); color: #a5a5ab; margin-left: calc(.6 * var(--u)); }
+  .round b span { font-size: calc(5.4 * var(--u)); color: var(--ov-muted); margin-left: calc(.6 * var(--u)); }
   #status { font-size: calc(5 * var(--u)); padding-bottom: calc(1 * var(--u)); }
   #percent { font-size: calc(10 * var(--u)); line-height: 1; }
   .bar { height: calc(2.4 * var(--u)); border-radius: calc(1.2 * var(--u)); background: rgba(255, 255, 255, .14); overflow: hidden; margin-top: calc(3 * var(--u)); }
-  .bar div { height: 100%; width: 0; background: #ededed; transition: width .5s ease-out; }
-  #box.countdown .bar div, #box.cleared .bar div { background: #6fbf8e; }
-  #box.countdown { border-color: rgba(111, 191, 142, .7); }
+  .bar div { height: 100%; width: 0; background: var(--ov-text); transition: width .5s ease-out; }
+  #box.countdown .bar div, #box.cleared .bar div { background: var(--ov-accent); }
+  #box.countdown { border-color: color-mix(in srgb, var(--ov-accent) 70%, transparent); }
   /* カウントダウン: 数字を大きく */
   #count {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center; gap: calc(4 * var(--u));
-    background: rgba(20, 20, 22, .94);
+    background: rgba(var(--ov-panel-rgb), .94);
   }
   #box.countdown #count { display: flex; }
-  #count b { font-size: calc(22 * var(--u)); line-height: 1; color: #8fd3a8; }
+  #count b { font-size: calc(22 * var(--u)); line-height: 1; color: var(--ov-accent); }
   #count b.tick { animation: tick .6s cubic-bezier(.2, 1.5, .4, 1); }
   #count span { font-size: calc(5.6 * var(--u)); }
   /* クリアの演出 */
   #clear {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
-    background: rgba(20, 20, 22, .95); overflow: hidden;
+    background: rgba(var(--ov-panel-rgb), .95); overflow: hidden;
   }
   #clear.on { display: flex; }
   #clear b { font-size: calc(12 * var(--u)); line-height: 1.05; letter-spacing: .02em; animation: slam .6s cubic-bezier(.2, 1.6, .4, 1) both; }
@@ -446,7 +474,7 @@ const ROUND = page({
     $('clearSub').textContent = all ? fill.rounds + 'ラウンド全部クリア！' : fill.round + ' / ' + fill.rounds + ' クリア';
     const box = $('clear');
     box.querySelectorAll('i').forEach((i) => i.remove());
-    const colors = ['#ffffff', '#cfcfd4', '#8fd3a8', '#a5a5ab'];
+    const colors = ['#ffffff', '#cfcfd4', STYLE.accentColor, STYLE.textColor];
     for (let n = 0; n < (all ? 60 : 32); n++) {
       const piece = document.createElement('i');
       piece.style.left = Math.random() * 100 + '%';
@@ -494,7 +522,7 @@ const RANKING = page({
     padding: calc(2 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)); border-radius: calc(2 * var(--u)); background: rgba(255, 255, 255, .05);
   }
   .rank { width: calc(11 * var(--u)); height: calc(11 * var(--u)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: calc(6 * var(--u)); background: rgba(255, 255, 255, .1); }
-  .row:first-child .rank { background: #ededed; color: #111; }
+  .row:first-child .rank { background: var(--ov-text); color: rgb(var(--ov-panel-rgb)); }
   .row:first-child { background: rgba(255, 255, 255, .1); }
   .name { font-size: calc(5.6 * var(--u)); }
   .coins { font-size: calc(5.4 * var(--u)); }

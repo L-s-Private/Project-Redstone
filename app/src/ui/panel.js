@@ -120,6 +120,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   input:hover, select:hover { border-color: #3a3a3a; }
   input:focus, select:focus { outline: none; border-color: var(--text); }
   input[type="number"] { font-variant-numeric: tabular-nums; }
+  input[type="color"] { height: 38px; padding: 3px; cursor: pointer; }
   .row { display: flex; gap: 8px; }
   .row > * { min-width: 0; }
   .row > button { flex: none; }
@@ -573,6 +574,21 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <h2>配信画面に出す部品</h2>
       <p class="lead" style="margin-bottom: 0;">TikTok LIVE Studio で「ソースを追加」→「リンク」を選び、下の URL を貼ります。部品ごとに別々に貼れるので、好きな位置・大きさに置いてください（大きさは縦画面 1080×1920 のときのおすすめです。枠を大きくすると、文字や絵も大きくなります）。下の絵は試しの表示です。</p>
     </section>
+    <section class="card" id="styleCard" hidden>
+      <div class="card-head"><h2>見た目</h2><button class="ghost" id="styleReset">元に戻す</button></div>
+      <p class="lead">4つの部品すべてに効きます。変えると、すぐ配信画面と下の試し表示に映ります。大きさと位置は、LIVE Studio で枠を動かして変えてください。</p>
+      <div class="fields" id="styleFields">
+        <div><label for="styleText">文字の色</label><input type="color" id="styleText" data-style="textColor"></div>
+        <div><label for="styleAccent">強調の色（カウントダウンなど）</label><input type="color" id="styleAccent" data-style="accentColor"></div>
+        <div><label for="stylePanel">面の色</label><input type="color" id="stylePanel" data-style="panelColor"></div>
+        <div><label for="styleOpacity">面の濃さ（%・0 で透明）</label><input type="number" id="styleOpacity" min="0" max="100" step="5" data-style="panelOpacity"></div>
+        <div><label for="styleFont">文字の形</label><select id="styleFont" data-style="font">
+          <option value="gothic">游ゴシック（ふつう）</option><option value="meiryo">メイリオ</option><option value="ud">BIZ UDPゴシック（読みやすい）</option><option value="mincho">游明朝</option>
+        </select></div>
+        <div><label for="styleSeconds">ギフト通知を出しておく秒数</label><input type="number" id="styleSeconds" min="2" max="15" step="0.5" data-style="alertSeconds"></div>
+        <div><label for="styleMax">ギフト通知を同時に出す数</label><input type="number" id="styleMax" min="1" max="5" data-style="alertMax"></div>
+      </div>
+    </section>
     <div class="widgets" id="widgets"></div>
   </div>
 </main>
@@ -931,6 +947,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     if (!rulesDirty) loadRules(state.rules);
     renderPresets();
     renderLicense();
+    renderStyle();
     renderRecent();
     if (!wizardChecked) {
       wizardChecked = true;
@@ -1532,6 +1549,27 @@ export const PANEL_HTML = String.raw`<!doctype html>
     });
     $('presets').replaceChildren(...state.presets.builtin.map((p) => chip(p, p.description)), ...mine, save);
   }
+
+  // ---- 配信画面の見た目（有料版の機能） ----
+  function renderStyle() {
+    $('styleCard').hidden = !state.plan?.overlayStyle;
+    const saved = state.savedOverlayStyle;
+    if (!saved) return;
+    for (const input of document.querySelectorAll('[data-style]')) {
+      // 入力中のものは上書きしない
+      if (document.activeElement !== input) input.value = String(saved[input.dataset.style]);
+    }
+  }
+  $('styleFields').addEventListener('change', (e) => {
+    const key = e.target.dataset?.style;
+    if (!key) return;
+    const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
+    post('/api/overlay/style', { style: { [key]: value } });
+  });
+  $('styleReset').addEventListener('click', async () => {
+    const ok = await askConfirm({ title: '見た目を元に戻しますか？', text: '色・文字の形・通知の秒数と数が、はじめの設定に戻ります。', ok: '元に戻す' });
+    if (ok) post('/api/overlay/style', { reset: true }, { done: '見た目を元に戻しました' });
+  });
 
   // ---- 有料版のライセンス（販売を始めるまでは出さない） ----
   function renderLicense() {

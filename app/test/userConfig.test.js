@@ -23,7 +23,7 @@ test('初回は設定例から作り、保存した内容を次回読める', as
   const second = await loadUserConfig(dir);
   assert.equal(second.created, false);
   assert.equal(second.config.tiktokUsername, 'taro');
-  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'fill', 'world', 'rules', 'presets']);
+  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'fill', 'world', 'rules', 'presets', 'overlay']);
 });
 
 test('ワールドの設定と自分のプリセットも保存して、次回読める', async () => {

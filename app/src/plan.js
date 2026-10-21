@@ -4,9 +4,9 @@
 // 上限を超えた設定は消さない。新しく足すことだけを断る（仕様書 10番の5）。
 
 export const PLANS = {
-  // importExport: 設定をファイルに書き出す・読み込む
-  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12, importExport: false },
-  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50, importExport: true },
+  // importExport: 設定をファイルに書き出す・読み込む / overlayStyle: 配信画面の部品の見た目を変える
+  free: { id: 'free', name: '無料版', userPresets: 1, rulesPerPreset: 12, importExport: false, overlayStyle: false },
+  plus: { id: 'plus', name: 'Creator Plus', userPresets: 20, rulesPerPreset: 50, importExport: true, overlayStyle: true },
 };
 
 /**

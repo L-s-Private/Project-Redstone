@@ -40,6 +40,38 @@ export function parseWorld(raw = {}) {
   };
 }
 
+/** 配信画面の部品の文字の形（Windows に入っているもの） */
+export const OVERLAY_FONTS = {
+  gothic: '"Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif',
+  meiryo: 'Meiryo, "Yu Gothic UI", system-ui, sans-serif',
+  ud: '"BIZ UDPGothic", "Yu Gothic UI", system-ui, sans-serif',
+  mincho: '"Yu Mincho", "Hiragino Mincho ProN", serif',
+};
+/** 配信画面の部品の見た目（有料版で変えられる）。既定は操作画面と同じグレー */
+export const DEFAULT_OVERLAY_STYLE = {
+  textColor: '#ededed', accentColor: '#6fbf8e', panelColor: '#141416', panelOpacity: 88, font: 'gothic', alertSeconds: 5.5, alertMax: 3,
+};
+
+/** 配信画面の部品の見た目を読む。おかしな値は既定値にする */
+export function parseOverlayStyle(raw = {}) {
+  const style = raw && typeof raw === 'object' ? raw : {};
+  const color = (value, fallback) => (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fallback);
+  const num = (value, fallback, min, max, step) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n / step) * step)) : fallback;
+  };
+  const d = DEFAULT_OVERLAY_STYLE;
+  return {
+    textColor: color(style.textColor, d.textColor),
+    accentColor: color(style.accentColor, d.accentColor),
+    panelColor: color(style.panelColor, d.panelColor),
+    panelOpacity: num(style.panelOpacity, d.panelOpacity, 0, 100, 1),
+    font: Object.hasOwn(OVERLAY_FONTS, style.font) ? style.font : d.font,
+    alertSeconds: num(style.alertSeconds, d.alertSeconds, 2, 15, 0.5),
+    alertMax: num(style.alertMax, d.alertMax, 1, 5, 1),
+  };
+}
+
 /** 埋め立ての設定を読む。おかしな値は既定値にする（設定ファイルが壊れても起動できるように） */
 export function parseFill(raw = {}) {
   const int = (value, fallback, min, max) => {
@@ -107,7 +139,7 @@ export function parseConfig(raw) {
   const rules = raw.rules.map((rule, i) => validateRule(rule, i + 1));
 
   return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules, fill: parseFill(raw.fill), world: parseWorld(raw.world),
-    presets: parsePresets(raw.presets) };
+    presets: parsePresets(raw.presets), overlay: parseOverlayStyle(raw.overlay) };
 }
 
 /** 自分で保存したプリセット（[{name, rules}]）。壊れているものは捨てる */

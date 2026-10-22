@@ -1,4 +1,4 @@
-import { buildAction, conditionHolds, findRuleIndex, pickChoice, RANDOM_ACTION } from './rules.js';
+import { buildAction, COMMENT_VIEWER_COOLDOWN_SEC, conditionHolds, findRuleIndex, pickChoice, RANDOM_ACTION } from './rules.js';
 import { modeProblem, TERRAIN_SAFE_ACTIONS } from './mining.js';
 
 /**
@@ -24,6 +24,8 @@ export class Dispatcher {
     this.lastFiredAt = new Map();
     // いいねのルールごとの、たまっている回数
     this.likeProgress = new Map();
+    // コメントのルールを、同じ人が最後に出した時刻（「ルールの番号:人」→ 時刻）
+    this.commentLast = new Map();
     this.stats = { received: 0, sent: 0, skipped: 0, failed: 0 };
   }
 
@@ -33,6 +35,27 @@ export class Dispatcher {
     this.lastFiredAt.clear();
     this.likeProgress.clear();
     this.lastChoice.clear();
+    this.commentLast.clear();
+  }
+
+  /**
+   * コメントを妨害につなげるか。言葉が合うルールがなく、同じ人が少し前に同じルールを出していれば false（ログにも出さない）。
+   * コメントはとても多いので、関係ないものは数えもしない。テスト送信は待たせない
+   */
+  takeComment(event) {
+    const index = findRuleIndex(this.rules, event, this.game());
+    if (index === -1) return false;
+    if (event.test) return true;
+    const key = index + ':' + (event.user || event.from);
+    const now = this.now();
+    const last = this.commentLast.get(key);
+    if (last !== undefined && now - last < COMMENT_VIEWER_COOLDOWN_SEC * 1000) return false;
+    this.commentLast.set(key, now);
+    // 長い配信でたまりすぎないよう、古いものを捨てる
+    if (this.commentLast.size > 5000) {
+      for (const [k, t] of this.commentLast) if (now - t >= COMMENT_VIEWER_COOLDOWN_SEC * 1000) this.commentLast.delete(k);
+    }
+    return true;
   }
 
   /**

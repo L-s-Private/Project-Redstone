@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { normalizeGift, normalizeLike, normalizeSocial } from './gifts.js';
+import { normalizeComment, normalizeGift, normalizeLike, normalizeSocial } from './gifts.js';
 
 const RETRY_OFFLINE_MS = 30000;
 const RETRY_DISCONNECTED_MS = 5000;
@@ -52,6 +52,7 @@ export class TikTokSource extends EventEmitter {
     connection.on(WebcastEvent.FOLLOW, (msg) => isCurrent() && this.emit('event', normalizeSocial('follow', msg)));
     connection.on(WebcastEvent.SHARE, (msg) => isCurrent() && this.emit('event', normalizeSocial('share', msg)));
     connection.on(WebcastEvent.LIKE, (msg) => isCurrent() && this.emit('event', normalizeLike(msg)));
+    connection.on(WebcastEvent.CHAT, (msg) => isCurrent() && this.emit('event', normalizeComment(msg)));
     connection.on(WebcastEvent.STREAM_END, () => isCurrent() && this.log('info', '配信が終了しました'));
     connection.on(ControlEvent.DISCONNECTED, () => {
       if (!isCurrent() || this.status.state !== 'connected') return;

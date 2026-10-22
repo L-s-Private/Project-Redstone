@@ -1,7 +1,7 @@
 // 操作画面。exe に入れるため、HTML ごと文字列で持つ。
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
 import { CONTROLS_CSS, CONTROLS_JS } from './controls.js';
-import { MAX_CHOICES, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
+import { COMMENT_VIEWER_COOLDOWN_SEC, MAX_CHOICES, MAX_COMMENT_WORD, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
 import { PLANS } from '../plan.js';
 import { OVERLAY_WIDGETS } from './overlays.js';
 import { BRAND, KEY_ART } from '../assets.js';
@@ -660,6 +660,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   @keyframes rule-flash { 0%, 35% { background: var(--hover); box-shadow: inset 0 0 0 1px var(--text); } 100% { box-shadow: inset 0 0 0 1px transparent; } }
   .ed-side-fields { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
   .ed-side-fields:empty { display: none; }
+  .trigger-note { flex-basis: 100%; color: var(--muted); font-size: 12px; line-height: 1.6; }
   .media-field { gap: 8px; }
   .media-slot { display: flex; align-items: center; gap: 8px; min-height: 40px; }
   .media-kind { width: 5.5em; flex: none; font-size: 12px; color: var(--muted); font-weight: 400; }
@@ -2057,6 +2058,7 @@ ${CONTROLS_JS}
     else if (a.kind === 'like') src.append(el('span', 'trigger-icon', '❤'), el('span', '', 'いいね ' + a.likes + '回'));
     else if (a.kind === 'follow') src.append(el('span', 'trigger-icon', '＋'), el('b', '', who), el('span', 'muted', 'がフォロー'));
     else if (a.kind === 'share') src.append(el('span', 'trigger-icon', '↗'), el('b', '', who), el('span', 'muted', 'がシェア'));
+    else if (a.kind === 'comment') src.append(el('span', 'trigger-icon', '💬'), el('b', '', who), el('span', 'muted', '「' + a.comment + '」'));
     else src.append(el('span', 'trigger-icon', '●'), el('span', '', '配信者のボタン'));
     if (a.test) src.append(el('span', 'rule-tag', 'テスト'));
     src.title = src.textContent;
@@ -2346,13 +2348,17 @@ ${CONTROLS_JS}
   /** ランダムの候補の数と出やすさの上限（rules.js と同じ） */
   const MAX_CHOICES = ${MAX_CHOICES};
   const MAX_WEIGHT = ${MAX_WEIGHT};
+  /** コメントの言葉の長さの上限と、同じ人の待ち時間（rules.js と同じ） */
+  const MAX_COMMENT_WORD = ${MAX_COMMENT_WORD};
+  const COMMENT_VIEWER_COOLDOWN_SEC = ${COMMENT_VIEWER_COOLDOWN_SEC};
   const PLUS_NAME = ${JSON.stringify(PLANS.plus.name)};
-  const TRIGGERS = [['gift', 'ギフト'], ['minDiamonds', 'コイン数で'], ['likes', 'いいね'], ['follow', 'フォロー'], ['share', 'シェア']];
+  const TRIGGERS = [['gift', 'ギフト'], ['minDiamonds', 'コイン数で'], ['likes', 'いいね'], ['comment', 'コメント'], ['follow', 'フォロー'], ['share', 'シェア']];
   /** 一覧のグループ（きっかけの種類ごと） */
   const RULE_GROUPS = [
     ['gift', 'ギフト', 'このギフトが届いたら', ['gift', 'giftId']],
     ['minDiamonds', 'コイン数で', '名前で決めていないギフトは、コイン数で決めます（大きい数から当てはめます）', ['minDiamonds']],
     ['likes', 'いいね', 'いいねが決まった回数たまるたびに', ['likes']],
+    ['comment', 'コメント', '決めた言葉だけをコメントしたら（同じ人は' + COMMENT_VIEWER_COOLDOWN_SEC + '秒に1回まで）', ['comment']],
     ['follow', 'フォロー・シェア', '', ['follow', 'share']],
   ];
 
@@ -2367,8 +2373,8 @@ ${CONTROLS_JS}
   const iconOf = (key) => (key.startsWith('mob:') ? key.slice(4) : key);
 
   function toRow(rule) {
-    const trigger = rule.event ?? (rule.gift !== undefined ? 'gift' : rule.likes !== undefined ? 'likes' : rule.minDiamonds !== undefined ? 'minDiamonds' : 'giftId');
-    const value = rule.gift ?? rule.likes ?? rule.minDiamonds ?? rule.giftId ?? '';
+    const trigger = rule.event ?? (rule.gift !== undefined ? 'gift' : rule.likes !== undefined ? 'likes' : rule.minDiamonds !== undefined ? 'minDiamonds' : rule.comment !== undefined ? 'comment' : 'giftId');
+    const value = rule.gift ?? rule.likes ?? rule.minDiamonds ?? rule.comment ?? rule.giftId ?? '';
     // ランダムのルールは、1つ目の候補を「1つ決める」に戻したときの妨害にしておく
     const random = rule.action === 'random';
     const single = random ? rule.choices[0] : rule;
@@ -2385,6 +2391,7 @@ ${CONTROLS_JS}
     else if (row.trigger === 'minDiamonds') rule.minDiamonds = Number(row.value);
     else if (row.trigger === 'likes') rule.likes = Number(row.value);
     else if (row.trigger === 'giftId') rule.giftId = row.value.trim();
+    else if (row.trigger === 'comment') rule.comment = row.value.trim();
     else rule.gift = row.value;
     if (row.random) {
       rule.action = 'random';
@@ -2504,6 +2511,9 @@ ${CONTROLS_JS}
       box.append(badge('🪙'), el('span', '', row.value + ' コイン以上'));
     } else if (row.trigger === 'likes') {
       box.append(badge('❤'), el('span', '', 'いいね ' + row.value + '回ごと'));
+    } else if (row.trigger === 'comment') {
+      box.append(badge('💬'), el('span', '', '「' + row.value + '」'));
+      box.title = '「' + row.value + '」とコメントしたら';
     } else {
       box.append(badge(row.trigger === 'follow' ? '＋' : '↗'), el('span', '', row.trigger === 'follow' ? 'フォロー' : 'シェア'));
     }
@@ -2539,7 +2549,7 @@ ${CONTROLS_JS}
   function ruleText(row) {
     const gift = row.trigger === 'gift' ? giftFor(row.value) : null;
     const actions = row.random ? row.choices.map((c) => ACTION_INFO[c.key]?.name ?? c.key) : [ACTION_INFO[actionKey(row)]?.name ?? row.action];
-    const trigger = { follow: 'フォロー', share: 'シェア', likes: 'いいね', minDiamonds: 'コイン', giftId: 'ギフトID' }[row.trigger] ?? '';
+    const trigger = { follow: 'フォロー', share: 'シェア', likes: 'いいね', minDiamonds: 'コイン', giftId: 'ギフトID', comment: 'コメント' }[row.trigger] ?? '';
     return foldText([row.value, gift?.nameJa, gift?.name, trigger, row.random ? 'ランダム' : '', ...actions, row.label].join(' '));
   }
 
@@ -2629,6 +2639,7 @@ ${CONTROLS_JS}
     if (row.trigger === 'minDiamonds') return { kind: 'gift', giftName: row.value + 'コインのギフト', diamonds: Number(row.value), count: 1 };
     if (row.trigger === 'likes') return { kind: 'like', count: Number(row.value) };
     if (row.trigger === 'follow' || row.trigger === 'share') return { kind: row.trigger };
+    if (row.trigger === 'comment' && row.value.trim()) return { kind: 'comment', text: row.value };
     return null;
   }
 
@@ -2660,7 +2671,7 @@ ${CONTROLS_JS}
   }
 
   /** きっかけの絵（一覧と同じ） */
-  const TRIGGER_ICONS = { gift: '🎁', minDiamonds: '🪙', likes: '❤', follow: '＋', share: '↗', giftId: '🎁' };
+  const TRIGGER_ICONS = { gift: '🎁', minDiamonds: '🪙', likes: '❤', comment: '💬', follow: '＋', share: '↗', giftId: '🎁' };
   const ARROW_DOWN = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v11M4 9l4 4 4-4"/></svg>';
   /** この妨害が、今選んでいるゲームモードで出ないなら、その短い説明 */
   function offModeNote(key) {
@@ -2673,6 +2684,8 @@ ${CONTROLS_JS}
 
   /** ギフトの名前をそろえる（英語名でも日本語名でも同じギフトなら同じ） */
   const giftKey = (name) => (giftFor(name)?.nameJa ?? String(name ?? '')).trim().toLowerCase();
+  /** コメントの言葉をそろえる（rules.js の foldComment と同じ） */
+  const commentKey = (text) => foldText(text).replace(/\s+/g, '');
   /** ほかのルールで使っているギフト（いま変えているルールは除く） */
   function giftsInUse() {
     return new Set(rows.filter((r, i) => i !== editing.index && r.trigger === 'gift').map((r) => giftKey(r.value)));
@@ -2743,9 +2756,10 @@ ${CONTROLS_JS}
   /** 同じきっかけ・同じ条件のほかのルール（あると、どちらか一方しか使われない） */
   function duplicateOf(row) {
     const same = (r) => r.trigger === row.trigger
-      && (row.trigger === 'follow' || row.trigger === 'share' || (row.trigger === 'gift' ? giftKey(r.value) === giftKey(row.value) : String(r.value).trim() === String(row.value).trim()))
+      && (row.trigger === 'follow' || row.trigger === 'share' || (row.trigger === 'gift' ? giftKey(r.value) === giftKey(row.value)
+        : row.trigger === 'comment' ? commentKey(r.value) === commentKey(row.value) : String(r.value).trim() === String(row.value).trim()))
       && (r.when || '') === (row.when || '') && String(r.minRound || '') === String(row.minRound || '');
-    if (row.trigger === 'gift' && !row.value.trim()) return null;
+    if ((row.trigger === 'gift' || row.trigger === 'comment') && !row.value.trim()) return null;
     const i = rows.findIndex((r, j) => j !== editing.index && same(r));
     return i === -1 ? null : { index: i, row: rows[i], wins: editing.index === null || i < editing.index };
   }
@@ -2803,6 +2817,13 @@ ${CONTROLS_JS}
       const field = input(row.value, live('value'), { placeholder: 'ギフトID' });
       field.style.maxWidth = '240px';
       value.replaceChildren(field, 'が届いたら');
+    } else if (row.trigger === 'comment') {
+      const field = input(row.value, live('value'), { placeholder: '例: TNT' });
+      field.maxLength = MAX_COMMENT_WORD;
+      field.style.maxWidth = '200px';
+      field.setAttribute('aria-label', 'コメントの言葉');
+      value.replaceChildren(el('span', '', '「'), field, el('span', '', '」とコメントしたら'),
+        el('small', 'trigger-note', 'その言葉だけのコメントで出ます（ひらがな・カタカナ、全角・半角、大文字・小文字は区別しません）。荒らし対策で、同じ人は' + COMMENT_VIEWER_COOLDOWN_SEC + '秒に1回までです'));
     } else {
       value.replaceChildren(row.trigger === 'follow' ? 'フォローされたら' : 'シェアされたら');
     }
@@ -3079,11 +3100,12 @@ ${CONTROLS_JS}
       : row.trigger === 'minDiamonds' ? row.value + ' コイン以上のギフトが届いたら'
       : row.trigger === 'likes' ? 'いいねが ' + row.value + ' 回たまるたびに'
       : row.trigger === 'giftId' ? (row.value.trim() ? 'ギフトID ' + row.value + ' が届いたら' : '')
+      : row.trigger === 'comment' ? (row.value.trim() ? '「' + row.value.trim() + '」とコメントしたら' : '')
       : row.trigger === 'follow' ? 'フォローされたら' : 'シェアされたら';
     const node = (cls, icon, small, text) => el('div', 'ed-node' + cls, el('span', 'ni', icon), el('div', '', el('small', '', small), el('b', '', text)));
     const trigger = triggerText
       ? node('', giftImg?.nodeType === 1 ? giftImg : TRIGGER_ICONS[row.trigger], 'きっかけ', triggerText)
-      : node(' is-empty', TRIGGER_ICONS[row.trigger], 'きっかけ', row.trigger === 'gift' ? 'ギフトを選んでください' : 'ギフトID を入れてください');
+      : node(' is-empty', TRIGGER_ICONS[row.trigger], 'きっかけ', row.trigger === 'gift' ? 'ギフトを選んでください' : row.trigger === 'comment' ? 'コメントの言葉を入れてください' : 'ギフトID を入れてください');
     let action;
     let desc = '';
     let warn = '';
@@ -3133,6 +3155,7 @@ ${CONTROLS_JS}
   function editorProblem(row) {
     if (row.trigger === 'gift' && !row.value.trim()) return 'ギフトを選んでください';
     if (row.trigger === 'giftId' && !row.value.trim()) return 'ギフトID を入れてください';
+    if (row.trigger === 'comment' && !row.value.trim()) return 'コメントの言葉を入れてください';
     if (row.trigger === 'minDiamonds' && !(Number(row.value) >= 1)) return 'コイン数は1以上にしてください';
     if (row.trigger === 'likes' && !(Number.isInteger(Number(row.value)) && Number(row.value) >= 1)) return 'いいねの回数は1以上の整数にしてください';
     if (row.random) {

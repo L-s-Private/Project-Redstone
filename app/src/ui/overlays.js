@@ -339,7 +339,7 @@ const GIFTS = page({
   const BASE_ROWS = 3;
   /** 1ページに入れる数（横8×縦4くらい）。これを超えたらページを分ける */
   const PAGE_MAX = 32;
-  const BADGES = { coins: '🪙', likes: '❤', follow: '＋', share: '↗' };
+  const BADGES = { coins: '🪙', likes: '❤', comment: '💬', follow: '＋', share: '↗' };
   let lastKey = '';
   let pages = [];
   let current = 0;

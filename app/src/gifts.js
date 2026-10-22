@@ -34,6 +34,11 @@ export function normalizeLike(msg) {
   return { kind: 'like', count: Math.max(0, Number(msg.count ?? msg.likeCount) || 0), from: displayName(msg.user) };
 }
 
+/** コメント。user: 同じ人かを見分ける ID（名前は変えられるため） */
+export function normalizeComment(msg) {
+  return { kind: 'comment', text: String(msg.comment ?? '').slice(0, 200), from: displayName(msg.user), user: msg.user?.userId ? String(msg.user.userId) : msg.user?.uniqueId ?? '' };
+}
+
 export function normalizeSocial(kind, msg) {
   return { kind, from: displayName(msg.user) };
 }

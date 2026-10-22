@@ -39,6 +39,17 @@ export const MAX_COUNT_BY_TYPE = {
   mining_bonus_drop: 16,
 };
 
+/** コメントの言葉の長さの上限 */
+export const MAX_COMMENT_WORD = 30;
+/** 同じ人のコメントで、同じルールを出せる間隔（荒らし対策） */
+export const COMMENT_VIEWER_COOLDOWN_SEC = 30;
+
+/** コメントの言葉をそろえる（全角半角・大文字小文字・ひらがなカタカナ・空白を気にしない） */
+export function foldComment(text) {
+  return String(text ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g, '')
+    .replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+}
+
 // ギフトの値段（minDiamonds・diamonds）は、視聴者が払うコインの数。TikTok の diamond_count がそのまま入る
 export function matches(rule, event, game = null) {
   if (!conditionHolds(rule, game)) {
@@ -46,6 +57,10 @@ export function matches(rule, event, game = null) {
   }
   if (rule.event !== undefined) {
     return event.kind === rule.event;
+  }
+  if (rule.comment !== undefined) {
+    // コメントがその言葉だけのとき（文の中に入っているだけでは出さない）
+    return event.kind === 'comment' && foldComment(event.text) === foldComment(rule.comment);
   }
   if (event.kind !== 'gift') {
     return false;
@@ -133,6 +148,8 @@ export function describeEvent(event) {
       return `${who}がシェア`;
     case 'like':
       return `いいね ${event.likes}回`;
+    case 'comment':
+      return `${who}のコメント「${event.text}」`;
     default:
       return `${who}: ${event.kind}`;
   }

@@ -6,7 +6,7 @@ const MAX_TABLE_ROWS = 96;
 /** ランキングに出す人数 */
 export const RANKING_SIZE = 5;
 
-const TRIGGER_ORDER = { gift: 0, coins: 1, likes: 2, follow: 3, share: 4 };
+const TRIGGER_ORDER = { gift: 0, coins: 1, likes: 2, comment: 3, follow: 4, share: 5 };
 
 /**
  * ルールから、配信画面のギフト表を作る。メッセージだけのルール（感謝など）は妨害ではないので出さない。
@@ -39,6 +39,8 @@ export function giftTable(rules, findGift, describe) {
       Object.assign(row, { trigger: 'coins', label: `${rule.minDiamonds}以上`, sub: 'コイン', coins: rule.minDiamonds });
     } else if (rule.likes !== undefined) {
       Object.assign(row, { trigger: 'likes', label: `${rule.likes}回`, sub: 'いいね', count: rule.likes });
+    } else if (rule.comment !== undefined) {
+      Object.assign(row, { trigger: 'comment', label: `「${rule.comment}」`, sub: 'コメント' });
     } else if (rule.event !== undefined) {
       Object.assign(row, { trigger: rule.event, label: rule.event === 'follow' ? 'フォロー' : 'シェア' });
     } else {

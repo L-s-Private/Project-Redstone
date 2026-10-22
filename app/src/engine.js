@@ -667,6 +667,8 @@ export class Engine extends EventEmitter {
   async handleEvent(raw) {
     try {
       if (raw.kind === 'like') return await this.handleLikes(raw);
+      // コメントは、ルールの言葉のものだけ（ほかのコメントや、同じ人の続けての書き込みは静かに捨てる）
+      if (raw.kind === 'comment' && !this.dispatcher.takeComment(raw)) return { status: 'ignored' };
       // テスト送信のギフトにも日本語名と絵を足す
       const event = this.withGiftInfo(raw);
       this.log('gift', testMark(event) + describeEvent(event), event.image ? { giftImage: event.image } : {});
@@ -691,7 +693,7 @@ export class Engine extends EventEmitter {
       // オーバーレイに出す「誰が」
       const who = event.kind === 'like' ? `いいね${result.likes}回` : event.kind === 'manual' ? '配信者' : `${event.from || '誰か'}さん`;
       const giftImage = event.kind === 'gift' ? event.image ?? '' : '';
-      const giftName = event.kind === 'gift' ? event.giftNameJa || event.giftName || '' : '';
+      const giftName = event.kind === 'gift' ? event.giftNameJa || event.giftName || '' : event.kind === 'comment' ? `「${event.text}」` : '';
       // ルールの演出（音・画像・動画）があれば、ギフト通知で鳴らす・出す
       const media = result.rule !== undefined ? this.dispatcher.rules[result.rule]?.media : undefined;
       this.emit('alert', { who, action: describeAction(result.action), icon, giftImage, giftName, count: event.kind === 'gift' ? event.count : 1, ...(media && { media }) });
@@ -775,6 +777,7 @@ export class Engine extends EventEmitter {
       giftImage: gift ? event.image ?? '' : '',
       count: gift ? event.count : 1,
       likes: event.kind === 'like' ? result.likes ?? 0 : 0,
+      comment: event.kind === 'comment' ? event.text : '',
       status: 'pending',
       action: '',
       icon: '',

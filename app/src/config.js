@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { ACTION_TYPES, MAX_CHOICES, MAX_WEIGHT, RANDOM_ACTION, SOCIAL_EVENTS, WHEN_PHASES } from './rules.js';
+import { ACTION_TYPES, foldComment, MAX_CHOICES, MAX_COMMENT_WORD, MAX_WEIGHT, RANDOM_ACTION, SOCIAL_EVENTS, WHEN_PHASES } from './rules.js';
 import { MAX_PRESET_NAME } from './presets.js';
 import { MAX_RULES, MAX_USER_PRESETS } from './plan.js';
 import { DEFAULT_GAME_MODE, GAME_MODES, parseMining } from './mining.js';
@@ -7,7 +7,7 @@ import { isMediaName } from './media.js';
 
 export const DEFAULT_MOD_PORT = 25599;
 
-const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event'];
+const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event', 'comment'];
 // MOD が出せるもの（docs/protocol.md）
 export const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
 const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec', 'choices', 'noRepeat', 'when', 'minRound', 'media'];
@@ -179,10 +179,16 @@ function validateRule(rule, number) {
   }
   const triggers = TRIGGER_KEYS.filter((key) => rule[key] !== undefined);
   if (triggers.length !== 1) {
-    throw new ConfigError(`${where}: gift / giftId / minDiamonds / likes / event のどれか1つだけを書いてください`);
+    throw new ConfigError(`${where}: gift / giftId / minDiamonds / likes / event / comment のどれか1つだけを書いてください`);
   }
   if (rule.gift !== undefined && !(typeof rule.gift === 'string' && rule.gift.trim())) {
     throw new ConfigError(`${where}: ギフト名を入れてください`);
+  }
+  if (rule.comment !== undefined) {
+    if (!(typeof rule.comment === 'string' && foldComment(rule.comment) && rule.comment.trim().length <= MAX_COMMENT_WORD)) {
+      throw new ConfigError(`${where}: コメントの言葉は1〜${MAX_COMMENT_WORD}文字にしてください`);
+    }
+    rule = { ...rule, comment: rule.comment.trim() };
   }
   if (rule.label !== undefined && !(typeof rule.label === 'string' && rule.label.length <= MAX_LABEL_LENGTH)) {
     throw new ConfigError(`${where}: 表示する文は${MAX_LABEL_LENGTH}文字までにしてください`);

@@ -403,6 +403,10 @@ function testEvent(body) {
   const from = 'テスト';
   if (body.kind === 'follow' || body.kind === 'share') return { kind: body.kind, from, test: true };
   if (body.kind === 'like') return { kind: 'like', count: Math.min(100000, Math.max(1, Math.floor(Number(body.count)) || 1)), from, test: true };
+  if (body.kind === 'comment') {
+    const text = String(body.text ?? '').trim().slice(0, 200);
+    return text ? { kind: 'comment', text, from, user: '', test: true } : null;
+  }
   if (body.kind !== 'gift') return null;
   const giftName = String(body.giftName ?? '').trim().slice(0, 64);
   const count = Math.min(100, Math.max(1, Math.floor(Number(body.count)) || 1));

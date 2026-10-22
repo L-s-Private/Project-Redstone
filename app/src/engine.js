@@ -387,7 +387,7 @@ export class Engine extends EventEmitter {
     const problem = checkFeature(this.plan, 'importExport', '設定の読み込み');
     if (problem) throw new Error(problem);
     if (data?.format !== SETTINGS_FORMAT || !Number.isInteger(data.version)) {
-      throw new Error('Project Redstone の設定ファイルではありません');
+      throw new Error('STATIC ARC の設定ファイルではありません');
     }
     if (data.version > SETTINGS_VERSION) {
       throw new Error('新しい版のアプリで書き出したファイルです。アプリを新しくしてから読み込んでください');

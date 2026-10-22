@@ -1,6 +1,6 @@
 {
   "name": "project-redstone-app",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "private": true,
   "description": "TikTok LIVE のギフトを受け取り、マイクラのMODに妨害を送るアプリ",
   "type": "module",
@@ -25,10 +25,10 @@
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3"
   },
-  "productName": "Project Redstone",
+  "productName": "STATIC ARC",
   "build": {
     "appId": "com.projectredstone.app",
-    "productName": "Project Redstone",
+    "productName": "STATIC ARC",
     "files": [
       "src/**/*",
       "electron/**/*",
@@ -49,7 +49,7 @@
       "target": "portable"
     },
     "portable": {
-      "artifactName": "ProjectRedstone-${version}.exe"
+      "artifactName": "StaticArc-${version}.exe"
     },
     "directories": {
       "output": "dist"

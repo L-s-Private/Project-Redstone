@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "project_redstone",
   "version": "${version}",
-  "name": "Project Redstone",
+  "name": "STATIC ARC",
   "description": "TikTok LIVE のギフトでマイクラに妨害を出すMOD。PCアプリと組み合わせて使う。",
   "authors": ["Tatsuya Tsukada"],
   "license": "All-Rights-Reserved",

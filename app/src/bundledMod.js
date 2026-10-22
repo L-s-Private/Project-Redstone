@@ -1,4 +1,4 @@
-// アプリに同梱した Project Redstone MOD の jar。
+// アプリに同梱した STATIC ARC MOD の jar。
 // 配布版（Electron）では resources/mod、開発中は mod/build/libs にビルドしたものを使う。
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';

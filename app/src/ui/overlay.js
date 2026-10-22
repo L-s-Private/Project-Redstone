@@ -5,7 +5,7 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>Project Redstone オーバーレイ</title>
+<title>STATIC ARC オーバーレイ</title>
 <style>
   html, body { margin: 0; background: transparent; overflow: hidden; }
   /* 操作画面と同じグレースケール。ゲーム画面の上でも読めるよう、濃いグレーの面に白い文字 */

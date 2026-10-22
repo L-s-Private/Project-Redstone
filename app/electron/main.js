@@ -6,6 +6,9 @@ import { app, BrowserWindow, dialog, shell } from 'electron';
 import { startApp } from '../src/app.js';
 import { ConfigError } from '../src/config.js';
 
+// 製品名を STATIC ARC に変えても、画面の覚えている内容（最後に開いたタブなど）を引き継ぐため、前と同じ場所を使う
+app.setPath('userData', join(app.getPath('appData'), 'Project Redstone'));
+
 // 2つ目を起動したら、1つ目のウィンドウを前に出すだけにする
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -30,7 +33,7 @@ if (!app.requestSingleInstanceLock()) {
       const message = e instanceof ConfigError ? e.message
         : e.code === 'EADDRINUSE' ? 'ポート 25600 がほかのソフトに使われています。そのソフトを閉じてから起動してください。'
         : String(e.stack ?? e);
-      dialog.showErrorBox('Project Redstone を起動できませんでした', message);
+      dialog.showErrorBox('STATIC ARC を起動できませんでした', message);
       app.quit();
       return;
     }
@@ -40,7 +43,7 @@ if (!app.requestSingleInstanceLock()) {
       height: 880,
       minWidth: 720,
       minHeight: 560,
-      title: 'Project Redstone',
+      title: 'STATIC ARC',
       backgroundColor: '#14161a',
       autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, sandbox: true },

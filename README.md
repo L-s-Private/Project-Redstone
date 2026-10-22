@@ -1,4 +1,4 @@
-# Project Redstone
+# STATIC ARC（開発コードネーム: Project Redstone）
 
 TikTok LIVE のギフトで、マイクラ（Java版）に妨害を出すツール。
 配信者がいつものシングルワールドで遊んだまま、視聴者のギフトで TNT・モブ・埋め立てが起きる。
@@ -51,7 +51,7 @@ GitHub Actions の `project-redstone-mod` からも jar をダウンロードで
 
 #### デスクトップ版（おすすめ）
 
-GitHub Actions の `project-redstone-app-windows` から `ProjectRedstone-<版>.exe` をダウンロードして、ダブルクリックする。
+GitHub Actions の `project-redstone-app-windows` から `StaticArc-<版>.exe` をダウンロードして、ダブルクリックする。
 インストールは不要。専用のウィンドウで操作画面が開く。
 
 - 初回は「WindowsによってPCが保護されました」と出ることがある（署名なしのため）。「詳細情報」→「実行」で起動できる。

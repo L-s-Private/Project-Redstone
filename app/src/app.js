@@ -78,7 +78,7 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const ui = createUiServer({ engine, port, setup, icons, saveConfig: (c) => saveUserConfig(configPath, c) });
   await ui.listen();
 
-  engine.log('info', `Project Redstone v${pkg.version} / 設定ファイル: ${configPath}${created ? '（新しく作りました）' : ''}`);
+  engine.log('info', `STATIC ARC v${pkg.version} / 設定ファイル: ${configPath}${created ? '（新しく作りました）' : ''}`);
   await updateModIfOutdated({ dir, bundledMod, log: (level, text) => engine.log(level, text) }).catch((e) => {
     engine.log('warn', `MOD の更新を確かめられませんでした: ${e.message}`);
   });

@@ -1,4 +1,4 @@
-// マイクラ側の準備（Fabric Loader・Fabric API・Project Redstone MOD の導入）を自動で行う。
+// マイクラ側の準備（Fabric Loader・Fabric API・STATIC ARC MOD の導入）を自動で行う。
 // Fabric 公式インストーラーと同じく、ランチャーに「fabric-loader-26.3」の起動構成を追加する。
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -80,12 +80,12 @@ export async function installAll({ dir, bundledMod, fetch = globalThis.fetch, lo
     }
 
     if (!bundledMod) {
-      log('warn', 'このアプリには MOD が入っていないため、Project Redstone MOD は入れませんでした');
+      log('warn', 'このアプリには MOD が入っていないため、STATIC ARC MOD は入れませんでした');
     } else if (before.mod.upToDate) {
-      log('info', `Project Redstone MOD: 導入済み（${bundledMod.fileName}）`);
+      log('info', `STATIC ARC MOD: 導入済み（${bundledMod.fileName}）`);
     } else {
       await replaceMods(dir, OUR_MOD_FILE, bundledMod.fileName, await bundledMod.read());
-      log('ok', `Project Redstone MOD を入れました（${bundledMod.fileName}）`);
+      log('ok', `STATIC ARC MOD を入れました（${bundledMod.fileName}）`);
     }
   } catch (e) {
     if (e instanceof SetupError) throw e;
@@ -98,7 +98,7 @@ export async function installAll({ dir, bundledMod, fetch = globalThis.fetch, lo
 }
 
 /**
- * すでに入っている Project Redstone MOD が古ければ、同梱の新しいものに入れ替える（アプリ起動時に呼ぶ）。
+ * すでに入っている STATIC ARC MOD が古ければ、同梱の新しいものに入れ替える（アプリ起動時に呼ぶ）。
  * 初めての導入は「まとめて導入」で行うので、入っていなければ何もしない。
  * @returns {Promise<'updated' | 'up_to_date' | 'not_installed' | 'busy'>}
  */

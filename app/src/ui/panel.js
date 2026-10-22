@@ -9,7 +9,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Project Redstone</title>
+<title>STATIC ARC</title>
 <style>
   /*
    * デスクトップアプリの形: 左にメニュー、右に画面。ウィンドウいっぱいを使い、画面ごとに役割を分ける。
@@ -442,7 +442,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 </head>
 <body>
 <aside>
-  <div class="brand"><span class="brand-mark"></span><b>Project Redstone</b></div>
+  <div class="brand"><span class="brand-mark"></span><b>STATIC ARC</b></div>
   <nav>
     <button class="active" data-tab="tabLive">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M4.5 4.5a5 5 0 0 0 0 7M11.5 4.5a5 5 0 0 1 0 7M2.4 2.4a8 8 0 0 0 0 11.2M13.6 2.4a8 8 0 0 1 0 11.2"/></svg>配信</button>
@@ -1187,7 +1187,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       [setup.launcherFound, 'マイクラのランチャー', setup.launcherFound ? setup.dir : '見つかりません。ランチャーを一度起動して閉じてください'],
       [setup.fabric.installed, 'Fabric Loader', setup.fabric.versionId ?? '未導入'],
       [setup.fabricApi.installed, 'Fabric API', setup.fabricApi.fileName ?? '未導入'],
-      [setup.mod.upToDate, 'Project Redstone MOD', setup.mod.upToDate ? setup.mod.fileName : setup.mod.installed ? '古いバージョン（' + setup.mod.fileName + '）' : '未導入'],
+      [setup.mod.upToDate, 'STATIC ARC MOD', setup.mod.upToDate ? setup.mod.fileName : setup.mod.installed ? '古いバージョン（' + setup.mod.fileName + '）' : '未導入'],
     ];
     const make = () => items.map(([ok, name, detail]) => {
       const li = document.createElement('li');

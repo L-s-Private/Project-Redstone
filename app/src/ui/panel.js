@@ -128,6 +128,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   @media (max-width: 980px) {
     .split, .split.list-first { grid-template-columns: minmax(0, 1fr); }
     .split-side { position: static; }
+    /* 配信の画面は、ゲームのカード（始める・止める）を届いたものの一覧より上に。並べて置く */
+    #tabLive .split > .split-side { order: -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; }
   }
   /* くわしい説明は、開いたときだけ */
   details.more-info { border-top: 1px solid var(--line-soft); margin-top: 14px; padding-top: 10px; }
@@ -352,6 +354,37 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .link-card { display: flex; align-items: center; gap: 16px; }
   .link-card > div { flex: 1; min-width: 0; }
   .link-card .lead { margin: 0; }
+  /* 配信の準備（足りないものだけ。そろうと消える） */
+  .ready-card { border-color: var(--warn); }
+  .ready-card .card-head small { color: var(--faint); font-size: 12px; }
+  .ready-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .ready-steps li { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); }
+  .ready-steps .num { width: 24px; height: 24px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; border: 1px solid var(--line); color: var(--muted); }
+  .ready-steps .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ready-steps .body b { font-size: 14px; }
+  .ready-steps .body small { color: var(--faint); font-size: 12px; }
+  .ready-steps .act { flex: none; display: flex; gap: 6px; align-items: center; }
+  .ready-steps .act input { width: 200px; }
+  .ready-steps li.done { opacity: .55; }
+  .ready-steps li.done .num { background: var(--invert-bg); border-color: var(--invert-bg); color: var(--invert-text); }
+  .ready-steps li.is-next { border-color: var(--text); }
+  .ready-steps li.is-next .num { border-color: var(--text); color: var(--text); }
+  #tabLive:has(#readyCard:not([hidden])) .alert.setup { display: none; }
+  /* 配信の画面のゲームのカード（始まっていないとき） */
+  .live-idle { flex-direction: column; align-items: stretch !important; gap: 12px !important; }
+  .live-idle-head { display: flex; align-items: center; gap: 12px; }
+  .live-idle-head div { display: flex; flex-direction: column; min-width: 0; }
+  .live-idle-head small { color: var(--faint); font-size: 12px; }
+  .live-idle-head b { color: var(--text); font-size: 16px; }
+  .live-idle .hint { margin: 0; }
+  .live-idle .hint.warn-text { color: var(--warn); }
+  .live-idle-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .live-idle-actions .primary { flex: 1; min-width: 140px; }
+  .fill-buttons .end { margin-left: auto; }
+  /* アプリの記録: ふだんは大事なものだけ */
+  .log-filter { margin: 0; }
+  .log-filter button { padding: 3px 10px; font-size: 12px; }
+  #log.key-only li.lv-info { display: none; }
   .checks { list-style: none; margin: 0 0 14px; padding: 0; }
   .checks li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
   .checks li:last-child { border-bottom: 0; }
@@ -385,7 +418,23 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .preset-save { border-style: dashed; color: var(--muted); background: transparent; }
   .show-more { align-self: center; color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
   /* ルールの一覧（きっかけの種類ごと） */
-  .rules-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .rules-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+  .rule-search { position: relative; width: min(300px, 100%); }
+  .rule-search input { width: 100%; padding-left: 34px; }
+  .rule-search svg { position: absolute; left: 11px; top: 50%; width: 15px; height: 15px; margin-top: -7.5px; color: var(--faint); pointer-events: none; }
+  .rule-search-none { margin-top: 18px; padding: 24px; border: 1px dashed var(--line); border-radius: var(--radius-sm); color: var(--faint); text-align: center; font-size: 13px; }
+  /* プリセット: ふだんは1行に縮める */
+  .preset-card > summary { display: flex; align-items: center; gap: 12px; list-style: none; color: var(--text); font-size: 14px; }
+  .preset-card > summary h2 { margin: 0; }
+  .preset-card > summary .preset-now { color: var(--muted); font-size: 13px; font-weight: 400; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .preset-card > summary .preset-now b { color: var(--text); font-weight: 700; }
+  .preset-card > summary .toggle-text { color: var(--faint); font-size: 12px; flex: none; }
+  .preset-card[open] > summary { margin-bottom: 14px; }
+  .preset-card .preset-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .preset-card .preset-tools .lead { margin: 0 auto 0 0; }
+  .recent-title small { display: block; font-weight: 400; color: var(--faint); font-size: 11px; }
+  .recent button.has-rule { border-color: var(--line); color: var(--muted); }
+  .recent button.has-rule::after { content: "ルールあり"; margin-left: 6px; font-size: 10px; color: var(--faint); }
   .rules-top h2 { font-size: 15px; margin: 0 auto 0 0; }
   .rule-group { margin-top: 18px; }
   .rule-group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
@@ -860,6 +909,10 @@ ${CONTROLS_CSS}
     <button class="lg danger" id="stop">全妨害ストップ</button>
   </div>
   <div class="page">
+    <section class="card ready-card" id="readyCard" hidden>
+      <div class="card-head"><h2 id="readyTitle">配信の準備</h2><small>全部そろうと、この欄は消えます</small></div>
+      <ol class="ready-steps" id="readySteps"></ol>
+    </section>
     <section class="card live-top">
       <div class="status-tile" id="tileTiktok"><span class="dot"></span><div><small>TikTok</small><b>—</b></div></div>
       <div class="status-tile" id="tileMod"><span class="dot"></span><div><small>マイクラ</small><b>—</b></div></div>
@@ -875,7 +928,7 @@ ${CONTROLS_CSS}
       <section class="card feed-card">
         <div class="card-head"><h2>届いたものと出した妨害</h2><span class="hint" style="margin: 0;">新しい順</span></div>
         <ol class="feed" id="feed"></ol>
-        <div class="feed-empty" id="feedEmpty">まだ何も届いていません。TikTok LIVE で届いたギフトと、それで出した妨害がここに並びます。「テスト」の画面で試しに送ることもできます。</div>
+        <div class="feed-empty" id="feedEmpty">まだ何も届いていません。TikTok LIVE で届いたギフトと、それで出した妨害がここに並びます。「妨害の設定」の「▶ 試す」で、試しに出すこともできます。</div>
       </section>
       <aside class="split-side">
         <section class="card" id="fillCard">
@@ -891,6 +944,7 @@ ${CONTROLS_CSS}
               <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
               <button data-action="fill_help" data-count="10" data-icon="fill_help">お助け +10</button>
               <button data-action="tnt" data-icon="tnt">TNT</button>
+              <button class="ghost end" id="liveFillStop">埋め立てを終える</button>
             </div>
           </div>
           <div id="liveMining" hidden>
@@ -901,13 +955,18 @@ ${CONTROLS_CSS}
               <button data-mining-op="abort">中止する</button>
             </div>
           </div>
-          <div class="empty" id="fillEmpty">
-            <span id="fillEmptyText">埋め立ては始まっていません。</span>
-            <button data-goto="tabFill">ゲームモードへ</button>
+          <div class="empty live-idle" id="fillEmpty">
+            <div class="live-idle-head"><span id="liveModeIcon"></span><div><small id="fillEmptyText">埋め立ては始まっていません。</small><b id="liveModeName">埋め立て</b></div></div>
+            <p class="hint" id="liveModeSummary"></p>
+            <div class="live-idle-actions">
+              <button class="primary" id="liveStart">始める</button>
+              <button class="ghost" data-goto="tabFill">設定を変える</button>
+            </div>
           </div>
         </section>
         <section class="card log-card">
-          <div class="card-head"><h2>アプリの記録</h2><button class="ghost" id="logLatest" hidden>最新へ ↓</button></div>
+          <div class="card-head"><h2>アプリの記録</h2><button class="ghost" id="logLatest" hidden>最新へ ↓</button>
+            <div class="segmented log-filter" id="logFilter"><button type="button" data-filter="key" title="うまくいった・注意・失敗だけ">大事なもの</button><button type="button" data-filter="all">すべて</button></div></div>
           <ul id="log"></ul>
         </section>
       </aside>
@@ -1065,24 +1124,26 @@ ${CONTROLS_CSS}
     <button class="lg next" id="saveRules">保存する</button>
   </div>
   <div class="page">
-    <section class="card">
-      <div class="card-head"><h2>プリセット</h2>
+    <details class="card preset-card" id="presetCard">
+      <summary><h2>プリセット</h2><span class="preset-now" id="presetNow"></span><span class="toggle-text" id="presetToggle"></span></summary>
+      <div class="preset-tools">
+        <p class="lead">押すと、ルールがまとめて入れ替わります（「保存する」で確定）。</p>
         <span id="settingsFile" hidden>
           <a class="button ghost" id="exportSettings" href="/api/settings/export" download title="今のルールと自分のプリセットを、ファイルに保存します（別の PC に持っていけます）">ファイルに書き出す</a>
           <button class="ghost" id="importSettings" title="書き出したファイルのプリセットを足します（今のルールは変わりません）">ファイルから読み込む</button>
           <input type="file" id="importFile" accept=".json,application/json" hidden>
         </span>
       </div>
-      <p class="lead">押すと、ルールがまとめて入れ替わります（「保存する」で確定）。</p>
       <div class="presets" id="presets"></div>
-    </section>
-    <div class="recent-strip" title="押すと、そのギフトのルールを作ります">
-      <span class="recent-title">最近届いたギフト</span>
+    </details>
+    <div class="recent-strip">
+      <span class="recent-title">最近届いたギフト<small>押すとルールを作れます</small></span>
       <div class="recent" id="recent"></div>
     </div>
     <section class="rules-section">
       <div class="rules-top">
         <h2>ルール <span class="count" id="ruleCount"></span></h2>
+        <label class="rule-search"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><input id="ruleSearch" type="search" placeholder="ギフト・妨害の名前で探す" autocomplete="off" spellcheck="false" aria-label="ルールを探す"></label>
         <button class="lg next" id="addRule">＋ ルールを追加</button>
       </div>
       <p class="hint" style="margin-top: 0;">行を押すと変えられます。「▶ 試す」で、そのきっかけが届いたことにしてマイクラで試せます。ギフトを連打すると、出る数も増えます。</p>
@@ -1652,6 +1713,8 @@ ${CONTROLS_JS}
     renderAlerts(mod, tiktok);
     renderFill(state.fill);
     renderMining();
+    renderReady();
+    renderLiveIdle();
     $('debugState').textContent = JSON.stringify({ mod: { connected: state.mod.connected, players: state.mod.players }, gameMode: state.gameMode, fill: state.fill,
       mining: state.mining, player: state.player, paused: state.paused, stats: state.stats }, null, 2);
     renderFillSettings(state.fillSettings);
@@ -1671,8 +1734,8 @@ ${CONTROLS_JS}
   function renderAlerts(mod, tiktok) {
     const items = [];
     if (state.paused) items.push(['warn', '一時停止中です。ギフトが来ても妨害は出ません。', '再開する', () => $('toggle').click()]);
-    if (!state.mod.connected) items.push(['bad', 'マイクラにつながっていません。ランチャーで「fabric-loader」を選んで起動し、ワールドを開いてください。', '接続と準備へ', 'tabSetup']);
-    if (!state.mock && !state.tiktokUsername) items.push(['bad', 'TikTok ID が入っていません。', '接続と準備へ', 'tabSetup']);
+    if (!state.mod.connected) items.push(['bad setup', 'マイクラにつながっていません。ランチャーで「fabric-loader」を選んで起動し、ワールドを開いてください。', '接続と準備へ', 'tabSetup']);
+    if (!state.mock && !state.tiktokUsername) items.push(['bad setup', 'TikTok ID が入っていません。', '接続と準備へ', 'tabSetup']);
     else if (!state.mock && state.tiktok.state === 'retrying') items.push(['bad', 'TikTok LIVE との接続が切れました。つなぎ直しています。', null, null]);
     const key = JSON.stringify(items.map((i) => i[1]));
     if ($('alertBar').dataset.key === key) return;
@@ -1702,6 +1765,95 @@ ${CONTROLS_JS}
     $('alertBar').querySelectorAll('[data-to]').forEach((b) => (b.hidden = b.dataset.to === id));
   }
 
+  // ---- 配信の準備（足りないものを、上から順に） ----
+  let readyKey = '';
+  function renderReady() {
+    if (!state) return;
+    const inWorld = state.mod.connected && state.mod.players > 0;
+    const installed = setupReady === true || state.mod.connected;
+    const steps = [
+      { done: installed, title: 'マイクラに MOD などを入れる',
+        hint: setupReady === null ? '確認しています…' : 'マイクラを閉じた状態で押すと、足りないものだけ入れます', install: true },
+      { done: inWorld, title: 'マイクラでワールドを開く',
+        hint: state.mod.connected ? 'ワールドに入ってください' : 'ランチャーで「fabric-loader」を選んで起動し、ワールドに入ってください' },
+      { done: state.mock || !!state.tiktokUsername, title: 'TikTok ID を入れる', hint: '入れておくと、LIVE を始めたら自動でつながります', tiktok: true },
+    ];
+    const left = steps.filter((x) => !x.done).length;
+    $('readyCard').hidden = left === 0;
+    const key = JSON.stringify(steps.map((x) => [x.done, x.hint]));
+    if (key === readyKey) return;
+    readyKey = key;
+    $('readyTitle').textContent = '配信の準備　あと ' + left + ' つ';
+    const next = steps.findIndex((x) => !x.done);
+    $('readySteps').replaceChildren(...steps.map((step, i) => {
+      const li = el('li', step.done ? 'done' : i === next ? 'is-next' : '', el('span', 'num', step.done ? '✓' : String(i + 1)),
+        el('div', 'body', el('b', '', step.title), ...(step.done ? [] : [el('small', '', step.hint)])));
+      if (step.done) return li;
+      if (step.install) {
+        const b = Object.assign(el('button', 'primary install-btn', 'まとめて導入する'), { type: 'button' });
+        b.addEventListener('click', installAll);
+        li.append(el('div', 'act', b));
+      } else if (step.tiktok) {
+        const field = input('', () => {}, { placeholder: 'TikTok ID（@なし）', autocomplete: 'off', spellcheck: false, maxLength: 60 });
+        field.setAttribute('aria-label', 'TikTok ID');
+        const save = Object.assign(el('button', 'next', '保存'), { type: 'button' });
+        const submit = () => {
+          const id = normalizeTikTokId(field.value);
+          field.value = id;
+          if (!id) return field.focus();
+          if (tiktokIdProblem(id)) {
+            toast(tiktokIdProblem(id), 'error');
+            return field.focus();
+          }
+          post('/api/tiktok', { username: id }, { button: save, done: 'TikTok ID を保存しました' });
+        };
+        save.addEventListener('click', submit);
+        field.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.isComposing) submit();
+        });
+        li.append(el('div', 'act', field, save));
+      }
+      return li;
+    }));
+  }
+
+  // ---- 配信の画面のゲームのカード（始まっていないとき）: 今のモードを、ここから始められる ----
+  function renderLiveIdle() {
+    if (!state || $('fillEmpty').hidden) return;
+    const mining = effectiveMode() === 'mining_challenge';
+    const inWorld = state.mod.connected && state.mod.players > 0;
+    let problem = inWorld ? '' : 'マイクラでワールドに入ると始められます';
+    let summary;
+    if (mining) {
+      const ms = state.miningSettings;
+      const t = targetOf(ms?.item);
+      summary = ms ? t.name + 'を ' + ms.targetCount + '個・制限時間 ' + clockText(ms.seconds) : '';
+      if (!problem) problem = miningChecks().find(([ok]) => !ok)?.[2] ?? '';
+      $('liveModeIcon').replaceChildren(mcIcon(t.icon || 'mining', 32));
+    } else {
+      const w = $('fillWidth').value;
+      summary = '枠 ' + w + '×' + w + '×高さ' + $('fillHeight').value + '・全' + $('fillRounds').value + 'ラウンド・埋めきってから ' + $('fillCountdown').value + '秒守ればクリア';
+      $('liveModeIcon').replaceChildren(mcIcon($('fillBlock').value || 'amethyst_block', 32));
+    }
+    $('liveModeName').textContent = mining ? '採掘・収集チャレンジ' : '埋め立て';
+    $('liveModeSummary').textContent = problem || summary;
+    $('liveModeSummary').classList.toggle('warn-text', !!problem);
+    $('liveStart').textContent = mining && state.mining ? 'もう一度挑戦' : mining ? 'チャレンジを始める' : '埋め立てを始める';
+    $('liveStart').disabled = !!problem;
+    $('liveStart').title = problem;
+  }
+  $('liveStart').addEventListener('click', () => (effectiveMode() === 'mining_challenge' ? startMining($('liveStart')) : startFill($('liveStart'))));
+  $('liveFillStop').addEventListener('click', () => $('fillStop').click());
+
+  // アプリの記録: ふだんは「大事なもの」（うまくいった・注意・失敗）だけ。選んだほうを覚えておく
+  function setLogFilter(filter) {
+    $('log').classList.toggle('key-only', filter !== 'all');
+    $('logFilter').querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b.dataset.filter === (filter === 'all' ? 'all' : 'key')));
+    storage('redstone.logFilter', filter);
+    if (followLog) $('log').scrollTop = $('log').scrollHeight;
+  }
+  $('logFilter').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setLogFilter(b.dataset.filter)));
+
   // ログはいつも最新（いちばん下）を見せる。上に戻して読んでいる間だけ追いかけるのを止め、「最新のログへ」で戻る。
   // 見えていない画面のあいだも追いかける（隠れている間は高さが 0 なので、そこで止めてしまわないように）
   let followLog = true;
@@ -1723,11 +1875,13 @@ ${CONTROLS_JS}
   };
   $('log').addEventListener('load', keepLogAtEnd, true);
   new ResizeObserver(keepLogAtEnd).observe($('log'));
+  setLogFilter(storage('redstone.logFilter') ?? 'key');
 
   function addLog(entry) {
     if (entry.level === 'gift' || entry.text.startsWith('  →')) return;
     const log = $('log');
     const li = document.createElement('li');
+    li.className = 'lv-' + entry.level;
     const time = document.createElement('time');
     time.textContent = new Date(entry.time).toLocaleTimeString('ja-JP', { hour12: false });
     const text = document.createElement('span');
@@ -1826,10 +1980,11 @@ ${CONTROLS_JS}
   }
 
   /** 確かめる窓。@returns {Promise<boolean>} */
-  function askConfirm({ title, text, ok, cancel = 'やめる' }) {
+  function askConfirm({ title, text, ok, cancel = 'やめる', danger = true }) {
     $('confirmTitle').textContent = title;
     $('confirmText').textContent = text;
     $('confirmOk').textContent = ok;
+    $('confirmOk').className = danger ? 'danger' : 'next';
     $('confirmCancel').textContent = cancel;
     $('confirmDialog').showModal();
     $('confirmCancel').focus();
@@ -1915,6 +2070,7 @@ ${CONTROLS_JS}
     // 全部そろっていれば中身はしまう。足りないときは開いて見せる（そろったかどうかが変わったときだけ）
     if (setupReady !== setup.ready) $('setupChecks').open = !setup.ready;
     setupReady = setup.ready;
+    renderReady();
   }
   let setupReady = null;
 
@@ -1925,14 +2081,15 @@ ${CONTROLS_JS}
     } catch {}
   }
 
-  document.querySelectorAll('.install-btn').forEach((button) => button.addEventListener('click', async () => {
+  async function installAll() {
     const all = document.querySelectorAll('.install-btn');
     all.forEach((b) => { b.disabled = true; b.textContent = '導入中…'; });
     const data = await post('/api/setup/install');
-    all.forEach((b) => { b.disabled = false; b.textContent = 'まとめて導入する'; });
+    document.querySelectorAll('.install-btn').forEach((b) => { b.disabled = false; b.textContent = 'まとめて導入する'; });
     if (data?.setup) renderSetup(data.setup);
     else loadSetup();
-  }));
+  }
+  document.querySelectorAll('.install-btn').forEach((button) => button.addEventListener('click', installAll));
   window.addEventListener('focus', loadSetup);
   loadSetup();
 
@@ -2231,14 +2388,34 @@ ${CONTROLS_JS}
     return '';
   }
 
+  /** ひらがな・カタカナ・全角半角・大文字小文字をそろえる（ばら → バラ） */
+  const foldText = (text) => String(text ?? '').normalize('NFKC').toLowerCase().replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  /** ルールを探すときに見る文字（きっかけ・妨害・配信画面に出す文） */
+  function ruleText(row) {
+    const gift = row.trigger === 'gift' ? giftFor(row.value) : null;
+    const actions = row.random ? row.choices.map((c) => ACTION_INFO[c.key]?.name ?? c.key) : [ACTION_INFO[actionKey(row)]?.name ?? row.action];
+    const trigger = { follow: 'フォロー', share: 'シェア', likes: 'いいね', minDiamonds: 'コイン', giftId: 'ギフトID' }[row.trigger] ?? '';
+    return foldText([row.value, gift?.nameJa, gift?.name, trigger, row.random ? 'ランダム' : '', ...actions, row.label].join(' '));
+  }
+
   function renderRows() {
-    $('ruleCount').textContent = rows.length ? rows.length + '件' : '';
+    const query = foldText($('ruleSearch').value.trim());
+    const shown = (row) => !query || ruleText(row).includes(query);
+    const hits = rows.filter(shown).length;
+    $('ruleCount').textContent = !rows.length ? '' : query ? rows.length + '件中 ' + hits + '件' : rows.length + '件';
     renderPresets();
+    renderRecent();
+    if (query && hits === 0) {
+      $('ruleGroups').replaceChildren(el('div', 'rule-search-none', '「' + $('ruleSearch').value.trim() + '」のルールはありません'));
+      return;
+    }
     $('ruleGroups').replaceChildren(...RULE_GROUPS.map(([trigger, title, lead, triggers]) => {
       const add = Object.assign(el('button', '', '＋ 追加'), { type: 'button', title: title + 'のルールを追加' });
       add.addEventListener('click', () => openEditor(null, { trigger }));
       const head = el('div', 'rule-group-head', el('h3', '', title), el('p', '', lead), add);
-      let list = rows.map((row, i) => ({ row, i })).filter(({ row }) => triggers.includes(row.trigger));
+      let list = rows.map((row, i) => ({ row, i })).filter(({ row }) => triggers.includes(row.trigger) && shown(row));
+      // 探しているときは、当てはまるものがない種類は出さない
+      if (query && list.length === 0) return '';
       if (trigger === 'minDiamonds') list = list.sort((a, b) => Number(b.row.value) - Number(a.row.value));
       if (trigger === 'likes') list = list.sort((a, b) => Number(a.row.value) - Number(b.row.value));
       const body = list.length === 0
@@ -2247,6 +2424,15 @@ ${CONTROLS_JS}
       return el('div', 'rule-group', head, body);
     }));
   }
+
+  $('ruleSearch').addEventListener('input', renderRows);
+  $('ruleSearch').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('ruleSearch').value) {
+      e.preventDefault();
+      $('ruleSearch').value = '';
+      renderRows();
+    }
+  });
 
   function ruleRow(row, i) {
     const line = el('div', 'rule');
@@ -2357,7 +2543,7 @@ ${CONTROLS_JS}
     const foot = el('div', 'gc-foot', note);
     const SHOWN = 150;
     // ひらがなで打っても、カタカナの名前が見つかるように（ばら → バラ）
-    const fold = (text) => text.normalize('NFKC').toLowerCase().replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+    const fold = foldText;
     function fill() {
       const query = fold(search.value.trim());
       const used = giftsInUse();
@@ -2752,7 +2938,7 @@ ${CONTROLS_JS}
     // 同じきっかけのルールが先にあると、このルールは出ない。気づかずに作らないように確かめる
     const dup = duplicateOf(row);
     if (dup?.wins) {
-      const ok = await askConfirm({ title: 'このルールは出ません', text: '同じきっかけ・条件のルール（→ ' + actionText(dup.row) + '）が先にあるため、そちらだけが使われます。それでも' + (index === null ? '追加' : '変更') + 'しますか？', ok: index === null ? '追加する' : '変更する', cancel: '戻って直す' });
+      const ok = await askConfirm({ title: 'このルールは出ません', text: '同じきっかけ・条件のルール（→ ' + actionText(dup.row) + '）が先にあるため、そちらだけが使われます。それでも' + (index === null ? '追加' : '変更') + 'しますか？', ok: index === null ? '追加する' : '変更する', cancel: '戻って直す', danger: false });
       if (!ok) return;
     }
     if (index === null) rows.push(row);
@@ -3140,7 +3326,19 @@ ${CONTROLS_JS}
     });
     const all = [...state.presets.builtin.map((p) => chip(p, p.description)), ...mine];
     $('presets').replaceChildren(...showSome(all, PRESETS_SHOWN, 'presets'), save);
+    const using = [...state.presets.builtin, ...state.presets.mine].find((preset) => rows.length > 0 && rulesKey(preset.rules) === current);
+    const count = state.presets.builtin.length + state.presets.mine.length;
+    $('presetNow').replaceChildren(...(using ? ['今のルール: ', el('b', '', using.name), ' と同じ'] : [count ? '今のルールは、どのプリセットとも違います' : 'まだありません。今のルールに名前を付けて取っておけます']));
+    $('presetToggle').textContent = (count ? count + '個・' : '') + ($('presetCard').open ? '閉じる' : '開く');
   }
+
+  // プリセットの欄は、開いたか閉じたかを覚えておく
+  $('presetCard').open = storage('redstone.presetsOpen') === '1';
+  $('presetCard').addEventListener('toggle', () => {
+    storage('redstone.presetsOpen', $('presetCard').open ? '1' : '0');
+    presetsKey = '';
+    renderPresets();
+  });
 
   // ---- 配信画面の見た目（有料版の機能） ----
   function renderStyle() {
@@ -3432,9 +3630,9 @@ ${CONTROLS_JS}
     if (showLive) {
       $('fillRunning').hidden = true;
       $('fillEmpty').hidden = !!m && active;
-      $('fillEmptyText').textContent = m ? 'チャレンジは終わりました。' : '採掘・収集チャレンジは始まっていません。';
+      $('fillEmptyText').textContent = m ? 'チャレンジは終わりました' : 'まだ始まっていません';
     } else {
-      $('fillEmptyText').textContent = '埋め立ては始まっていません。';
+      $('fillEmptyText').textContent = 'まだ始まっていません';
     }
     const liveKey = showLive ? nowKey : '';
     if (showLive && m && liveKey !== liveMiningKey) $('liveMiningStatus').replaceChildren(miningStatus(m));
@@ -3588,13 +3786,13 @@ ${CONTROLS_JS}
     if (data?.ok) toast(data.applied ? 'ワールドの設定をマイクラに入れました' : '保存しました。マイクラのワールドに入ったら入れます');
   }));
 
-  $('fillStart').addEventListener('click', async () => {
+  async function startFill(button) {
     const body = {};
     for (const [id, key] of Object.entries(FILL_FIELDS)) {
       const value = $(id).value;
       body[key] = $(id).tagName !== 'SELECT' ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
     }
-    const data = await post('/api/fill/start', body, { button: $('fillStart'), done: '埋め立てを始めました' });
+    const data = await post('/api/fill/start', body, { button, done: '埋め立てを始めました' });
     if (data?.ok) {
       fillFormDirty = false;
       // 保存された値（範囲に収めたもの）で入れ直す
@@ -3602,7 +3800,8 @@ ${CONTROLS_JS}
       // 始めたら、状況が見える配信の画面へ
       showTab('tabLive');
     }
-  });
+  }
+  $('fillStart').addEventListener('click', () => startFill($('fillStart')));
   $('fillStop').addEventListener('click', async () => {
     const ok = await askConfirm({ title: '埋め立てを終えますか？', text: '置いたブロックはそのまま残ります。届く距離などの設定は元に戻ります。', ok: '終える' });
     if (ok) post('/api/fill/stop', {}, { button: $('fillStop'), done: '埋め立てを終えました' });
@@ -3650,7 +3849,7 @@ ${CONTROLS_JS}
     if (!state) return;
     const recent = state.recentGifts;
     // 変わっていなければ作り直さない（絵を読み直してちらつかないように）
-    const key = giftsVersion + JSON.stringify(recent);
+    const key = giftsVersion + JSON.stringify(recent) + JSON.stringify(rows.map((r) => r.trigger + ':' + r.value));
     if (key === recentKey) return;
     recentKey = key;
     if (!recent.length) {
@@ -3661,7 +3860,14 @@ ${CONTROLS_JS}
       const b = document.createElement('button');
       b.className = 'icon-btn';
       b.append(giftIcon(gift.image || gift.giftName), gift.giftName + '（🪙' + gift.diamonds + '）');
-      b.addEventListener('click', () => openEditor(null, { trigger: 'gift', value: gift.giftName }));
+      const index = rows.findIndex((r) => r.trigger === 'gift' && giftKey(r.value) === giftKey(gift.giftName));
+      if (index !== -1) {
+        b.classList.add('has-rule');
+        b.title = 'このギフトのルールがあります。押すと開きます';
+      } else {
+        b.title = '押すと、このギフトのルールを作ります';
+      }
+      b.addEventListener('click', () => (index !== -1 ? openEditor(index) : openEditor(null, { trigger: 'gift', value: gift.giftName })));
       return b;
     }));
   }

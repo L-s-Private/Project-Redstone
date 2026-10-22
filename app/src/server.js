@@ -401,7 +401,7 @@ function sendHtml(res, html, { frameable = false, readable = false } = {}) {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
     // ギフトの絵は TikTok の画像サーバーから直接読む
-    'Content-Security-Policy': `default-src 'self'; img-src 'self' https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors ${frameable ? "'self'" : "'none'"}`,
+    'Content-Security-Policy': `default-src 'self'; img-src 'self' data: https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors ${frameable ? "'self'" : "'none'"}`,
   });
   res.end(html);
 }

@@ -475,3 +475,30 @@ test('配信の画面用に、誰が何を送ってどうなったかを1件ず�
   assert.equal(seen[2].status, 'failed');
   assert.equal(seen[2].action, '');
 });
+
+test('採掘チャレンジ: ゲーム中はモードを切り替えられず、終わったら結果をログに残す。MOD が挑戦を忘れたら中止にする', async () => {
+  const { engine, client, logs } = setup({ gameMode: 'mining_challenge' });
+  const base = { sessionId: 's1', item: 'minecraft:coal', targetCount: 4, progress: 0, mined: 0, support: 0, durationSeconds: 180, elapsedSeconds: 0, seq: 1 };
+  const status = (mining) => {
+    client.status = { connected: true, players: 1, mining };
+    client.emit('status', client.status);
+  };
+  status({ ...base, state: 'running' });
+  assert.throws(() => engine.setGameMode('fill'), /実行中/);
+  assert.throws(() => engine.setMining({ targetCount: 8 }), /チャレンジ中/);
+  assert.throws(() => engine.setMining({ targetCount: 513 }), /目標数/);
+  status({ ...base, state: 'running', progress: 2, mined: 1, support: 1, seq: 2 });
+  status({ ...base, state: 'running', progress: 1, seq: 1 });
+  status({ ...base, state: 'succeeded', progress: 4, mined: 3, support: 1, elapsedSeconds: 65, seq: 3 });
+  const texts = logs.map((l) => l.text);
+  assert.ok(texts.some((t) => t.includes('石炭 2 / 4（+2・うち支援 1）')));
+  assert.ok(texts.some((t) => t.includes('チャレンジクリア！ 石炭 4 / 4（1分5秒）')));
+  assert.equal(texts.filter((t) => t.includes('石炭 1 / 4')).length, 0, '古い知らせは使わない');
+  engine.setGameMode('fill');
+  assert.equal(engine.state.gameMode, 'fill');
+
+  status({ ...base, sessionId: 's2', state: 'running', seq: 1 });
+  status(undefined);
+  assert.equal(engine.state.mining.state, 'aborted');
+  assert.equal(engine.state.mining.failureReason, 'world_closed');
+});

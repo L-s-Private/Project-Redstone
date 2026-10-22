@@ -119,7 +119,7 @@ public final class Sounds {
                 later(server, 4, SoundEvents.GLASS_BREAK, 1.0f, 0.8f);
                 later(server, 8, SoundEvents.GENERIC_EXPLODE, 0.8f, 0.6f);
             }
-            case FILL_HELP -> {
+            case FILL_HELP, MINING_BONUS_DROP -> {
                 now(server, SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
                 arpeggio(server, SoundEvents.NOTE_BLOCK_CHIME, 2, 1.0f, 1.26f, 1.5f, 2.0f);
             }
@@ -133,7 +133,7 @@ public final class Sounds {
                 now(server, SoundEvents.BEACON_ACTIVATE, 1.0f, 1.0f);
             }
             case FILL_STOP -> now(server, SoundEvents.BEACON_DEACTIVATE, 1.0f, 1.0f);
-            case LIGHTNING, FILL_SET, WORLD, PING -> {
+            case LIGHTNING, FILL_SET, WORLD, PING, MINING_START, MINING_PAUSE, MINING_RESUME, MINING_ABORT, MINING_TEST -> {
             }
         }
     }
@@ -188,6 +188,37 @@ public final class Sounds {
         later(server, delay, SoundEvents.FIREWORK_ROCKET_LAUNCH, 1.0f, 1.0f);
         later(server, delay + 14, SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, 1.0f, 1.0f);
         later(server, delay + 20, SoundEvents.FIREWORK_ROCKET_TWINKLE_FAR, 1.0f, 1.0f);
+    }
+
+    // ---- 採掘チャレンジ ----
+
+    /** 開始のカウントダウン「3・2・1」 */
+    public static void miningCountdown(MinecraftServer server) {
+        now(server, SoundEvents.NOTE_BLOCK_BASEDRUM, 1.0f, 0.8f);
+        now(server, SoundEvents.NOTE_BLOCK_PLING, 1.0f, 1.0f);
+    }
+
+    /** スタート！ */
+    public static void miningStarted(MinecraftServer server) {
+        now(server, SoundEvents.NOTE_BLOCK_PLING, 1.0f, 2.0f);
+        now(server, SoundEvents.BEACON_ACTIVATE, 1.0f, 1.2f);
+    }
+
+    /** 対象のアイテムを拾って進んだ（拾った本人にだけ、小さく） */
+    public static void miningCredit(ServerPlayer player) {
+        play(player, SoundEvents.NOTE_BLOCK_CHIME, 0.6f, 1.6f);
+    }
+
+    /** 残り10秒からの1秒ごと。だんだん高くする */
+    public static void miningLastSeconds(MinecraftServer server, int secondsLeft) {
+        now(server, SoundEvents.NOTE_BLOCK_HAT, 1.0f, 1.0f + (10 - secondsLeft) * 0.1f);
+    }
+
+    /** 時間切れ・やられた: 「ガシャーン」→「ブッブー」 */
+    public static void miningFailed(MinecraftServer server) {
+        now(server, SoundEvents.ANVIL_DESTROY, 1.0f, 0.8f);
+        now(server, SoundEvents.NOTE_BLOCK_BASS, 1.0f, 0.6f);
+        later(server, 5, SoundEvents.NOTE_BLOCK_BASS, 1.0f, 0.5f);
     }
 
     /** 逮捕・操作禁止が解けたとき */

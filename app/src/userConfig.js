@@ -56,6 +56,6 @@ function dropRemovedRules(raw) {
 
 /** 保存の途中でアプリが落ちても、設定ファイルが壊れないように書く */
 export async function saveUserConfig(path, config) {
-  const { tiktokUsername, mod, rules, fill, world, presets, overlay } = config;
-  await writeFileSafely(path, `${JSON.stringify({ tiktokUsername, mod, fill, world, rules, presets, overlay }, null, 2)}\n`);
+  const { tiktokUsername, mod, rules, fill, world, presets, overlay, gameMode, mining } = config;
+  await writeFileSafely(path, `${JSON.stringify({ tiktokUsername, mod, gameMode, fill, mining, world, rules, presets, overlay }, null, 2)}\n`);
 }

@@ -50,7 +50,14 @@ export const MC_ICON_JS = `
     night: { item: 'clock_32' },
     fill_raise: { item: 'ladder' },
     quartz_block: { cube: ['quartz_block_top', 'quartz_block_side'] },
+    // 採掘チャレンジ: 支援はツルハシ、古代の残骸はブロック、ほかの資源はアイテムの絵
+    mining_bonus_drop: { item: 'diamond_pickaxe' },
+    mining: { item: 'iron_pickaxe' },
+    ancient_debris: { cube: ['ancient_debris_top', 'ancient_debris_side'] },
   };
+  for (const name of ['coal', 'raw_iron', 'raw_copper', 'raw_gold', 'diamond', 'emerald', 'lapis_lazuli', 'redstone', 'quartz', 'amethyst_shard', 'flint']) {
+    MC_ICONS[name] = { item: name };
+  }
   for (const name of ['amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block',
     'glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock']) {
     MC_ICONS[name] = { cube: [name, name] };

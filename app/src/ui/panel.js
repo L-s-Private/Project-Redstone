@@ -3,6 +3,7 @@ import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
 import { MAX_CHOICES, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
 import { PLANS } from '../plan.js';
 import { OVERLAY_WIDGETS } from './overlays.js';
+import { FILL_ONLY_ACTIONS, MINING_LIMITS, MINING_ONLY_ACTIONS, MINING_PRESETS, MINING_REASONS, MINING_TARGETS } from '../mining.js';
 
 export const PANEL_HTML = String.raw`<!doctype html>
 <html lang="ja">
@@ -261,6 +262,42 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .fill-detail { color: var(--muted); font-size: 13px; }
   .fill-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
   .empty { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--muted); }
+
+  /* ---- ゲームモード（埋め立て / 採掘・収集チャレンジ） ---- */
+  .mode-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .mode-card {
+    position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; row-gap: 2px; align-items: center;
+    justify-content: stretch; text-align: left; padding: 14px 16px; white-space: normal; background: var(--surface); border-color: var(--line-soft);
+  }
+  .mode-card:hover { background: var(--raised); }
+  .mode-card .mc { --s: 34px; grid-row: span 2; }
+  .mode-card b { font-size: 14px; padding-right: 56px; }
+  .mode-card small { color: var(--faint); font-size: 12px; font-weight: 400; }
+  .mode-card.selected { border-color: var(--text); background: var(--raised); }
+  .mode-card .in-use { position: absolute; top: 10px; right: 12px; font-size: 11px; color: var(--ok); font-weight: 700; }
+  .mode-card:disabled { opacity: 1; }
+  .mode-card:disabled:not(.selected) { opacity: .4; }
+  @media (max-width: 720px) { .mode-cards { grid-template-columns: minmax(0, 1fr); } }
+  /* 採掘チャレンジの状況（ゲームモードの画面と配信の画面で同じ形） */
+  .mining-target { display: flex; align-items: center; gap: 10px; min-width: 0; margin-bottom: 14px; }
+  .mining-target .mc { --s: 36px; }
+  .mining-target div { min-width: 0; }
+  .mining-target small { display: block; color: var(--muted); font-size: 12px; }
+  .mining-target b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mining-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .mining-time.warn b { color: var(--bad); }
+  .fill-progress.cleared div { background: var(--ok); }
+  .fill-progress.failed div { background: var(--bad); }
+  .fill-progress.paused div, .fill-progress.aborted div { background: var(--muted); }
+  .fill-phase.paused { color: var(--warn); }
+  .fill-phase.failed { color: var(--bad); }
+  .fill-phase.aborted { color: var(--muted); }
+  #miningSettings.locked { opacity: .55; }
+  #miningPresets { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  #miningPresets .preset { min-width: 0; max-width: none; }
+  .mining-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+  .mining-actions:empty { display: none; }
+  .rule-tag.warn { color: var(--warn); }
 
   /* ---- 埋め立ての設定 ---- */
   .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px 14px; }
@@ -657,7 +694,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <button class="active" data-tab="tabLive">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M4.5 4.5a5 5 0 0 0 0 7M11.5 4.5a5 5 0 0 1 0 7M2.4 2.4a8 8 0 0 0 0 11.2M13.6 2.4a8 8 0 0 1 0 11.2"/></svg>配信</button>
     <button data-tab="tabFill">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 14 5v6l-6 3.2L2 11V5z"/><path d="M2 5l6 3.2L14 5M8 8.2v6"/></svg>埋め立て</button>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 14 5v6l-6 3.2L2 11V5z"/><path d="M2 5l6 3.2L14 5M8 8.2v6"/></svg>ゲームモード</button>
     <span class="nav-group">準備</span>
     <button data-tab="tabRules">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>妨害の設定<span class="badge" id="rulesBadge" title="保存していない変更があります" hidden></span></button>
@@ -724,9 +761,17 @@ export const PANEL_HTML = String.raw`<!doctype html>
               <button data-action="tnt" data-icon="tnt">TNT</button>
             </div>
           </div>
+          <div id="liveMining" hidden>
+            <div id="liveMiningStatus"></div>
+            <div class="mining-actions">
+              <button data-mining-op="pause">一時停止</button>
+              <button data-mining-op="resume">再開する</button>
+              <button data-mining-op="abort">中止する</button>
+            </div>
+          </div>
           <div class="empty" id="fillEmpty">
-            <span>埋め立ては始まっていません。</span>
-            <button data-goto="tabFill">埋め立ての設定へ</button>
+            <span id="fillEmptyText">埋め立ては始まっていません。</span>
+            <button data-goto="tabFill">ゲームモードへ</button>
           </div>
         </section>
         <section class="card log-card">
@@ -740,11 +785,52 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
 <main id="tabFill" hidden>
   <div class="page-head">
-    <h1>埋め立て</h1>
+    <h1>ゲームモード</h1>
     <button class="lg primary" id="fillStart">埋め立てを始める</button>
     <button class="lg" id="fillStop" hidden>埋め立てを終える</button>
+    <button class="lg primary" id="miningStart" hidden>チャレンジを始める</button>
+    <button class="lg" data-mining-op="pause" hidden>一時停止</button>
+    <button class="lg" data-mining-op="resume" hidden>再開する</button>
+    <button class="lg" data-mining-op="abort" hidden>中止する</button>
   </div>
   <div class="page">
+    <section class="mode-cards" id="modeCards" aria-label="ゲームモード">
+      <button type="button" class="mode-card" data-mode="fill" data-icon="amethyst_block"><b>埋め立て</b><small>空中の枠をブロックで埋めきればクリア。ギフトで枠が広がったり、TNT で崩されたりします</small><span class="in-use" hidden>選択中</span></button>
+      <button type="button" class="mode-card" data-mode="mining_challenge" data-icon="mining"><b>採掘・収集チャレンジ</b><small>制限時間のうちに、決めた資源を決めた数だけ掘って拾えばクリア</small><span class="in-use" hidden>選択中</span></button>
+    </section>
+    <p class="hint" id="modeLocked" style="margin: -4px 0 0;" hidden>ゲーム中はモードを切り替えられません。今のゲームを終えてから切り替えてください。</p>
+    <div id="modeMining" class="stack" hidden>
+      <div class="banner" id="miningBusy" hidden>チャレンジ中は設定を変えられません。変えるときは中止してから始め直してください。</div>
+      <div class="split">
+        <div class="stack">
+          <section class="card" id="miningNow" hidden>
+            <div id="miningNowStatus"></div>
+            <div class="mining-actions" id="miningAgain" hidden><button class="primary" id="miningRetry">もう一度挑戦</button></div>
+          </section>
+          <section class="card" id="miningSettings">
+            <h2>チャレンジの決まり</h2>
+            <p class="lead">制限時間のうちに、対象の資源を目標の数だけ掘って拾えばクリアです。</p>
+            <div class="presets" id="miningPresets" style="margin-bottom: 14px;"></div>
+            <div class="setting tall"><div class="setting-text"><label for="miningItem">対象アイテム</label><small id="miningNote"></small></div><div class="setting-control">
+              <select id="miningItem" data-tiles aria-label="対象アイテム">${MINING_TARGETS.map((t) => '<option value="' + t.icon + '">' + t.name + '</option>').join('')}</select></div></div>
+            <div class="setting"><div class="setting-text"><label for="miningCount">目標数</label><small>${MINING_LIMITS.minCount}〜${MINING_LIMITS.maxCount}個</small></div><div class="setting-control"><input id="miningCount" type="number" min="${MINING_LIMITS.minCount}" max="${MINING_LIMITS.maxCount}" data-unit="個"></div></div>
+            <div class="setting"><div class="setting-text"><label for="miningSeconds">制限時間</label><small id="miningClock"></small></div><div class="setting-control"><input id="miningSeconds" type="number" min="${MINING_LIMITS.minSeconds}" max="${MINING_LIMITS.maxSeconds}" step="30" data-unit="秒"></div></div>
+          </section>
+        </div>
+        <aside class="split-side">
+          <section class="card">
+            <h2>始める前の確認</h2>
+            <p class="lead">全部 ✓ になると始められます。</p>
+            <ul class="checks" id="miningChecks"></ul>
+            <details class="more-info">
+              <summary>数え方と、妨害の出方</summary>
+              <p class="hint" style="margin-top: 8px;">プレイヤーが掘ったブロックから落ちた対象アイテムを、拾ったときだけ数えます（チェストの中身・もともと持っていた物・ほかの人が掘った物は数えません）。シルクタッチで掘ると鉱石のまま落ちるので数えません。スーパーフラットのワールドには鉱石がありません。「始める」を押すと3秒のカウントダウンのあと始まり、残り時間はマイクラ画面の上のバーにも出ます。チャレンジの一時停止中は時間も進み具合も止まり、ギフトの妨害は出しません（あとからまとめて出すこともしません）。採掘チャレンジでは TNT とクリーパーの爆発で地形は壊れません。枠を使う妨害（枠を広げる・逮捕など）は出しません。</p>
+            </details>
+          </section>
+        </aside>
+      </div>
+    </div>
+    <div id="modeFill" class="stack">
     <div class="banner" id="fillBusy" hidden>埋め立て中です。設定を変えるときは、いったん終えてから始め直してください。</div>
     <div class="split">
     <div class="stack">
@@ -825,6 +911,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
         </details>
       </section>
     </aside>
+    </div>
     </div>
   </div>
 </main>
@@ -990,6 +1077,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <button data-action="fill_help" data-count="64" data-icon="fill_help">お助け +64</button>
           <button data-action="fill_layer" data-icon="fill_layer">一段埋め</button>
           <button data-action="fill_clear" data-icon="fill_clear">全消し</button>
+        </div>
+        <p class="group-label test-group">採掘チャレンジ中だけ（進み具合・時間を変えた挑戦は「テスト」の印が付きます）</p>
+        <div class="quick">
+          <button data-mining-test="drop" data-icon="mining">テスト用のアイテムを出す（数えない）</button>
+          <button data-mining-test="progress" data-percent="50" data-icon="mining">進み具合を 50% に</button>
+          <button data-mining-test="progress" data-percent="100" data-icon="mining">進み具合を 100% に（クリア）</button>
+          <button data-mining-test="time" data-icon="night">残り 5秒に</button>
+          <button data-action="mining_bonus_drop" data-count="3" data-icon="mining_bonus_drop">収集支援 ×3</button>
         </div>
         <p class="group-label test-group">埋め立てを進める（下の段から順に埋めます）</p>
         <div class="quick">
@@ -1406,7 +1501,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
     renderAlerts(mod, tiktok);
     renderFill(state.fill);
-    $('debugState').textContent = JSON.stringify({ mod: { connected: state.mod.connected, players: state.mod.players }, fill: state.fill, paused: state.paused, stats: state.stats }, null, 2);
+    renderMining();
+    $('debugState').textContent = JSON.stringify({ mod: { connected: state.mod.connected, players: state.mod.players }, gameMode: state.gameMode, fill: state.fill,
+      mining: state.mining, player: state.player, paused: state.paused, stats: state.stats }, null, 2);
     renderFillSettings(state.fillSettings);
     renderWorldSettings(state.worldSettings);
     if (!rulesDirty) loadRules(state.rules);
@@ -1495,7 +1592,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
 
   // ---- 届いたものと出した妨害（新しい順） ----
-  const SKIP_SHORT = { no_rule: 'ルールがないので出さず', paused: '一時停止中なので出さず', cooldown: '待ち時間中なので出さず' };
+  const SKIP_SHORT = {
+    no_rule: 'ルールがないので出さず', paused: '一時停止中なので出さず', cooldown: '待ち時間中なので出さず',
+    challenge_paused: 'チャレンジの一時停止中なので出さず', mode_incompatible: '今のゲームモードでは出せないので出さず',
+    no_active_mode: 'チャレンジが始まっていないので出さず',
+  };
   function activityResult(a) {
     if (a.status === 'pending') return 'マイクラを待っています…';
     if (a.status === 'sent') return a.action;
@@ -1575,10 +1676,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
 
   /** 確かめる窓。@returns {Promise<boolean>} */
-  function askConfirm({ title, text, ok }) {
+  function askConfirm({ title, text, ok, cancel = 'やめる' }) {
     $('confirmTitle').textContent = title;
     $('confirmText').textContent = text;
     $('confirmOk').textContent = ok;
+    $('confirmCancel').textContent = cancel;
     $('confirmDialog').showModal();
     $('confirmCancel').focus();
     return new Promise((resolve) => {
@@ -1744,7 +1846,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   /** 出す妨害。グループごとに絵つきで並べる。unit は数の単位（なければ数を決めない）、def は選んだときの数 */
   const ACTION_GROUPS = [
     ['敵・爆発', [
-      ['tnt', 'TNT', '個', 1, '枠の中に TNT が落ちて、埋めたブロックを壊す'],
+      ['tnt', 'TNT', '個', 1, '枠の中に TNT が落ちて、埋めたブロックを壊す（採掘チャレンジでは地形を壊さない）'],
       ['mob:zombie', 'ゾンビ', '体', 1], ['mob:skeleton', 'スケルトン', '体', 1], ['mob:creeper', 'クリーパー', '体', 1],
       ['mob:spider', 'クモ', '体', 1], ['mob:witch', 'ウィッチ', '体', 1], ['mob:silverfish', 'シルバーフィッシュ', '体', 1], ['mob:pig', 'ブタ', '体', 1],
       ['lightning', '雷', '回', 1, '枠の中に雷が落ちて、まわりのブロックを少し壊す（火事にはならない）'],
@@ -1765,6 +1867,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
       ['fill_layer', '一段埋め', '段', 1, 'いちばん下の空いている段が、まるごと埋まる'],
       ['fill_shrink', '枠を縮める', 'マス', 1, '枠が小さくなって、埋める所が減る'],
       ['message', 'メッセージだけ', '', 0, '配信画面とマイクラに文を出すだけ（感謝などに）'],
+    ]],
+    ['採掘チャレンジのお助け', [
+      ['mining_bonus_drop', '収集支援', '個', 3, '対象アイテムがプレイヤーの近くに落ちる。拾うと数える（1回の挑戦で目標数の4分の1まで。採掘チャレンジ中だけ）'],
     ]],
   ];
   const ACTION_INFO = Object.fromEntries(ACTION_GROUPS.flatMap(([, list]) => list.map(([key, name, unit, def, desc]) => [key, { name, unit, def, desc }])));
@@ -1951,6 +2056,17 @@ export const PANEL_HTML = String.raw`<!doctype html>
     return el('div', 'rule-then', mcIcon(row.action === 'mob' ? row.mob : row.action, 22), text);
   }
 
+  /** 選んでいるゲームモードで出ない妨害なら、その注意（ランダムは全部の候補が出ないときだけ） */
+  const FILL_ONLY = ${JSON.stringify(FILL_ONLY_ACTIONS)};
+  const MINING_ONLY = ${JSON.stringify(MINING_ONLY_ACTIONS)};
+  function ruleModeNote(row) {
+    const mining = state?.gameMode === 'mining_challenge';
+    const types = row.random ? row.choices.map((c) => c.key.split(':')[0]) : [row.action];
+    if (mining && types.every((t) => FILL_ONLY.includes(t))) return '採掘チャレンジでは出ません';
+    if (!mining && types.every((t) => MINING_ONLY.includes(t))) return '埋め立てでは出ません';
+    return '';
+  }
+
   function renderRows() {
     $('ruleCount').textContent = rows.length ? rows.length + '件' : '';
     renderPresets();
@@ -1981,7 +2097,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
       row.when === 'filling' ? '埋め立て中' : row.when === 'countdown' ? 'カウントダウン中' : '',
       Number(row.cooldownSec) > 0 ? '待ち ' + row.cooldownSec + '秒' : '',
     ].filter(Boolean);
-    const tag = tags.length ? el('span', 'rule-tag', tags.join('・')) : el('span');
+    const note = ruleModeNote(row);
+    const tag = note ? el('span', 'rule-tag warn', [...tags, note].join('・')) : tags.length ? el('span', 'rule-tag', tags.join('・')) : el('span');
     // 試す: このルールのきっかけが届いたことにする（保存したルールで動くので、保存していない変更があるときは押せない）
     const body = testBodyFor(row);
     const tryIt = Object.assign(el('button', 'try', '▶ 試す'), { type: 'button' });
@@ -2332,7 +2449,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('detailGifts').replaceChildren(...(d.topGifts.length ? d.topGifts.map((g) => item(giftIcon(g.name), g.name, '×' + fmtNum(g.count) + '・🪙' + fmtNum(g.coins))) : [none('ギフトは届いていません')]));
     $('detailSupporters').replaceChildren(...(d.supporters.length ? d.supporters.map((x, i) => item(null, (i + 1) + '. ' + x.name, '🪙' + fmtNum(x.coins))) : [none('まだいません')]));
     $('detailActions').replaceChildren(...(d.byAction.length ? d.byAction.map((a) => item(mcIcon(iconOf(a.key), 20), ACTION_INFO[a.key]?.name ?? a.key, fmtNum(a.count) + '回')) : [none('出していません')]));
-    const skipped = [['cooldown', '待ち時間（クールダウン）中'], ['paused', '一時停止中'], ['no_rule', '合うルールがない']]
+    const skipped = [['cooldown', '待ち時間（クールダウン）中'], ['paused', '一時停止中'], ['no_rule', '合うルールがない'],
+      ['challenge_paused', '採掘チャレンジの一時停止中'], ['mode_incompatible', '今のゲームモードでは出せない'], ['no_active_mode', 'チャレンジが始まっていない']]
       .filter(([key]) => d.actions[key] > 0).map(([key, text]) => item(null, text, fmtNum(d.actions[key]) + '回'));
     const failures = d.failures.map((f) => item(null, '失敗: ' + f.reason, fmtNum(f.count) + '回'));
     $('detailFailures').replaceChildren(...(failures.length + skipped.length ? [...failures, ...skipped] : [none('すべて出せました')]));
@@ -2756,6 +2874,190 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('fillBar').firstElementChild.style.width = (fill.total ? (fill.filled / fill.total) * 100 : 0) + '%';
     $('fillDetail').textContent = fill.filled.toLocaleString('ja-JP') + ' / ' + fill.total.toLocaleString('ja-JP') + ' マス（幅' + fill.width + '・高さ' + fill.height + '）';
   }
+
+  // ---- ゲームモードの切り替えと、採掘・収集チャレンジ ----
+  const MINING_TARGETS = ${JSON.stringify(MINING_TARGETS)};
+  const MINING_PRESETS = ${JSON.stringify(MINING_PRESETS)};
+  const MINING_REASONS = ${JSON.stringify(MINING_REASONS)};
+  const MINING_ACTIVE = ['countdown', 'running', 'paused'];
+  const GAME_MODE_NAMES = { survival: 'サバイバル', creative: 'クリエイティブ', adventure: 'アドベンチャー', spectator: 'スペクテイター' };
+  const clockText = (sec) => String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+  const targetOf = (id) => MINING_TARGETS.find((t) => t.id === id) ?? { id, name: id, icon: '', note: '' };
+  /** 今のモード: 動いているゲームがあればそれ、なければ選んでいるモード */
+  function effectiveMode() {
+    if (state.fill) return 'fill';
+    if (MINING_ACTIVE.includes(state.mining?.state)) return 'mining_challenge';
+    return state.gameMode ?? 'fill';
+  }
+  function miningPhase(m) {
+    if (m.state === 'countdown') return ['countdown', 'まもなくスタート（' + m.countdownSecondsLeft + '）'];
+    if (m.state === 'running') return ['', '挑戦中'];
+    if (m.state === 'paused') return ['paused', '一時停止中（時間と進み具合が止まっています）'];
+    if (m.state === 'succeeded') return ['cleared', 'クリア！'];
+    if (m.state === 'failed') return ['failed', m.failureReason === 'player_died' ? '失敗（プレイヤーが倒れた）' : '失敗（時間切れ）'];
+    return ['aborted', '中止（' + (MINING_REASONS[m.failureReason] ?? '') + '）'];
+  }
+  /** 採掘チャレンジの状況（対象・集めた数・残り時間・バー・内訳） */
+  function miningStatus(m) {
+    const t = targetOf(m.item);
+    const shown = Math.min(m.progress, m.targetCount);
+    const [cls, text] = miningPhase(m);
+    const bar = el('div', 'fill-progress ' + cls, el('div'));
+    bar.firstChild.style.width = Math.min(100, (shown / m.targetCount) * 100) + '%';
+    const warn = m.state === 'running' && m.remainingSeconds <= 10;
+    const detail = '掘った ' + m.mined + '・支援 ' + m.support + '（支援は ' + m.supportLimit + '個まで）' + (m.test ? '・テスト' : '');
+    return el('div', '',
+      el('div', 'mining-target', mcIcon(t.icon, 36), el('div', '', el('small', '', '採掘・収集チャレンジ'), el('b', '', t.name))),
+      el('div', 'mining-hero',
+        el('div', 'fill-round', el('small', '', '集めた数'), el('b', '', String(shown), el('span', '', '/ ' + m.targetCount))),
+        el('div', 'fill-pct mining-time' + (warn ? ' warn' : ''), el('small', '', '残り時間'), el('b', '', clockText(m.remainingSeconds)))),
+      bar,
+      el('div', 'fill-meta', el('span', 'fill-phase ' + cls, text), el('span', 'fill-detail', detail)));
+  }
+  /** 始める前の確認。[できているか, 名前, できていないときの説明] */
+  function miningChecks() {
+    const p = state.player;
+    const inWorld = state.mod.connected && state.mod.players > 0;
+    const item = state.miningSettings?.item;
+    return [
+      [state.mod.connected, 'マイクラにつながっている', 'ランチャーで「fabric-loader」を選んで起動してください'],
+      [inWorld, 'ワールドに入っている', 'ワールドを開いてください'],
+      [inWorld && p?.gameMode === 'survival', 'サバイバルモード', !p ? '確認中…' : 'いまは' + (GAME_MODE_NAMES[p.gameMode] ?? p.gameMode) + 'です。サバイバルに切り替えてください'],
+      [inWorld && !!p?.alive, 'プレイヤーが生きている', !p ? '確認中…' : 'リスポーンしてから始めてください'],
+      [!state.fill, '埋め立てをしていない', '埋め立てを終えてから始めてください'],
+      [!(state.miningUnavailable ?? []).includes(item), '対象アイテムが使える', 'このマイクラでは使えません。別の対象を選んでください'],
+    ];
+  }
+  let miningNowKey = '';
+  let liveMiningKey = '';
+  let miningChecksKey = '';
+  function renderMining() {
+    const mode = effectiveMode();
+    const m = state.mining;
+    const active = MINING_ACTIVE.includes(m?.state);
+    const locked = !!state.fill || active;
+    // モードのカード
+    document.querySelectorAll('.mode-card').forEach((card) => {
+      const on = card.dataset.mode === mode;
+      card.classList.toggle('selected', on);
+      card.querySelector('.in-use').hidden = !on;
+      card.disabled = locked;
+    });
+    $('modeLocked').hidden = !locked;
+    const mining = mode === 'mining_challenge';
+    $('modeFill').hidden = mining;
+    $('modeMining').hidden = !mining;
+    // 上のボタン
+    if (mining) {
+      $('fillStart').hidden = true;
+      $('fillStop').hidden = true;
+    }
+    $('miningStart').hidden = !mining || active;
+    const checks = miningChecks();
+    $('miningStart').disabled = !checks.every(([ok]) => ok);
+    $('miningStart').title = $('miningStart').disabled ? '「始める前の確認」が全部 ✓ になると押せます' : '';
+    document.querySelectorAll('[data-mining-op]').forEach((b) => {
+      const op = b.dataset.miningOp;
+      b.hidden = !mining || !(op === 'pause' ? m?.state === 'running' : op === 'resume' ? m?.state === 'paused' : active);
+    });
+    // 始める前の確認
+    const checksKey = JSON.stringify(checks);
+    if (checksKey !== miningChecksKey) {
+      miningChecksKey = checksKey;
+      $('miningChecks').replaceChildren(...checks.map(([ok, name, why]) =>
+        el('li', ok ? 'yes' : 'no', el('span', 'mark', ok ? '✓' : '✗'), el('div', '', name, ok ? '' : el('small', '', why)))));
+    }
+    // 今の挑戦（終わったあとは結果と「もう一度挑戦」）
+    $('miningBusy').hidden = !active;
+    $('miningSettings').classList.toggle('locked', active);
+    $('miningSettings').inert = active;
+    $('miningNow').hidden = !m;
+    $('miningAgain').hidden = !m || active;
+    const nowKey = JSON.stringify(m);
+    if (m && nowKey !== miningNowKey) $('miningNowStatus').replaceChildren(miningStatus(m));
+    miningNowKey = nowKey;
+    // 配信の画面のカード
+    const showLive = mining && !state.fill;
+    $('liveMining').hidden = !showLive || !m;
+    if (showLive) {
+      $('fillRunning').hidden = true;
+      $('fillEmpty').hidden = !!m && active;
+      $('fillEmptyText').textContent = m ? 'チャレンジは終わりました。' : '採掘・収集チャレンジは始まっていません。';
+    } else {
+      $('fillEmptyText').textContent = '埋め立ては始まっていません。';
+    }
+    const liveKey = showLive ? nowKey : '';
+    if (showLive && m && liveKey !== liveMiningKey) $('liveMiningStatus').replaceChildren(miningStatus(m));
+    liveMiningKey = liveKey;
+    renderMiningSettings(state.miningSettings);
+    // モードを変えたら、ルールの一覧の注意（このモードでは出ない）を出し直す
+    if (state.gameMode !== rowsMode) {
+      rowsMode = state.gameMode;
+      renderRows();
+    }
+  }
+  let rowsMode = null;
+
+  // 採掘チャレンジの設定（前回の設定を入れる。入力中の欄は上書きしない）
+  let miningSettingsKey = '';
+  function renderMiningSettings(settings) {
+    if (!settings) return;
+    const key = JSON.stringify(settings);
+    if (key === miningSettingsKey) return;
+    miningSettingsKey = key;
+    const t = targetOf(settings.item);
+    $('miningItem').value = t.icon;
+    $('miningItem').dispatchEvent(new Event('sync'));
+    $('miningNote').textContent = t.note;
+    for (const [id, value] of [['miningCount', settings.targetCount], ['miningSeconds', settings.seconds]]) {
+      if (document.activeElement !== $(id)) $(id).value = String(value);
+    }
+    $('miningClock').textContent = '＝ ' + clockText(settings.seconds) + '（30〜1800秒）';
+    const presets = [...MINING_PRESETS, { id: 'custom', name: 'カスタム', description: '自分で決める' }];
+    $('miningPresets').replaceChildren(...presets.map((preset) => {
+      const b = Object.assign(el('button', 'preset' + (settings.preset === preset.id ? ' current' : ''), el('b', '', preset.name),
+        el('small', '', preset.item ? targetOf(preset.item).name + ' ' + preset.targetCount + '個・' + clockText(preset.seconds) : preset.description)), { type: 'button' });
+      if (preset.item) b.addEventListener('click', () => saveMining({ item: preset.item, targetCount: preset.targetCount, seconds: preset.seconds }));
+      else b.addEventListener('click', () => $('miningCount').focus());
+      return b;
+    }));
+  }
+  async function saveMining(body) {
+    const data = await post('/api/mining', body);
+    // 断られたら、保存されている値に戻す
+    if (!data?.ok) {
+      miningSettingsKey = '';
+      if (state) renderMiningSettings(state.miningSettings);
+    }
+  }
+  const miningForm = () => ({ item: 'minecraft:' + $('miningItem').value, targetCount: Number($('miningCount').value), seconds: Number($('miningSeconds').value) });
+  $('miningItem').addEventListener('input', () => saveMining(miningForm()));
+  ['miningCount', 'miningSeconds'].forEach((id) => $(id).addEventListener('change', () => saveMining(miningForm())));
+  $('miningSeconds').addEventListener('input', () => {
+    const sec = Number($('miningSeconds').value);
+    if (Number.isInteger(sec) && sec >= 0) $('miningClock').textContent = '＝ ' + clockText(sec) + '（30〜1800秒）';
+  });
+
+  document.querySelectorAll('.mode-card').forEach((card) => card.addEventListener('click', () => {
+    if (card.dataset.mode !== state?.gameMode) post('/api/mode', { mode: card.dataset.mode }, { button: card });
+  }));
+  const startMining = (button) => post('/api/mining/start', {}, { button, done: 'チャレンジを始めます（3秒のカウントダウン）' });
+  $('miningStart').addEventListener('click', async () => {
+    const data = await startMining($('miningStart'));
+    if (data?.ok) showTab('tabLive');
+  });
+  $('miningRetry').addEventListener('click', () => startMining($('miningRetry')));
+  document.querySelectorAll('[data-mining-op]').forEach((b) => b.addEventListener('click', async () => {
+    const op = b.dataset.miningOp;
+    if (op === 'abort') {
+      const ok = await askConfirm({ title: 'チャレンジを中止しますか？', text: '現在の進捗は結果として保存されます。掘ったブロックや取得済みアイテムは元に戻りません。', ok: '中止する', cancel: '続ける' });
+      if (!ok) return;
+    }
+    const done = { pause: 'チャレンジを一時停止しました', resume: 'チャレンジを再開しました', abort: 'チャレンジを中止しました' };
+    post('/api/mining/control', { op }, { button: b, done: done[op] });
+  }));
+  document.querySelectorAll('[data-mining-test]').forEach((b) => b.addEventListener('click', () =>
+    post('/api/mining/test', { op: b.dataset.miningTest, percent: Number(b.dataset.percent ?? 100) }, { button: b, done: '「' + b.textContent.trim() + '」をしました' })));
 
   // 前回の設定を入れる（入力中は上書きしない）
   const FILL_FIELDS = {

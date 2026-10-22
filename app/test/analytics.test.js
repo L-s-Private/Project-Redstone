@@ -52,7 +52,7 @@ test('出した妨害・失敗の理由・出さなかった理由を数え、�
   analytics.recordResult(ev, { status: 'failed', error: 'ワールドにプレイヤーがいません' });
   analytics.recordResult(ev, { status: 'cooldown' });
   const [s] = analytics.list();
-  assert.deepEqual(s.actions, { sent: 3, failed: 1, cooldown: 1, paused: 0, no_rule: 0 });
+  assert.deepEqual(s.actions, { sent: 3, failed: 1, cooldown: 1, paused: 0, no_rule: 0, challenge_paused: 0, mode_incompatible: 0, no_active_mode: 0 });
   assert.equal(s.failureRate, 25);
   const detail = analytics.get(s.id);
   assert.deepEqual(detail.byAction, [{ key: 'tnt', count: 2 }, { key: 'mob:pig', count: 1 }]);

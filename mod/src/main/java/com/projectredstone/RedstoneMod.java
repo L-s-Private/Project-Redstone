@@ -3,6 +3,8 @@ package com.projectredstone;
 import com.google.gson.JsonObject;
 import com.projectredstone.action.ActionExecutor;
 import com.projectredstone.action.FillGameManager;
+import com.projectredstone.action.MiningManager;
+import com.projectredstone.action.SafeBlasts;
 import com.projectredstone.action.Sounds;
 import com.projectredstone.game.FillGame;
 import com.projectredstone.bridge.ActionRequest;
@@ -10,6 +12,7 @@ import com.projectredstone.bridge.BridgeServer;
 import com.projectredstone.bridge.InvalidRequestException;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -52,12 +55,20 @@ public class RedstoneMod implements ModInitializer {
     private static int tickErrors;
     /** 同じエラーでログがあふれないよう、続けて起きている間は5秒に1回だけ書く */
     private static long lastTickErrorLoggedAt;
+    /** 採掘チャレンジの tick で続けて失敗している数 */
+    private static int miningTickErrors;
 
     @Override
     public void onInitialize() {
-        ServerLifecycleEvents.SERVER_STARTED.register(this::startBridge);
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            MiningManager.onServerStarted();
+            startBridge(server);
+        });
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             stopBridge();
+            // 採掘チャレンジ中なら中止にする（次にワールドを開いても続きからは始めない）
+            MiningManager.onServerStopping(server);
+            SafeBlasts.reset();
             FillGameManager.stop(server);
             // 操作禁止・夜など、ワールドをまたいで残ってはいけないものも消す（別のワールドを開いたときに持ち越さない）
             FillGameManager.reset();
@@ -70,6 +81,10 @@ public class RedstoneMod implements ModInitializer {
         ServerPlayerEvents.JOIN.register(FillGameManager::onJoin);
         // 「モブに攻撃される」で始めたプレイヤーは、モブからの攻撃でだけダメージを受ける
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> FillGameManager.allowDamage(entity, source));
+        // 採掘チャレンジ中にやられたら失敗
+        ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> MiningManager.onDeath(entity));
+        // 前の採掘チャレンジ（マイクラが落ちたなど）で出したまま残っている TNT・モブは、読み込まれたときに消す
+        ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> MiningManager.onEntityLoad(entity));
         // 埋め立て中は、枠より上にブロックを置かせない（クライアント側でも止めるので、置いた瞬間に消える見た目にならない）。
         // 置けるときは、手に持つブロックを置かれるブロックへ差し替えるために場所を覚えておく
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
@@ -109,6 +124,11 @@ public class RedstoneMod implements ModInitializer {
             status.addProperty("players", players);
             status.addProperty("version", VERSION);
             status.add("fill", fillStatus());
+            status.add("mining", MiningManager.status());
+            status.add("player", MiningManager.playerInfo());
+            if (!MiningManager.unavailable().isEmpty()) {
+                status.add("miningUnavailable", MiningManager.unavailableJson());
+            }
             return status;
         }
         if (players == 0) {
@@ -175,6 +195,25 @@ public class RedstoneMod implements ModInitializer {
                     FillGameManager.stop(server);
                 } catch (RuntimeException stopError) {
                     LOGGER.error("埋め立てを終えられませんでした", stopError);
+                }
+            }
+        }
+        // 採掘チャレンジは埋め立てと別に動かす（片方のエラーで、もう片方を止めない）
+        try {
+            SafeBlasts.tick();
+            MiningManager.tick(server);
+            miningTickErrors = 0;
+        } catch (RuntimeException e) {
+            if (++miningTickErrors == 1) {
+                LOGGER.error("採掘チャレンジの処理でエラーが起きました", e);
+            }
+            if (miningTickErrors >= MAX_TICK_ERRORS) {
+                miningTickErrors = 0;
+                LOGGER.error("エラーが続くので、採掘チャレンジを中止します");
+                try {
+                    MiningManager.abortOnError(server, e);
+                } catch (RuntimeException abortError) {
+                    LOGGER.error("採掘チャレンジを中止できませんでした", abortError);
                 }
             }
         }

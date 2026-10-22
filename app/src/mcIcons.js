@@ -20,6 +20,10 @@ export const ICON_TEXTURES = Object.fromEntries([
   // v0.12 で足した妨害のアイコン
   ...['iron_bars', 'packed_ice', 'lightning_rod', 'ladder', 'scaffolding_top', 'scaffolding_side', 'piston_top', 'piston_side'].map((n) => [n, `block/${n}`]),
   ...['barrier', 'shulker_shell', 'clock_00', 'clock_32', 'trident'].map((n) => [n, `item/${n}`]),
+  // 採掘チャレンジの資源と、支援のアイコン
+  ...['coal', 'raw_iron', 'raw_copper', 'raw_gold', 'diamond', 'emerald', 'lapis_lazuli', 'redstone', 'quartz', 'amethyst_shard', 'flint',
+    'iron_pickaxe', 'diamond_pickaxe'].map((n) => [n, `item/${n}`]),
+  ...['ancient_debris_top', 'ancient_debris_side'].map((n) => [n, `block/${n}`]),
 ]);
 
 /** マイクラ本体の jar の候補。ランチャーで一度でも起動していれば 1つ目がある（2つ目は開発用） */

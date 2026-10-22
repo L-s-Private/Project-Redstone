@@ -77,3 +77,35 @@ test('ランダムのルールは候補から1つ出し、条件のあるルー�
   game = { phase: 'filling', round: 0 };
   assert.equal((await dispatcher.handleLikes({ kind: 'like', count: 10 }))[0].action.type, 'freeze');
 });
+
+test('採掘チャレンジ: 一時停止中はルールの妨害を出さず、あとからも出さない。待ち時間も始めない', async () => {
+  let mode = { mode: 'mining_challenge', running: false, paused: true };
+  const sent = [];
+  const dispatcher = new Dispatcher({
+    rules: [{ gift: 'Rose', action: 'tnt', cooldownSec: 60 }], client: { async send(a) { sent.push(a); return { ok: true }; } },
+    now: () => 0, mode: () => mode,
+  });
+  assert.equal((await dispatcher.handle(rose)).status, 'challenge_paused');
+  mode = { mode: 'mining_challenge', running: true, paused: false };
+  assert.equal((await dispatcher.handle(rose)).status, 'sent');
+  assert.equal(sent.length, 1, '一時停止中の分はまとめて出さない');
+  assert.equal(sent[0].terrain, false, '採掘チャレンジでは TNT で地形を壊さない');
+});
+
+test('採掘チャレンジ: 埋め立て専用の妨害は出さず、待ち時間も始めない。支援はチャレンジ中だけ', async () => {
+  let mode = { mode: 'mining_challenge', running: true, paused: false };
+  const sent = [];
+  const dispatcher = new Dispatcher({
+    rules: [{ gift: 'Rose', action: 'jail', count: 5, cooldownSec: 60 }, { event: 'follow', action: 'mining_bonus_drop', count: 3 }],
+    client: { async send(a) { sent.push(a); return { ok: true }; } }, now: () => 0, mode: () => mode,
+  });
+  assert.equal((await dispatcher.handle(rose)).status, 'mode_incompatible');
+  assert.equal((await dispatcher.handle({ kind: 'follow', from: '' })).status, 'sent');
+  mode = { mode: 'fill', running: true, paused: false };
+  assert.equal((await dispatcher.handle(rose)).status, 'sent', '待ち時間は始まっていない');
+  assert.equal((await dispatcher.handle({ kind: 'follow', from: '' })).status, 'mode_incompatible');
+  assert.equal(sent.find((a) => a.type === 'jail').terrain, undefined, '埋め立てでは地形の印を付けない');
+  assert.equal((await dispatcher.fire(-1, rose, { type: 'fill_help', count: 1 })).status, 'sent');
+  mode = { mode: 'mining_challenge', running: false, paused: false };
+  assert.equal((await dispatcher.fire(-1, rose, { type: 'mining_bonus_drop', count: 1 })).status, 'no_active_mode', '画面のボタンでも同じ');
+});

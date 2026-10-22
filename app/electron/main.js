@@ -1,10 +1,12 @@
 // デスクトップ版の入口。アプリ本体を起動して、操作画面を専用のウィンドウで開く。
 // オーバーレイ（LIVE Studio に貼る URL）は同じサーバーから出す。
+import { readFileSync, writeFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, screen, shell } from 'electron';
 import { startApp } from '../src/app.js';
 import { ConfigError } from '../src/config.js';
+import { restoreBounds } from '../src/windowBounds.js';
 
 // 製品名を STATIC ARC に変えても、画面の覚えている内容（最後に開いたタブなど）を引き継ぐため、前と同じ場所を使う
 app.setPath('userData', join(app.getPath('appData'), 'Project Redstone'));
@@ -40,21 +42,35 @@ if (!app.requestSingleInstanceLock()) {
 
     // いちばん多い画面（1920×1080。ノートの拡大125%なら 1536×864 相当）に合わせて、1280×800 で開く。
     // 小さい画面では、はみ出さないように縮める。いちばん小さくて 960×600（1920 の画面の半分に置ける大きさ）
+    // 前に閉じたときの大きさ・位置があれば、そこで開く（モニターを外したなどで見えない位置なら使わない）
     const area = screen.getPrimaryDisplay().workAreaSize;
     const fit = (size, room) => Math.min(size, Math.round(room * 0.92));
+    const min = { minWidth: fit(960, area.width), minHeight: fit(600, area.height) };
+    const boundsFile = join(app.getPath('userData'), 'window.json');
+    let saved = null;
+    try {
+      saved = restoreBounds(JSON.parse(readFileSync(boundsFile, 'utf8')), screen.getAllDisplays().map((d) => d.workArea), min);
+    } catch {
+      // 初めて開いたとき・壊れていたときは、ふつうの大きさで開く
+    }
     window = new BrowserWindow({
-      width: fit(1280, area.width),
-      height: fit(800, area.height),
-      minWidth: fit(960, area.width),
-      minHeight: fit(600, area.height),
-      useContentSize: true,
-      center: true,
+      ...(saved ? { x: saved.x, y: saved.y, width: saved.width, height: saved.height } : { width: fit(1280, area.width), height: fit(800, area.height), useContentSize: true, center: true }),
+      ...min,
       title: 'STATIC ARC',
       backgroundColor: '#14161a',
       autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, sandbox: true },
     });
     window.removeMenu();
+    if (saved?.maximized) window.maximize();
+    // 閉じるときに、最大化する前の大きさ・位置と、最大化していたかを覚える
+    window.on('close', () => {
+      try {
+        writeFileSync(boundsFile, JSON.stringify({ ...window.getNormalBounds(), maximized: window.isMaximized() }));
+      } catch {
+        // 覚えられなくても、閉じるのは止めない
+      }
+    });
     // 画面内のリンクはいつものブラウザで開く
     window.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);

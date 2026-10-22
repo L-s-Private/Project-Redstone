@@ -160,4 +160,27 @@ class ActionRequestTest {
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"world\",\"time\":\"dusk\"}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"world\",\"weather\":\"snow\"}"));
     }
+
+    @Test
+    void parsesMiningActions() throws Exception {
+        ActionRequest start = ActionRequest.parse("{\"type\":\"mining_start\",\"item\":\"minecraft:diamond\",\"targetCount\":3,\"seconds\":300}");
+        assertEquals(ActionRequest.Type.MINING_START, start.type());
+        assertEquals("minecraft:diamond", start.item());
+        assertEquals(3, start.targetCount());
+        assertEquals(300, start.seconds());
+        // 範囲の外・知らない資源は丸めずに断る
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mining_start\",\"item\":\"minecraft:stone\"}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mining_start\",\"targetCount\":0}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mining_start\",\"targetCount\":513}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mining_start\",\"seconds\":10}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mining_start\",\"seconds\":\"180\"}"));
+        // 支援は1回16個まで
+        assertEquals(16, ActionRequest.parse("{\"type\":\"mining_bonus_drop\",\"count\":99}").count());
+        assertEquals(ActionRequest.Type.MINING_ABORT, ActionRequest.parse("{\"type\":\"mining_abort\"}").type());
+        assertEquals("time", ActionRequest.parse("{\"type\":\"mining_test\",\"op\":\"time\"}").op());
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"mining_test\",\"op\":\"give\"}"));
+        // 地形を壊さない TNT（既定は今までどおり壊す）
+        assertTrue(ActionRequest.parse("{\"type\":\"tnt\"}").terrain());
+        assertFalse(ActionRequest.parse("{\"type\":\"tnt\",\"terrain\":false}").terrain());
+    }
 }

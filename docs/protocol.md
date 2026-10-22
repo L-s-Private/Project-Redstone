@@ -11,8 +11,8 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
 | `id` | 文字列 | 応答と対応づけるためのID（任意） |
-| `type` | 文字列 | `ping` / `tnt` / `mob` / `message` / `fill_start` / `fill_stop` / `fill_expand` / `fill_shrink` / `fill_help` / `fill_set` / `world` / `jail` / `freeze` / `fill_layer` / `fill_clear` / `lightning` / `levitate` / `night` / `fill_raise` / `stop_all` |
-| `count` | 数値 | 回数。種類ごとの上限で丸める（`tnt` 20、`mob` 10、`fill_expand`・`fill_shrink` 5マス、`fill_help` 64個、`jail` 60秒、`freeze` 30秒、`fill_layer` 5段、`fill_clear` 1、`lightning` 10回、`levitate` 15秒、`night` 300秒、`fill_raise` 5段） |
+| `type` | 文字列 | `ping` / `tnt` / `mob` / `message` / `fill_start` / `fill_stop` / `fill_expand` / `fill_shrink` / `fill_help` / `fill_set` / `world` / `jail` / `freeze` / `fill_layer` / `fill_clear` / `lightning` / `levitate` / `night` / `fill_raise` / `stop_all` / `mining_start` / `mining_pause` / `mining_resume` / `mining_abort` / `mining_bonus_drop` / `mining_test` |
+| `count` | 数値 | 回数。種類ごとの上限で丸める（`tnt` 20、`mob` 10、`fill_expand`・`fill_shrink` 5マス、`fill_help` 64個、`jail` 60秒、`freeze` 30秒、`fill_layer` 5段、`fill_clear` 1、`lightning` 10回、`levitate` 15秒、`night` 300秒、`fill_raise` 5段、`mining_bonus_drop` 16個） |
 | `from` | 文字列 | ギフトを送った人の表示名（画面表示用、最大32文字） |
 | `label` | 文字列 | 画面に出す文言（最大100文字）。`message` では本文 |
 | `mob` | 文字列 | `type: mob` のときのモブ。`zombie` `skeleton` `creeper` `spider` `witch` `silverfish` `pig` |
@@ -32,7 +32,12 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | `mobSpawning` | 真偽 | `world` で、モブが自然に湧くか（既定 true） |
 | `keepInventory` | 真偽 | `world` で、やられても持ち物が残るか（既定 false） |
 | `mobLifetime` | 数値 | `fill_start` で、枠に出したモブが消えるまでの秒数（0〜600。既定30。0 なら消えない）。消えるときは煙を出す |
-| `percent` | 数値 | `fill_set` で埋める割合（0〜100。既定100） |
+| `percent` | 数値 | `fill_set` で埋める割合（0〜100。既定100）。`mining_test` の `progress` では進み具合の割合 |
+| `item` | 文字列 | `mining_start` の対象アイテム。`minecraft:coal` `minecraft:raw_iron` `minecraft:raw_copper` `minecraft:raw_gold` `minecraft:diamond` `minecraft:emerald` `minecraft:lapis_lazuli` `minecraft:redstone` `minecraft:quartz` `minecraft:ancient_debris` `minecraft:amethyst_shard` `minecraft:flint` のどれか（ほかは断る） |
+| `targetCount` | 数値 | `mining_start` の目標数（1〜512）。範囲の外は丸めずに断る |
+| `seconds` | 数値 | `mining_start` の制限時間（30〜1800秒）。範囲の外は丸めずに断る |
+| `terrain` | 真偽 | `tnt` `mob` で、爆発で地形を壊すか（既定 true）。アプリは採掘チャレンジのモードのとき false を付ける。false なら、埋め立ての枠の外では TNT とクリーパーの爆発をブロックを壊さない爆発に差し替える（ダメージと見た目はそのまま） |
+| `op` | 文字列 | `mining_test` の操作。`drop`（数えないテスト用の対象アイテムを足元に1個出す）/ `progress`（進み具合を `percent`% にする）/ `time`（残りを5秒にする） |
 
 ### 妨害の内容
 
@@ -64,6 +69,22 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 
 `fill_expand` `fill_shrink` `fill_help` `fill_set` `fill_stop` `jail` `fill_layer` `fill_clear` `fill_raise` は、埋め立てが始まっていないと `"埋め立てが始まっていません"` で断る。
 
+### 採掘・収集チャレンジ
+
+制限時間のうちに、対象アイテム（`item`）を目標数（`targetCount`）だけ集めるゲーム。埋め立てとは同時にできない（埋め立て中の `mining_start`、チャレンジ中の `fill_start` は断る）。時間はサーバーの tick で数えるので、ゲームが止まっている間（ポーズ画面など）は進まない。残り時間・進み具合はボスバーに出す（残り10秒からは赤く、1秒ごとに音を鳴らす）。
+
+数えるのは、チャレンジ中の**そのプレイヤーが壊したブロック**から落ちた対象アイテムを、そのプレイヤーが**拾った**ときだけ（`Block.dropResources` から出たアイテムに印を付けて覚える）。アイテムがまとまった・分かれた・消えた（時間切れ・溶岩など）も追いかけ、同じアイテムを2回数えない。チェストの中身・もとから持っていた物・ほかのプレイヤーが壊した物・テスト用のアイテムは数えない。チャレンジの一時停止中に拾った分も数えない。
+
+状態（`state`）: `countdown`（3秒）→ `running` ⇄ `paused` → `succeeded` / `failed` / `aborted`。終わった挑戦は再開しない（始め直すと新しい `sessionId`）。
+
+- `mining_start`: 次をこの順で確かめ、だめなら理由を返して始めない: 埋め立て中でない・ほかのチャレンジ中でない・プレイヤーが生きている・サバイバルモード・対象アイテムがこのマイクラにある。通れば3秒のカウントダウン（画面の真ん中に 3・2・1・スタート！）のあと始める。
+- `mining_pause` / `mining_resume`: チャレンジを一時停止／再開する（時間と進み具合を止める）。妨害の一時停止とは別。
+- `mining_abort`: 中止する（カウントダウン中なら開始の取り消し `countdown_cancelled`、それ以外は `user_abort`）。掘ったブロック・拾ったアイテムはそのまま。
+- `mining_bonus_drop`（収集支援）: チャレンジ中（`running`）だけ。対象アイテムを `count` 個（16個まで）プレイヤーの近くに落とす。拾ったときに数える（`support`）。1回の挑戦で支援で進められるのは目標数の4分の1まで（`supportLimit`、最低1）。足元が溶岩・水・奈落なら出さない。
+- `mining_test`: テスト用。`op` を参照。`progress`・`time` を使った挑戦には `test: true` が付く。
+
+チャレンジが終わったら、残っているアイテムの印・ボスバー・チャレンジ中に付けた浮遊を消す。プレイヤーがやられたら `failed`（`player_died`）、時間切れも `failed`（`timeout`）。ワールドを閉じたら `aborted`（`world_closed`）。マイクラの中で同じエラーが続いたら `aborted`（`error`）。
+
 ### 効果音
 
 MOD はマイクラにもともとある音を、プレイヤーの位置で鳴らす（`action/Sounds.java`）。アプリから指定するものはない。配信で目立つよう、1つの場面で何個かの音を重ねたり、少しずつずらして続けて鳴らしたりする。
@@ -89,10 +110,16 @@ MOD はマイクラにもともとある音を、プレイヤーの位置で鳴�
 - 実行中にエラーが起きた
 - 5秒たっても出し終わらない（`"マイクラが応答しないので、出しませんでした"`）。このときは、あとから遅れて出ることはない
 
-`ping` の応答には、ワールドにいるプレイヤー数 `players`、MOD の版 `version`（0.16.2 から。アプリは自分に入っている MOD と違えば知らせる）、埋め立ての状況 `fill` が入る（始まっていなければ `null`）。
+`ping` の応答には、ワールドにいるプレイヤー数 `players`、MOD の版 `version`（0.16.2 から。アプリは自分に入っている MOD と違えば知らせる）、埋め立ての状況 `fill` が入る（始まっていなければ `null`）。0.17.0 からは、採掘チャレンジの状況 `mining`（一度も始めていなければ無い）、プレイヤーの様子 `player`（`gameMode` と `alive`。いなければ無い）、このマイクラに無い対象アイテム `miningUnavailable`（あるときだけ）も入る。
 
 ```json
 {"id":"7","ok":true,"players":1,"version":"0.16.2","fill":{"phase":"filling","filled":512,"total":1089,"percent":47,"width":11,"height":9,"countdownSecondsLeft":0,"countdownSeconds":10,"round":1,"rounds":10}}
 ```
+
+```json
+{"id":"8","ok":true,"players":1,"version":"0.17.0","fill":null,"player":{"gameMode":"survival","alive":true},"mining":{"sessionId":"b1c…","state":"running","item":"minecraft:raw_iron","targetCount":16,"progress":5,"mined":4,"support":1,"supportLimit":4,"remainingSeconds":131,"durationSeconds":180,"countdownSecondsLeft":0,"elapsedSeconds":49,"test":false,"seq":212,"debug":{"eligibleDropEntities":2,"pendingEligibleItems":3,"testPickedUp":0,"lastError":""}}}
+```
+
+`mining` の `progress` は `mined`（掘って拾った数）＋ `support`（支援で拾った数）。`failureReason` は終わったときだけ（`timeout` `player_died` `user_abort` `countdown_cancelled` `world_closed` `player_left` `error`）。`seq` は知らせるたびに増える番号で、アプリは同じ `sessionId` で `seq` が戻った知らせを使わない。
 
 `phase` は `filling`（埋めている途中）/ `countdown`（埋めきってカウントダウン中）/ `cleared`（全ラウンドクリア）。`round` はクリアしたラウンドの数、`rounds` はラウンド数。

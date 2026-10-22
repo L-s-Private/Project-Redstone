@@ -5,7 +5,7 @@
 // action が random のルールは、choices の中から1つを抽選して出す（重み weight・同じものを続けない noRepeat）。
 
 export const ACTION_TYPES = ['tnt', 'mob', 'message', 'fill_expand', 'fill_shrink', 'fill_help',
-  'jail', 'freeze', 'fill_layer', 'fill_clear', 'lightning', 'levitate', 'night', 'fill_raise'];
+  'jail', 'freeze', 'fill_layer', 'fill_clear', 'lightning', 'levitate', 'night', 'fill_raise', 'mining_bonus_drop'];
 export const SOCIAL_EVENTS = ['follow', 'share'];
 /** いくつかの妨害から1つを抽選するルールの action */
 export const RANDOM_ACTION = 'random';
@@ -36,6 +36,7 @@ export function hasCondition(rule) {
 export const MAX_COUNT_BY_TYPE = {
   tnt: 20, mob: 10, message: 1, fill_expand: 5, fill_shrink: 5, fill_help: 64,
   jail: 60, freeze: 30, fill_layer: 5, fill_clear: 1, lightning: 10, levitate: 15, night: 300, fill_raise: 5,
+  mining_bonus_drop: 16,
 };
 
 // ギフトの値段（minDiamonds・diamonds）は、視聴者が払うコインの数。TikTok の diamond_count がそのまま入る

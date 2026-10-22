@@ -1,4 +1,5 @@
 import { buildAction, conditionHolds, findRuleIndex, pickChoice, RANDOM_ACTION } from './rules.js';
+import { modeProblem, TERRAIN_SAFE_ACTIONS } from './mining.js';
 
 /**
  * イベントを受けて、ルール判定・クールダウン・一時停止を通ったものだけ MOD に送る。
@@ -8,12 +9,14 @@ export class Dispatcher {
   /**
    * game: 今の埋め立ての状況（MOD の ping の fill。始まっていなければ null）。条件のあるルールに使う
    * random: 抽選に使う（0以上1未満）
+   * mode: 今のゲームモード（mining.js の currentMode）。そのモードで出せない妨害は出さない
    */
-  constructor({ rules, client, now = Date.now, game = () => null, random = Math.random }) {
+  constructor({ rules, client, now = Date.now, game = () => null, random = Math.random, mode = () => ({ mode: 'fill', running: false, paused: false }) }) {
     this.rules = rules;
     this.client = client;
     this.now = now;
     this.game = game;
+    this.mode = mode;
     this.random = random;
     // 抽選するルールごとの、前に出した候補（同じものを続けないため）
     this.lastChoice = new Map();
@@ -55,7 +58,7 @@ export class Dispatcher {
   }
 
   /**
-   * @returns {Promise<{status: 'sent' | 'no_rule' | 'paused' | 'cooldown' | 'failed', action?: object, error?: string}>}
+   * @returns {Promise<{status: 'sent' | 'no_rule' | 'paused' | 'cooldown' | 'challenge_paused' | 'mode_incompatible' | 'no_active_mode' | 'failed', action?: object, error?: string}>}
    */
   async handle(event) {
     this.stats.received++;
@@ -68,29 +71,45 @@ export class Dispatcher {
 
   /**
    * rules[index] の妨害を出す。action を渡したときはルールを使わずそれを送る（画面のボタンから）。
-   * 一時停止中はどちらも出さない。
+   * 一時停止中はどちらも出さない。採掘チャレンジの一時停止中は、ルールの妨害を出さない（あとからまとめても出さない）。
+   * 今のゲームモードで出せない妨害（埋め立て専用など）は、どちらも出さない。
    */
   async fire(index, event, action) {
     let random = false;
     if (this.paused) {
       return this.skip('paused');
     }
+    const mode = this.mode();
     if (!action) {
+      if (mode.paused) {
+        return this.skip('challenge_paused');
+      }
       const rule = this.rules[index];
       const cooldownMs = (rule.cooldownSec ?? 0) * 1000;
       const last = this.lastFiredAt.get(index);
       if (cooldownMs > 0 && last !== undefined && this.now() - last < cooldownMs) {
         return this.skip('cooldown');
       }
-      this.lastFiredAt.set(index, this.now());
+      let choice;
       if (rule.action === RANDOM_ACTION) {
-        const choice = pickChoice(rule, this.lastChoice.get(index), this.random);
-        if (!event.test) this.lastChoice.set(index, choice);
+        choice = pickChoice(rule, this.lastChoice.get(index), this.random);
         action = buildAction(rule, event, rule.choices[choice]);
         random = true;
       } else {
         action = buildAction(rule, event);
       }
+      // 出せないものは、クールダウンも始めない（次に届いたときに出せるように）
+      const problem = modeProblem(action.type, mode);
+      if (problem) return { ...this.skip(problem), action, ...(random && { random }) };
+      this.lastFiredAt.set(index, this.now());
+      if (random && !event.test) this.lastChoice.set(index, choice);
+    } else {
+      const problem = modeProblem(action.type, mode);
+      if (problem) return { ...this.skip(problem), action };
+    }
+    // 採掘チャレンジでは、TNT とクリーパーの爆発で地形を壊さない
+    if (mode.mode === 'mining_challenge' && TERRAIN_SAFE_ACTIONS.includes(action.type)) {
+      action = { ...action, terrain: false };
     }
 
     try {

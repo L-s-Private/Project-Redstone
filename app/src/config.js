@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { ACTION_TYPES, MAX_CHOICES, MAX_WEIGHT, RANDOM_ACTION, SOCIAL_EVENTS, WHEN_PHASES } from './rules.js';
 import { MAX_PRESET_NAME } from './presets.js';
 import { MAX_RULES, MAX_USER_PRESETS } from './plan.js';
+import { DEFAULT_GAME_MODE, GAME_MODES, parseMining } from './mining.js';
 
 export const DEFAULT_MOD_PORT = 25599;
 
@@ -142,7 +143,9 @@ export function parseConfig(raw) {
   const rules = raw.rules.map((rule, i) => validateRule(rule, i + 1));
 
   return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules, fill: parseFill(raw.fill), world: parseWorld(raw.world),
-    presets: parsePresets(raw.presets), overlay: parseOverlayStyle(raw.overlay) };
+    presets: parsePresets(raw.presets), overlay: parseOverlayStyle(raw.overlay),
+    // ゲームモード（前の版の設定には無いので埋め立て）と、採掘チャレンジの設定（埋め立ての設定 fill とは別に持つ）
+    gameMode: GAME_MODES.includes(raw.gameMode) ? raw.gameMode : DEFAULT_GAME_MODE, mining: parseMining(raw.mining) };
 }
 
 /** 自分で保存したプリセット（[{name, rules}]）。壊れているものは捨てる */

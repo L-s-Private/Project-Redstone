@@ -65,16 +65,21 @@ public final class ActionExecutor {
 
         switch (request.type()) {
             case TNT -> {
-                if (spawnTnt(level, player, request.count()) == 0) {
+                if (spawnTnt(level, player, request.count(), request.terrain()) == 0) {
                     return "枠の中の TNT が多すぎるので出しませんでした（爆発していない TNT は" + FillGameManager.MAX_TNT + "個まで）";
                 }
             }
             case MOB -> {
-                if (spawnMobs(level, player, MOBS.get(request.mob()), request.count()) == 0) {
+                if (spawnMobs(level, player, MOBS.get(request.mob()), request.count(), request.terrain()) == 0) {
                     return "モブを出せませんでした";
                 }
             }
-            case FILL_START -> FillGameManager.start(player, request);
+            case FILL_START -> {
+                if (MiningManager.active()) {
+                    return "採掘チャレンジ中です。先にチャレンジを終えてください";
+                }
+                FillGameManager.start(player, request);
+            }
             case FILL_STOP -> FillGameManager.stop(server);
             case FILL_EXPAND -> FillGameManager.resize(request.count());
             case FILL_SHRINK -> FillGameManager.resize(-request.count());
@@ -90,12 +95,37 @@ public final class ActionExecutor {
             case FILL_LAYER -> FillGameManager.fillLayers(request.count());
             case FILL_CLEAR -> FillGameManager.clearAll();
             case LIGHTNING -> strikeLightning(level, player, request.count());
-            case LEVITATE -> player.addEffect(new MobEffectInstance(MobEffects.LEVITATION, request.count() * 20, 0), null);
+            case LEVITATE -> {
+                player.addEffect(new MobEffectInstance(MobEffects.LEVITATION, request.count() * 20, 0), null);
+                MiningManager.noteLevitation();
+            }
             case NIGHT -> FillGameManager.night(server, request.count());
             case FILL_RAISE -> FillGameManager.raise(request.count());
             case STOP_ALL -> {
                 stopAll(server);
                 return null;
+            }
+            // 採掘チャレンジの操作（音と画面の文字は MiningManager が出す）
+            case MINING_START -> {
+                return MiningManager.start(server, player, request);
+            }
+            case MINING_PAUSE -> {
+                return MiningManager.pause();
+            }
+            case MINING_RESUME -> {
+                return MiningManager.resume();
+            }
+            case MINING_ABORT -> {
+                return MiningManager.abort(server);
+            }
+            case MINING_TEST -> {
+                return MiningManager.test(player, request);
+            }
+            case MINING_BONUS_DROP -> {
+                String problem = MiningManager.bonusDrop(player, request.count());
+                if (problem != null) {
+                    return problem;
+                }
             }
             case MESSAGE, PING -> {
             }
@@ -109,7 +139,7 @@ public final class ActionExecutor {
      * 埋め立て中は枠の真上から落とし、枠の中のブロックだけを壊す。そうでなければプレイヤーの周りに出す。
      * @return 実際に出した数
      */
-    private static int spawnTnt(ServerLevel level, ServerPlayer player, int count) {
+    private static int spawnTnt(ServerLevel level, ServerPlayer player, int count, boolean terrain) {
         RandomSource random = level.getRandom();
         List<double[]> inFrame = FillGameManager.tntPositions(count);
         int spawned = 0;
@@ -133,10 +163,14 @@ public final class ActionExecutor {
             PrimedTnt tnt = new PrimedTnt(level, x, y, z, null);
             tnt.setFuse(TNT_FUSE_TICKS + random.nextInt(20));
             tnt.addTag(SPAWNED_TAG);
+            MiningManager.tagSpawned(tnt);
             level.addFreshEntity(tnt);
             spawned++;
             if (inFrame != null) {
                 FillGameManager.trackTnt(tnt);
+            } else if (!terrain) {
+                // 採掘チャレンジ: 地形を壊さない爆発にする
+                SafeBlasts.track(tnt);
             }
         }
         return spawned;
@@ -161,6 +195,7 @@ public final class ActionExecutor {
         }
         FillGameManager.stopEffects(server);
         Sounds.reset();
+        SafeBlasts.reset();
     }
 
     /** ギフトで出したモブと TNT に付ける印（モブは昼でも燃えないようにする。mixin/MobSunBurnMixin。全妨害ストップで消す目印にもする） */
@@ -170,7 +205,7 @@ public final class ActionExecutor {
      * 埋め立て中は枠の中（埋めたブロックの上）に出す。そうでなければプレイヤーの周りに出す。
      * @return 実際に出した数
      */
-    private static int spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count) {
+    private static int spawnMobs(ServerLevel level, ServerPlayer player, EntityType<?> type, int count, boolean terrain) {
         RandomSource random = level.getRandom();
         List<double[]> inFrame = FillGameManager.mobPositions(count);
         int spawned = 0;
@@ -181,7 +216,12 @@ public final class ActionExecutor {
             Entity mob = type.spawn(level, pos, EntitySpawnReason.EVENT);
             if (mob != null) {
                 mob.addTag(SPAWNED_TAG);
+                MiningManager.tagSpawned(mob);
                 spawned++;
+                if (inFrame == null && !terrain) {
+                    // 採掘チャレンジ: クリーパーの爆発も地形を壊さないようにする
+                    SafeBlasts.track(mob);
+                }
             }
             if (mob != null && inFrame != null) {
                 FillGameManager.trackMob(mob);
@@ -233,7 +273,9 @@ public final class ActionExecutor {
             case LEVITATE -> "浮遊 " + request.count() + "秒";
             case NIGHT -> "夜になった！ " + request.count() + "秒";
             case FILL_RAISE -> "枠が " + request.count() + " 段高くなった！";
-            case FILL_START, FILL_STOP, MESSAGE, PING, WORLD, STOP_ALL -> "";
+            case MINING_BONUS_DROP -> "収集支援 ×" + request.count();
+            case FILL_START, FILL_STOP, MESSAGE, PING, WORLD, STOP_ALL, MINING_START, MINING_PAUSE, MINING_RESUME, MINING_ABORT,
+                 MINING_TEST -> "";
         };
     }
 }

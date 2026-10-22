@@ -9,6 +9,7 @@ import { giftTable, Ranking } from './overlayData.js';
 import { Analytics } from './analytics.js';
 import { actionText, RulesHistory } from './history.js';
 import { TikTokSource } from './tiktok.js';
+import { checkMining, clock, currentMode, GAME_MODES, MINING_REASONS, miningActive, parseMining, targetName } from './mining.js';
 
 const MAX_LOGS = 200;
 /** ランキングは、変わってからこれだけ待ってまとめて保存する（ギフトが続いても書きすぎないように） */
@@ -25,6 +26,9 @@ const SKIP_MESSAGES = {
   no_rule: '対応する妨害がないので無視しました',
   paused: '一時停止中なので出しませんでした',
   cooldown: 'クールダウン中なので出しませんでした',
+  challenge_paused: '採掘チャレンジの一時停止中なので出しませんでした',
+  mode_incompatible: '今のゲームモードでは出せないので出しませんでした',
+  no_active_mode: '採掘チャレンジが始まっていないので出しませんでした',
 };
 
 const ACTION_NAMES = {
@@ -42,6 +46,7 @@ const ACTION_NAMES = {
   levitate: '浮遊',
   night: '夜にする',
   fill_raise: '枠を高くする',
+  mining_bonus_drop: '収集支援',
 };
 
 // 回数を見せない妨害
@@ -137,7 +142,10 @@ export class Engine extends EventEmitter {
     this.now = now;
     this.client = client ?? new ModClient(config.mod);
     this.tiktok = tiktok ?? new TikTokSource();
-    this.dispatcher = new Dispatcher({ rules: config.rules, client: this.client, now, game: () => this.client.status?.fill ?? null });
+    this.dispatcher = new Dispatcher({ rules: config.rules, client: this.client, now, game: () => this.client.status?.fill ?? null,
+      mode: () => currentMode(this.client.status, this.config.gameMode) });
+    // 採掘チャレンジの最後の様子（MOD が忘れたあとも、結果として見せる）
+    this.miningLast = null;
     this.logs = [];
     this.activity = [];
     this.activitySeq = 0;
@@ -166,8 +174,9 @@ export class Engine extends EventEmitter {
     // 埋め立ての進み具合でも status は届くので、接続の変化だけログに出す
     let previous = { connected: false, players: null };
     let warnedVersion;
-    this.client.on('status', ({ connected, players, version, fill }) => {
+    this.client.on('status', ({ connected, players, version, fill, mining }) => {
       if (this.analytics.recordGame(fill)) this.saveAnalytics();
+      if (connected && players !== null) this.followMining(mining ?? null);
       if (!connected) warnedVersion = undefined;
       // 古い MOD は版を知らせない（version が null）。その場合も「合わない」とする
       if (connected && players !== null && this.modVersion && version !== this.modVersion && warnedVersion !== version) {
@@ -305,6 +314,12 @@ export class Engine extends EventEmitter {
       mod: this.client.status,
       fill: this.client.status.fill ?? null,
       fillSettings: this.config.fill ?? parseFill(),
+      gameMode: this.config.gameMode ?? 'fill',
+      miningSettings: this.config.mining ?? parseMining(),
+      // 採掘チャレンジ（MOD が数えている今の様子。MOD が忘れたら、最後に見た結果）
+      mining: this.client.status.mining ?? this.miningLast,
+      player: this.client.status.player ?? null,
+      miningUnavailable: this.client.status.miningUnavailable ?? [],
       worldSettings: this.config.world ?? parseWorld(),
       stats: { ...this.dispatcher.stats },
       rules: this.config.rules,
@@ -490,6 +505,7 @@ export class Engine extends EventEmitter {
   /** 埋め立てを始める。枠はマイクラのプレイヤーの真上の空中に作られる。使った設定は覚えておく */
   async startFill(options) {
     this.requireMod();
+    if (miningActive(this.client.status.mining)) throw new Error('採掘チャレンジ中です。先にチャレンジを終えてください');
     const fill = parseFill({ ...this.config.fill, ...options });
     const response = await this.client.send({ type: 'fill_start', ...fill });
     if (!response.ok) throw new Error(response.error);
@@ -529,6 +545,100 @@ export class Engine extends EventEmitter {
     const response = await this.client.send({ type: 'fill_stop' });
     if (!response.ok) throw new Error(response.error);
     this.log('info', '埋め立てを終えました');
+  }
+
+  /** ゲームモードを選ぶ（埋め立て / 採掘・収集チャレンジ）。動いているゲームがあれば断る */
+  setGameMode(mode) {
+    if (!GAME_MODES.includes(mode)) throw new Error('そのゲームモードはありません');
+    if (this.client.status.fill || miningActive(this.client.status.mining)) {
+      throw new Error('別のゲームモードが実行中です。先に今のモードを終えてから切り替えてください');
+    }
+    if ((this.config.gameMode ?? 'fill') === mode) return;
+    this.config.gameMode = mode;
+    this.log('info', `ゲームモードを「${mode === 'fill' ? '埋め立て' : '採掘・収集チャレンジ'}」にしました`);
+    this.emitState();
+  }
+
+  /** 採掘チャレンジの設定（資源・目標数・制限時間）を変える。挑戦中は変えられない */
+  setMining(settings) {
+    const next = { ...(this.config.mining ?? parseMining()), ...settings };
+    const problem = checkMining(next);
+    if (problem) throw new Error(problem);
+    if (miningActive(this.client.status.mining)) throw new Error('チャレンジ中は設定を変えられません。中止してから変えてください');
+    this.config.mining = parseMining(next);
+    this.emitState();
+  }
+
+  /** 採掘チャレンジを始める（MOD が、遊べる状態かを全部確かめてから3秒のカウントダウンを始める） */
+  async startMining() {
+    this.requireMod();
+    if (!this.client.status.players) throw new Error('先にMinecraftでワールドを開いてください');
+    const mining = this.config.mining ?? parseMining();
+    const problem = checkMining(mining);
+    if (problem) throw new Error(problem);
+    const response = await this.client.send({ type: 'mining_start', item: mining.item, targetCount: mining.targetCount, seconds: mining.seconds });
+    if (!response.ok) throw new Error(response.error);
+    this.log('info', `[採掘] 開始前チェックを通りました。3秒後に始まります（${targetName(mining.item)} ${mining.targetCount}個・${clock(mining.seconds)}）`);
+  }
+
+  /**
+   * 採掘チャレンジの一時停止・再開・中止（カウントダウン中の中止は開始の取り消し）。妨害の一時停止中でもできる
+   * @param {'pause' | 'resume' | 'abort'} op
+   */
+  async controlMining(op) {
+    this.requireMod();
+    const response = await this.client.send({ type: `mining_${op}` });
+    if (!response.ok) throw new Error(response.error);
+    if (op === 'pause') this.log('warn', '[採掘] チャレンジを一時停止しました（時間と進み具合が止まります。妨害は出しません）');
+    if (op === 'resume') this.log('ok', '[採掘] チャレンジを再開しました（残り時間から続けます）');
+  }
+
+  /**
+   * 採掘チャレンジのテスト。drop: 数えないテスト用のアイテムを1個出す / progress: 進み具合を percent% に / time: 残り5秒に
+   * （progress・time を使った挑戦は「テスト」の印が付く）
+   */
+  async testMining(op, percent = 100) {
+    this.requireMod();
+    const response = await this.client.send({ type: 'mining_test', op, percent });
+    if (!response.ok) throw new Error(response.error);
+    const done = { drop: 'テスト用の対象アイテムを1個出しました（拾っても進み具合には入りません）', progress: `進み具合を${percent}%にしました`, time: '残り時間を5秒にしました' };
+    this.log('info', `[採掘] テスト: ${done[op]}`);
+  }
+
+  /** MOD から届いた採掘チャレンジの様子を見て、始まった・進んだ・終わったをログに残す */
+  followMining(mining) {
+    const last = this.miningLast;
+    if (!mining) {
+      // 挑戦中だったのに MOD が知らない（ワールドを閉じた・マイクラが起動し直した）→ 中止として残す
+      if (last && miningActive(last)) {
+        this.miningLast = { ...last, state: 'aborted', failureReason: 'world_closed' };
+        this.log('warn', `[採掘] チャレンジは中止になりました（${MINING_REASONS.world_closed}）。続きからは始めません`);
+        this.emitState();
+      }
+      return;
+    }
+    // 古い知らせ（順番が入れ替わった）は使わない
+    if (last && last.sessionId === mining.sessionId && (last.seq ?? 0) > (mining.seq ?? 0)) return;
+    const name = targetName(mining.item);
+    const progress = `${Math.min(mining.progress, mining.targetCount)} / ${mining.targetCount}`;
+    if (!last || last.sessionId !== mining.sessionId) {
+      if (last && miningActive(last)) this.log('warn', '[採掘] 前のチャレンジは中止になりました');
+      if (miningActive(mining)) this.log('ok', `[採掘] チャレンジを始めました（${name} ${mining.targetCount}個・${clock(mining.durationSeconds)}）`);
+    } else {
+      if (mining.progress > last.progress) {
+        const support = mining.support - last.support;
+        this.log('info', `[採掘] ${name} ${progress}（+${mining.progress - last.progress}${support > 0 ? `・うち支援 ${support}` : ''}）`);
+      }
+      if (last.state === 'countdown' && mining.state === 'running') this.log('ok', '[採掘] スタート！');
+      if (miningActive(last) && !miningActive(mining)) {
+        const time = `${Math.floor(mining.elapsedSeconds / 60)}分${mining.elapsedSeconds % 60}秒`;
+        const reason = MINING_REASONS[mining.failureReason] ?? mining.failureReason;
+        if (mining.state === 'succeeded') this.log('ok', `[採掘] チャレンジクリア！ ${name} ${progress}（${time}）`);
+        if (mining.state === 'failed') this.log('warn', `[採掘] チャレンジ失敗（${reason}） ${name} ${progress}`);
+        if (mining.state === 'aborted') this.log('info', `[採掘] チャレンジを中止しました（${reason}） ${name} ${progress}`);
+      }
+    }
+    this.miningLast = mining;
   }
 
   /**

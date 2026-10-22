@@ -23,6 +23,10 @@ export class ModClient extends EventEmitter {
     this.connected = false;
     this.players = null;
     this.fill = null;
+    // 採掘チャレンジの様子・プレイヤーのゲームモード・このマイクラに無い資源（ping で分かる。古い MOD には無い）
+    this.mining = null;
+    this.player = null;
+    this.miningUnavailable = [];
     // マイクラに入っている MOD の版（ping で分かる。古い MOD には無い）
     this.version = null;
     this.nextId = 1;
@@ -47,7 +51,10 @@ export class ModClient extends EventEmitter {
   }
 
   get status() {
-    return { connected: this.connected, players: this.players, fill: this.fill, version: this.version };
+    return {
+      connected: this.connected, players: this.players, fill: this.fill, version: this.version,
+      mining: this.mining, player: this.player, miningUnavailable: this.miningUnavailable,
+    };
   }
 
   /** @returns {Promise<{ok: boolean, error?: string}>} */
@@ -112,6 +119,9 @@ export class ModClient extends EventEmitter {
       this.players = null;
       this.fill = null;
       this.version = null;
+      this.mining = null;
+      this.player = null;
+      this.miningUnavailable = [];
       for (const entry of this.inFlight.values()) {
         clearTimeout(entry.timer);
         entry.reject(new Error('MODとの接続が切れました'));
@@ -158,10 +168,21 @@ export class ModClient extends EventEmitter {
       const response = await this.send({ type: 'ping' });
       const fill = response.fill ?? null;
       const version = response.version ?? null;
-      if (response.ok && (this.players !== response.players || this.version !== version || JSON.stringify(this.fill) !== JSON.stringify(fill))) {
+      // 知らない形の知らせ（版の違う MOD）でも落ちないよう、オブジェクトでなければ無いことにする
+      const object = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : null);
+      const mining = object(response.mining);
+      const player = object(response.player);
+      const miningUnavailable = Array.isArray(response.miningUnavailable) ? response.miningUnavailable.filter((id) => typeof id === 'string') : [];
+      const changed = this.players !== response.players || this.version !== version || JSON.stringify(this.fill) !== JSON.stringify(fill)
+        || JSON.stringify(this.mining) !== JSON.stringify(mining) || JSON.stringify(this.player) !== JSON.stringify(player)
+        || JSON.stringify(this.miningUnavailable) !== JSON.stringify(miningUnavailable);
+      if (response.ok && changed) {
         this.players = response.players;
         this.fill = fill;
         this.version = version;
+        this.mining = mining;
+        this.player = player;
+        this.miningUnavailable = miningUnavailable;
         this.emitStatus();
       }
     } catch {

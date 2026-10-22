@@ -1,14 +1,15 @@
 // 配信画面（オーバーレイ）の部品。LIVE Studio に「リンク」のソースとして1つずつ貼る（縦画面向け）。
 // 背景は透明。文字や絵の大きさは枠の大きさに合わせて変わる（単位 --u。page() を参照）ので、LIVE Studio で枠を大きくすればそのまま大きくなる。
-// URL の最後に #demo を付けると、試しのデータで動く（操作画面のプレビュー用）。
+// URL の最後に #demo を付けると、試しのデータで動く（操作画面のプレビュー用）。#demo-mining はゲーム状況の採掘チャレンジの試し。
 import { DEFAULT_OVERLAY_STYLE, OVERLAY_FONTS } from '../config.js';
+import { MINING_TARGETS } from '../mining.js';
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
 
 /** 部品の一覧。size は縦画面（1080×1920）に置くときのおすすめの大きさ */
 export const OVERLAY_WIDGETS = [
   { id: 'alerts', name: 'ギフト通知', description: 'ギフトが届いて妨害が出たら、ギフトの絵・送った人・出た妨害を大きく出します。', size: [1080, 560] },
   { id: 'gifts', name: 'ギフト表', description: 'どのギフトで何が起きるかを、「ギフト＋妨害」のカードにして横長の1枚に並べます（基本は横5×縦3）。「妨害の設定」のルールがそのまま出ます。増えるとカードを小さくして1枚に収めます。', size: [1080, 608] },
-  { id: 'round', name: 'ラウンドと進み具合', description: 'ラウンドと埋めた割合。埋めきったらカウントダウンを大きく出し、クリアで演出します。埋め立て中だけ出ます。', size: [1080, 360] },
+  { id: 'round', name: 'ゲーム状況', description: '埋め立てはラウンドと埋めた割合、採掘チャレンジは集めた数と残り時間。カウントダウンを大きく出し、クリアで演出します。ゲーム中だけ出ます。', size: [1080, 360] },
   { id: 'ranking', name: 'ギフトランキング', description: 'ギフトをたくさん送ってくれた人の上位5人（コインの合計）。配信が始まってからの分を数え、次の配信で0に戻ります（アプリを起動し直しても続きから）。テスト送信は数えません。', size: [540, 600] },
 ];
 
@@ -46,7 +47,7 @@ const BASE_CSS = String.raw`
 `;
 
 const BASE_JS = String.raw`
-  const DEMO = location.hash === '#demo';
+  const DEMO = location.hash.startsWith('#demo');
   const $ = (id) => document.getElementById(id);
   function el(tag, className, ...children) {
     const node = document.createElement(tag);
@@ -386,9 +387,10 @@ const GIFTS = page({
 `,
 });
 
-// ---- ラウンドと進み具合 ----
+// ---- ゲーム状況（埋め立て: ラウンドと進み具合 / 採掘チャレンジ: 集めた数と残り時間） ----
+// URL は前と同じ round.html（LIVE Studio に貼り直さなくてよいように）
 const ROUND = page({
-  title: 'ラウンドと進み具合',
+  title: 'ゲーム状況',
   size: widgetSize('round'),
   css: String.raw`
   #box { position: fixed; inset: calc(2 * var(--u)); padding: calc(3.4 * var(--u)) calc(4.4 * var(--u)) calc(4 * var(--u)); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
@@ -421,6 +423,25 @@ const ROUND = page({
   #clear b { font-size: calc(12 * var(--u)); line-height: 1.05; letter-spacing: .02em; animation: slam .6s cubic-bezier(.2, 1.6, .4, 1) both; }
   #clear small { font-size: calc(4.6 * var(--u)); margin-top: calc(1.4 * var(--u)); animation: fade .6s .3s both; }
   #clear i { position: absolute; top: calc(-4 * var(--u)); width: calc(1.8 * var(--u)); height: calc(3 * var(--u)); border-radius: calc(.4 * var(--u)); animation: fall linear forwards; }
+  /* 採掘チャレンジ: 左に資源、まん中に集めた数、右に残り時間 */
+  #mine { display: none; }
+  #box.mining .top, #box.mining > .bar { display: none; }
+  #box.mining #mine { display: block; }
+  #mine .head { display: flex; justify-content: space-between; gap: calc(3 * var(--u)); font-size: calc(3.6 * var(--u)); white-space: nowrap; }
+  #mine .row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: calc(4 * var(--u)); margin-top: calc(1.4 * var(--u)); }
+  #mine .what { display: flex; align-items: center; gap: calc(2 * var(--u)); min-width: 0; }
+  #mine .what .mc { --s: calc(8 * var(--u)); }
+  #mineName { font-size: calc(5.6 * var(--u)); }
+  #mineCount { font-size: calc(9.5 * var(--u)); line-height: 1; white-space: nowrap; }
+  #mineCount span { font-size: calc(5 * var(--u)); color: var(--ov-muted); margin-left: calc(.6 * var(--u)); }
+  #mineTime { font-size: calc(9.5 * var(--u)); line-height: 1; }
+  #mineTime.warn { color: #ff6b5e; animation: pulse 1s ease-in-out infinite; }
+  #mineState { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #mineState.paused { color: var(--ov-accent); }
+  #mine .bar div { background: var(--ov-accent); }
+  #clear.fail b { color: #ff6b5e; }
+  #clear.abort b { color: var(--ov-muted); }
+  @keyframes pulse { 50% { opacity: .55; } }
   @keyframes tick { from { transform: scale(1.8); opacity: .3; } to { transform: none; opacity: 1; } }
   @keyframes slam { from { transform: scale(2.4); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
@@ -433,7 +454,16 @@ const ROUND = page({
     <div id="percent" class="num"></div>
   </div>
   <div class="bar"><div id="bar"></div></div>
-  <div id="count"><b class="num" id="countNum"></b><span>崩されなければクリア</span></div>
+  <div id="mine">
+    <div class="head muted"><span>採掘チャレンジ</span><span id="mineState"></span></div>
+    <div class="row">
+      <div class="what"><span id="mineIcon"></span><b id="mineName" class="ellipsis fit"></b></div>
+      <b class="num" id="mineCount"></b>
+      <b class="num" id="mineTime"></b>
+    </div>
+    <div class="bar"><div id="mineBar"></div></div>
+  </div>
+  <div id="count"><b class="num" id="countNum"></b><span id="countText">崩されなければクリア</span></div>
   <div id="clear"><b id="clearText"></b><small class="muted" id="clearSub"></small></div>
 </div>`,
   script: String.raw`
@@ -448,6 +478,7 @@ const ROUND = page({
       return;
     }
     $('box').className = 'panel ' + fill.phase;
+    $('countText').textContent = '崩されなければクリア';
     const total = el('span', '', '/' + fill.rounds);
     $('round').replaceChildren(String(Math.min(fill.round + (fill.phase === 'cleared' ? 0 : 1), fill.rounds)), total);
     const status = fill.phase === 'cleared' ? '全ラウンドクリア！' : fill.filled.toLocaleString('ja-JP') + ' / ' + fill.total.toLocaleString('ja-JP');
@@ -471,12 +502,18 @@ const ROUND = page({
   }
   function celebrate(fill) {
     const all = fill.phase === 'cleared';
-    $('clearText').textContent = all ? 'ALL CLEAR!' : 'ROUND CLEAR!';
-    $('clearSub').textContent = all ? fill.rounds + 'ラウンド全部クリア！' : fill.round + ' / ' + fill.rounds + ' クリア';
+    showResult(all ? 'ALL CLEAR!' : 'ROUND CLEAR!', all ? fill.rounds + 'ラウンド全部クリア！' : fill.round + ' / ' + fill.rounds + ' クリア',
+      '', all ? 60 : 32, all ? CLEAR_MS * 2 : CLEAR_MS);
+  }
+  /** 結果を大きく出す。pieces は紙吹雪の数（0 なら出さない） */
+  function showResult(text, sub, kind, pieces, ms) {
+    $('clearText').textContent = text;
+    $('clearSub').textContent = sub;
     const box = $('clear');
+    box.className = kind;
     box.querySelectorAll('i').forEach((i) => i.remove());
     const colors = ['#ffffff', '#cfcfd4', STYLE.accentColor, STYLE.textColor];
-    for (let n = 0; n < (all ? 60 : 32); n++) {
+    for (let n = 0; n < pieces; n++) {
       const piece = document.createElement('i');
       piece.style.left = Math.random() * 100 + '%';
       piece.style.background = colors[n % colors.length];
@@ -486,9 +523,97 @@ const ROUND = page({
     }
     box.classList.add('on');
     clearTimeout(clearTimer);
-    clearTimer = setTimeout(() => box.classList.remove('on'), all ? CLEAR_MS * 2 : CLEAR_MS);
+    clearTimer = setTimeout(() => box.classList.remove('on'), ms);
   }
-  if (DEMO) {
+
+  // ---- 採掘チャレンジ ----
+  const TARGETS = Object.fromEntries(${JSON.stringify(MINING_TARGETS.map((t) => [t.id, { name: t.name, icon: t.icon }]))});
+  const ACTIVE = ['countdown', 'running', 'paused'];
+  /** 終わった結果を出しておく時間（そのあとは隠す） */
+  const RESULT_MS = 8000;
+  let lastMining = null;
+  let resultUntil = 0;
+  let hideTimer = null;
+  let lastState = null;
+  const clockText = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  /** 採掘チャレンジを出すか（挑戦中か、終わってすぐ）。出したら true */
+  function renderMining(m, connected) {
+    const active = m && ACTIVE.includes(m.state);
+    // 古い知らせ（前の挑戦・番号が戻った）では表示を戻さない
+    if (m && lastMining && m.sessionId === lastMining.sessionId && (m.seq ?? 0) < (lastMining.seq ?? 0)) return true;
+    const ended = m && lastMining && lastMining.sessionId === m.sessionId && ACTIVE.includes(lastMining.state) && !active;
+    lastMining = m;
+    if (ended) {
+      const target = TARGETS[m.item]?.name ?? '';
+      const count = target + ' ' + Math.min(m.progress, m.targetCount) + ' / ' + m.targetCount;
+      if (m.state === 'succeeded') showResult('CLEAR!', count, '', 60, RESULT_MS);
+      else if (m.state === 'failed') showResult(m.failureReason === 'player_died' ? 'GAME OVER' : 'TIME UP!', count, 'fail', 0, RESULT_MS);
+      else showResult('中止', count, 'abort', 0, RESULT_MS);
+      resultUntil = Date.now() + RESULT_MS;
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => lastState && renderAll(lastState), RESULT_MS + 50);
+    }
+    // 結果を出しているうちに次の挑戦が始まったら、結果は消す
+    if (active && resultUntil > Date.now()) {
+      resultUntil = 0;
+      clearTimeout(clearTimer);
+      $('clear').classList.remove('on');
+    }
+    if (!m || (!active && Date.now() > resultUntil)) return false;
+    $('box').hidden = false;
+    $('box').className = 'panel mining' + (m.state === 'countdown' ? ' countdown' : '');
+    const target = TARGETS[m.item] ?? { name: m.item, icon: '' };
+    if ($('mineName').textContent !== target.name) {
+      $('mineName').textContent = target.name;
+      $('mineIcon').replaceChildren(mcIcon(target.icon));
+      fitText($('box'));
+    }
+    const shown = Math.min(m.progress, m.targetCount);
+    $('mineCount').replaceChildren(String(shown), el('span', '', '/' + m.targetCount));
+    $('mineBar').style.width = Math.min(100, (shown / m.targetCount) * 100) + '%';
+    $('mineTime').textContent = clockText(m.remainingSeconds);
+    $('mineTime').className = 'num' + (m.state === 'running' && m.remainingSeconds <= 10 ? ' warn' : '');
+    const support = m.support > 0 ? '採掘 ' + m.mined + '・支援 ' + m.support : '';
+    const status = !connected && active ? 'マイクラとの接続が切れています' : m.state === 'paused' ? '一時停止中' : support;
+    $('mineState').textContent = status;
+    $('mineState').className = m.state === 'paused' ? 'paused' : '';
+    if (m.state === 'countdown' && m.countdownSecondsLeft !== lastCount) {
+      $('countText').textContent = 'まもなくスタート';
+      const num = $('countNum');
+      num.textContent = m.countdownSecondsLeft;
+      num.classList.remove('tick');
+      void num.offsetWidth;
+      num.classList.add('tick');
+    }
+    lastCount = m.state === 'countdown' ? m.countdownSecondsLeft : null;
+    return true;
+  }
+  function renderAll(state) {
+    lastState = state;
+    if (renderMining(state.mining ?? null, state.mod?.connected !== false)) return;
+    render(state.fill);
+  }
+
+  if (location.hash === '#demo-mining') {
+    // 採掘チャレンジ: カウントダウン → 集める → クリア → もう一度 → 時間切れ をくり返す
+    const base = { sessionId: 'demo', item: 'minecraft:raw_iron', targetCount: 16, progress: 0, mined: 0, support: 0, remainingSeconds: 180, countdownSecondsLeft: 0, seq: 0 };
+    let step = 0;
+    let seq = 0;
+    setInterval(() => {
+      step = (step + 1) % 40;
+      seq++;
+      let m;
+      if (step < 3) m = { ...base, state: 'countdown', countdownSecondsLeft: 3 - step };
+      else if (step < 15) m = { ...base, state: 'running', progress: (step - 2) + (step > 10 ? 3 : 0), mined: step - 2, support: step > 10 ? 3 : 0, remainingSeconds: 180 - (step - 2) * 9 };
+      else if (step < 20) m = { ...base, state: 'succeeded', progress: 16, mined: 13, support: 3, remainingSeconds: 72 };
+      else if (step < 22) m = { ...base, sessionId: 'demo2', state: 'countdown', countdownSecondsLeft: 22 - step };
+      else if (step < 34) m = { ...base, sessionId: 'demo2', state: 'running', progress: Math.floor((step - 22) / 2), mined: Math.floor((step - 22) / 2), remainingSeconds: 12 - (step - 22) };
+      else m = { ...base, sessionId: 'demo2', state: 'failed', failureReason: 'timeout', progress: 6, mined: 6, remainingSeconds: 0 };
+      if (step === 0) lastMining = null;
+      renderAll({ mining: { ...m, seq }, fill: null, mod: { connected: true } });
+    }, 1000);
+    renderAll({ mining: { ...base, state: 'countdown', countdownSecondsLeft: 3 }, fill: null, mod: { connected: true } });
+  } else if (DEMO) {
     // 埋める → カウントダウン → クリア をくり返す
     let step = 0;
     const base = { filled: 0, total: 1089, rounds: 10, round: 2, countdownSecondsLeft: 0, phase: 'filling', percent: 0 };
@@ -504,7 +629,7 @@ const ROUND = page({
     }, 900);
     render(base);
   } else {
-    connect({ onState: (state) => render(state.fill) });
+    connect({ onState: renderAll });
   }
 `,
 });

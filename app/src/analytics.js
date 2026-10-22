@@ -18,7 +18,9 @@ const MAX_SUPPORTERS = 100;
 const MAX_GIFT_KINDS = 100;
 const MAX_FAILURE_KINDS = 20;
 
-const emptyActions = () => ({ sent: 0, failed: 0, cooldown: 0, paused: 0, no_rule: 0 });
+const emptyActions = () => ({ sent: 0, failed: 0, cooldown: 0, paused: 0, no_rule: 0, challenge_paused: 0, mode_incompatible: 0, no_active_mode: 0 });
+/** 出さなかった理由（前の版で保存した記録には無い理由もあるので、無ければ0から数える） */
+const SKIP_STATUSES = Object.keys(emptyActions()).filter((key) => key !== 'sent' && key !== 'failed');
 
 export class Analytics {
   /**
@@ -111,8 +113,8 @@ export class Analytics {
       const reason = String(result.error ?? '').slice(0, 120) || '理由不明';
       stream.failures[reason] = (stream.failures[reason] ?? 0) + 1;
       stream.failures = keepTop(stream.failures, MAX_FAILURE_KINDS, (n) => n);
-    } else if (result.status in stream.actions) {
-      stream.actions[result.status]++;
+    } else if (SKIP_STATUSES.includes(result.status)) {
+      stream.actions[result.status] = (stream.actions[result.status] ?? 0) + 1;
     } else {
       return false;
     }

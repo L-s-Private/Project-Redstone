@@ -99,9 +99,25 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
     document.getElementById('fillBar').style.width = (fill.total ? (fill.filled / fill.total) * 100 : 0) + '%';
   }
 
+  // 採掘チャレンジ中は、集めた数と残り時間を同じ場所に出す
+  const MINING_ACTIVE = ['countdown', 'running', 'paused'];
+  function show(state) {
+    const m = state.mining;
+    if (!m || !MINING_ACTIVE.includes(m.state)) return showFill(state.fill);
+    const box = document.getElementById('fill');
+    box.style.display = 'block';
+    box.className = m.state === 'countdown' ? 'countdown' : '';
+    const s = m.remainingSeconds;
+    const time = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    const label = m.state === 'countdown' ? 'まもなくスタート ' + m.countdownSecondsLeft : m.state === 'paused' ? '一時停止中' : '残り ' + time;
+    document.getElementById('fillText').textContent = '採掘チャレンジ ' + label;
+    const shown = Math.min(m.progress, m.targetCount);
+    document.getElementById('fillPercent').textContent = shown + ' / ' + m.targetCount;
+    document.getElementById('fillBar').style.width = Math.min(100, (shown / m.targetCount) * 100) + '%';
+  }
   const events = new EventSource('/events');
-  events.addEventListener('snapshot', (e) => showFill(JSON.parse(e.data).state.fill));
-  events.addEventListener('state', (e) => showFill(JSON.parse(e.data).fill));
+  events.addEventListener('snapshot', (e) => show(JSON.parse(e.data).state));
+  events.addEventListener('state', (e) => show(JSON.parse(e.data)));
   events.addEventListener('alert', (e) => showAlert(JSON.parse(e.data)));
   if (location.hash === '#demo') {
     showAlert({ who: 'テストさん', action: 'TNT ×3', icon: 'tnt' });

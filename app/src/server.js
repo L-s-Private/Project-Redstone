@@ -139,6 +139,47 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       if (result.status === 'failed') return { status: 400, error: result.error };
       if (result.status === 'paused') return { status: 400, error: '一時停止中です' };
     },
+    'POST /api/mode': async (body) => {
+      try {
+        engine.setGameMode(String(body.mode ?? ''));
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+      await saveConfig(engine.config);
+    },
+    // 採掘チャレンジの設定（資源・目標数・制限時間）。範囲の外は丸めずに断る
+    'POST /api/mining': async (body) => {
+      try {
+        engine.setMining({ item: body.item, targetCount: body.targetCount, seconds: body.seconds });
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+      await saveConfig(engine.config);
+    },
+    'POST /api/mining/start': async () => {
+      try {
+        await engine.startMining();
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+    },
+    'POST /api/mining/control': async (body) => {
+      if (!['pause', 'resume', 'abort'].includes(body.op)) return { status: 400, error: 'この操作はできません' };
+      try {
+        await engine.controlMining(body.op);
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+    },
+    'POST /api/mining/test': async (body) => {
+      if (!['drop', 'progress', 'time'].includes(body.op)) return { status: 400, error: 'この操作はできません' };
+      const percent = Math.min(100, Math.max(0, Math.floor(Number(body.percent ?? 100)) || 0));
+      try {
+        await engine.testMining(body.op, percent);
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+    },
     'POST /api/fill/stop': async () => {
       try {
         await engine.stopFill();

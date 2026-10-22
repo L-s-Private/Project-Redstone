@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.projectredstone.game.MiningChallenge;
 
 import java.util.Map;
 import java.util.Set;
@@ -16,11 +17,12 @@ public record ActionRequest(String id, Type type, int count, String from, String
                             int width, int height, int countdown, String wall, String block, int skyY, int reach,
                             String placeSpeed, int percent, int rounds, String breakSpeed, String handBlock,
                             boolean mobsAttack, String time, String weather, boolean mobSpawning, boolean keepInventory,
-                            int mobLifetime) {
+                            int mobLifetime, String item, int targetCount, int seconds, boolean terrain, String op) {
 
     public enum Type {
         PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET, WORLD,
-        JAIL, FREEZE, FILL_LAYER, FILL_CLEAR, LIGHTNING, LEVITATE, NIGHT, FILL_RAISE, STOP_ALL
+        JAIL, FREEZE, FILL_LAYER, FILL_CLEAR, LIGHTNING, LEVITATE, NIGHT, FILL_RAISE, STOP_ALL,
+        MINING_START, MINING_PAUSE, MINING_RESUME, MINING_ABORT, MINING_BONUS_DROP, MINING_TEST
     }
 
     /**
@@ -39,11 +41,15 @@ public record ActionRequest(String id, Type type, int count, String from, String
             Map.entry(Type.LIGHTNING, 10),
             Map.entry(Type.LEVITATE, 15),
             Map.entry(Type.NIGHT, 300),
-            Map.entry(Type.FILL_RAISE, 5));
+            Map.entry(Type.FILL_RAISE, 5),
+            Map.entry(Type.MINING_BONUS_DROP, MiningChallenge.MAX_SUPPORT_PER_EVENT));
 
     /** 埋め立て中でないと使えない種類 */
     public static final Set<Type> NEEDS_FILL_GAME = Set.of(Type.FILL_EXPAND, Type.FILL_SHRINK, Type.FILL_HELP, Type.FILL_SET, Type.FILL_STOP,
             Type.JAIL, Type.FILL_LAYER, Type.FILL_CLEAR, Type.FILL_RAISE);
+
+    /** mining_test の操作: drop（数えないテスト用の対象アイテムを1個出す）/ progress（進み具合を percent% にする）/ time（残り5秒にする） */
+    public static final Set<String> MINING_TEST_OPS = Set.of("drop", "progress", "time");
 
     public static final Set<String> ALLOWED_MOBS = Set.of("zombie", "skeleton", "creeper", "spider", "witch", "silverfish", "pig");
 
@@ -171,9 +177,31 @@ public record ActionRequest(String id, Type type, int count, String from, String
         boolean keepInventory = optBoolean(json, "keepInventory", false);
         int mobLifetime = Math.max(0, Math.min(MAX_MOB_LIFETIME, optInt(json, "mobLifetime", DEFAULT_MOB_LIFETIME)));
 
+        // 採掘チャレンジ: 資源・目標数・制限時間は、範囲の外なら丸めずに断る（MiningChallenge.create でも確かめる）
+        String item = optString(json, "item", "minecraft:raw_iron");
+        int targetCount = optInt(json, "targetCount", 16);
+        int seconds = optInt(json, "seconds", 180);
+        if (type == Type.MINING_START) {
+            if (!MiningChallenge.TARGETS.contains(item)) {
+                throw new InvalidRequestException("選択中の対象アイテムは使えません。別の対象を選んでください");
+            }
+            if (targetCount < MiningChallenge.MIN_TARGET || targetCount > MiningChallenge.MAX_TARGET) {
+                throw new InvalidRequestException("目標数は" + MiningChallenge.MIN_TARGET + "〜" + MiningChallenge.MAX_TARGET + "の整数にしてください");
+            }
+            if (seconds < MiningChallenge.MIN_SECONDS || seconds > MiningChallenge.MAX_SECONDS) {
+                throw new InvalidRequestException("制限時間は" + MiningChallenge.MIN_SECONDS + "〜" + MiningChallenge.MAX_SECONDS + "秒にしてください");
+            }
+        }
+        // tnt・mob: false なら地形を壊さない（採掘チャレンジで使う。TNT とクリーパーの爆発をブロックを壊さない爆発にする）
+        boolean terrain = optBoolean(json, "terrain", true);
+        String op = optString(json, "op", "drop");
+        if (type == Type.MINING_TEST && !MINING_TEST_OPS.contains(op)) {
+            throw new InvalidRequestException("未対応のテストです: " + op);
+        }
+
         return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach, placeSpeed, percent,
                 rounds, breakSpeed, handBlock, mobsAttack, time, weather, mobSpawning, keepInventory,
-                mobLifetime);
+                mobLifetime, item, targetCount, seconds, terrain, op);
     }
 
     /** 押しっぱなしで次のブロックを置けるまでの tick 数 */
@@ -211,6 +239,12 @@ public record ActionRequest(String id, Type type, int count, String from, String
             case "night" -> Type.NIGHT;
             case "fill_raise" -> Type.FILL_RAISE;
             case "stop_all" -> Type.STOP_ALL;
+            case "mining_start" -> Type.MINING_START;
+            case "mining_pause" -> Type.MINING_PAUSE;
+            case "mining_resume" -> Type.MINING_RESUME;
+            case "mining_abort" -> Type.MINING_ABORT;
+            case "mining_bonus_drop" -> Type.MINING_BONUS_DROP;
+            case "mining_test" -> Type.MINING_TEST;
             default -> throw new InvalidRequestException("未対応の type です: " + raw);
         };
     }

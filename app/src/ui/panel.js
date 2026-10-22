@@ -450,11 +450,17 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .preset-card > summary .preset-now b { color: var(--text); font-weight: 700; }
   .preset-card > summary .toggle-text { color: var(--faint); font-size: 12px; flex: none; }
   .preset-card[open] > summary { margin-bottom: 14px; }
+  .fold-card > summary { display: flex; align-items: center; gap: 12px; list-style: none; cursor: pointer; }
+  .fold-card > summary h2 { margin: 0; flex: none; }
+  .fold-card > summary .fold-note { color: var(--muted); font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fold-card[open] > summary { margin-bottom: 8px; }
+  .fold-card .fold-sub { margin: 20px 0 2px; font-size: 13px; }
   .preset-card .preset-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   .preset-card .preset-tools .lead { margin: 0 auto 0 0; }
   .recent-title small { display: block; font-weight: 400; color: var(--faint); font-size: 11px; }
   .recent button.has-rule { border-color: var(--line); color: var(--muted); }
   .recent button.has-rule::after { content: "ルールあり"; margin-left: 6px; font-size: 10px; color: var(--faint); }
+  .recent button.by-coins::after { content: "コイン数で出る"; margin-left: 6px; font-size: 10px; color: var(--faint); }
   .rules-top h2 { font-size: 15px; margin: 0 auto 0 0; }
   .rule-group { margin-top: 18px; }
   .rule-group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
@@ -1070,16 +1076,17 @@ ${CONTROLS_CSS}
     <div id="fillIdle" class="stack">
       <section class="card">
         <h2>ゲームの決まり</h2>
-        <p class="lead">埋めきって、決めた秒数崩されなければ 1ラウンドクリアです。</p>
+        <p class="lead">埋めきって、決めた秒数崩されなければ 1ラウンドクリアです。変えるとすぐ保存されます。</p>
         <div class="setting"><div class="setting-text"><label for="fillRounds">ラウンド数</label></div><div class="setting-control"><input id="fillRounds" type="number" min="1" max="99" data-unit="回"></div></div>
         <div class="setting"><div class="setting-text"><label for="fillCountdown">埋めきってからクリアまで</label><small>この秒数のあいだ崩されなければクリア</small></div><div class="setting-control"><input id="fillCountdown" type="number" min="0" max="600" data-unit="秒"></div></div>
         <div class="setting"><div class="setting-text"><label for="fillWidth">枠の幅</label><small>3〜41 の奇数</small></div><div class="setting-control"><input id="fillWidth" type="number" min="3" max="41" step="2" data-unit="マス"></div></div>
         <div class="setting"><div class="setting-text"><label for="fillHeight">枠の高さ</label></div><div class="setting-control"><input id="fillHeight" type="number" min="1" max="30" data-unit="マス"></div></div>
+      </section>
+      <details class="card fold-card" id="fillMore">
+        <summary><h2>細かい設定</h2><span class="fold-note">そのままで大丈夫です（枠を作る高さ・モブ・プレイヤーの速さなど）</span></summary>
         <div class="setting"><div class="setting-text"><label for="fillSkyY">枠を作る高さ</label><small>Y 座標</small></div><div class="setting-control"><input id="fillSkyY" type="number" min="-60" max="300" data-unit=""></div></div>
         <div class="setting"><div class="setting-text"><label for="fillMobLifetime">モブが消えるまで</label><small>0 にすると消えません</small></div><div class="setting-control"><input id="fillMobLifetime" type="number" min="0" max="600" step="5" data-unit="秒"></div></div>
-      </section>
-      <section class="card">
-        <h2>プレイヤー</h2>
+        <h3 class="fold-sub">プレイヤー</h3>
         <p class="lead">埋め立て中だけ変わり、終えると元に戻ります。</p>
         <div class="setting"><div class="setting-text"><label for="fillMobsAttack">モブからの攻撃</label></div><div class="setting-control"><select id="fillMobsAttack">
           <option value="true">モブの攻撃でだけダメージ</option><option value="false">攻撃されない</option>
@@ -1091,7 +1098,7 @@ ${CONTROLS_CSS}
           <option value="normal">ふつう（バニラと同じ）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
         </select></div></div>
         <div class="setting"><div class="setting-text"><label for="fillReach">届く距離</label></div><div class="setting-control"><input id="fillReach" type="number" min="1" max="64" data-unit="マス"></div></div>
-      </section>
+      </details>
       <section class="card">
         <h2>見た目</h2>
         <p class="lead">配信に映るブロックと枠です。</p>
@@ -2214,6 +2221,7 @@ ${CONTROLS_JS}
     // 全部そろっていれば中身はしまう。足りないときは開いて見せる（そろったかどうかが変わったときだけ）
     if (setupReady !== setup.ready) $('setupChecks').open = !setup.ready;
     setupReady = setup.ready;
+    if ($('wizard').open) renderWizardNext();
     renderReady();
   }
   let setupReady = null;
@@ -3981,7 +3989,27 @@ ${CONTROLS_JS}
     fillMobsAttack: 'mobsAttack', fillMobLifetime: 'mobLifetime',
   };
   let fillFormDirty = false;
-  Object.keys(FILL_FIELDS).forEach((id) => $(id).addEventListener('input', () => (fillFormDirty = true)));
+  // 変えたらすぐ保存する（続けて押したときは、止まってからまとめて）
+  let fillSaveTimer = null;
+  function fillBody() {
+    const body = {};
+    for (const [id, key] of Object.entries(FILL_FIELDS)) {
+      const value = $(id).value;
+      body[key] = $(id).tagName !== 'SELECT' ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
+    }
+    return body;
+  }
+  async function saveFill() {
+    clearTimeout(fillSaveTimer);
+    fillSaveTimer = null;
+    const data = await post('/api/fill', fillBody());
+    if (data?.ok) fillFormDirty = false;
+  }
+  Object.keys(FILL_FIELDS).forEach((id) => ['input', 'change'].forEach((type) => $(id).addEventListener(type, () => {
+    fillFormDirty = true;
+    clearTimeout(fillSaveTimer);
+    fillSaveTimer = setTimeout(saveFill, 600);
+  })));
   let fillSettingsKey = '';
   /** 右の枠の図（幅×幅×高さの箱。置かれるブロックの色で下から3分の1を塗る） */
   const BLOCK_COLORS = {
@@ -4054,12 +4082,8 @@ ${CONTROLS_JS}
   }));
 
   async function startFill(button) {
-    const body = {};
-    for (const [id, key] of Object.entries(FILL_FIELDS)) {
-      const value = $(id).value;
-      body[key] = $(id).tagName !== 'SELECT' ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
-    }
-    const data = await post('/api/fill/start', body, { button, done: '埋め立てを始めました' });
+    clearTimeout(fillSaveTimer);
+    const data = await post('/api/fill/start', fillBody(), { button, done: '埋め立てを始めました' });
     if (data?.ok) {
       fillFormDirty = false;
       // 保存された値（範囲に収めたもの）で入れ直す
@@ -4128,9 +4152,14 @@ ${CONTROLS_JS}
       b.className = 'icon-btn';
       b.append(giftIcon(gift.image || gift.giftName), gift.giftName + '（🪙' + gift.diamonds + '）');
       const index = rows.findIndex((r) => r.trigger === 'gift' && giftKey(r.value) === giftKey(gift.giftName));
+      // 名前のルールがなくても、コイン数のルールで出るなら、そのことを見せる
+      const byCoins = index === -1 && rows.find((r) => r.trigger === 'minDiamonds' && Number(r.value) <= gift.diamonds);
       if (index !== -1) {
         b.classList.add('has-rule');
         b.title = 'このギフトのルールがあります。押すと開きます';
+      } else if (byCoins) {
+        b.classList.add('by-coins');
+        b.title = '「' + byCoins.value + ' コイン以上」のルールで出ます。押すと、このギフトだけのルールを作ります';
       } else {
         b.title = '押すと、このギフトのルールを作ります';
       }
@@ -4190,9 +4219,16 @@ ${CONTROLS_JS}
     document.querySelectorAll('#wizard [data-step]').forEach((el) => (el.hidden = Number(el.dataset.step) !== step));
     $('wizSteps').textContent = STEP_NAMES.map((name, i) => (i === step ? '● ' : '○ ') + name).join('　');
     $('wizBack').style.visibility = step === 0 ? 'hidden' : 'visible';
-    $('wizNext').textContent = step === STEP_NAMES.length - 1 ? 'はじめる' : '次へ';
+    renderWizardNext();
     if (step === 0) loadSetup();
     if (step === 1) $('wizUsername').value = state?.tiktokUsername ?? '';
+  }
+
+  /** マイクラの準備が足りないうちは、「次へ」を控えめにして「まとめて導入する」を先に押してもらう */
+  function renderWizardNext() {
+    const later = wizardStep === 0 && setupReady === false;
+    $('wizNext').classList.toggle('next', !later);
+    $('wizNext').textContent = later ? 'あとで入れる' : wizardStep === STEP_NAMES.length - 1 ? 'はじめる' : '次へ';
   }
 
   function openWizard() {

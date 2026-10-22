@@ -518,6 +518,13 @@ export class Engine extends EventEmitter {
     this.emitState();
   }
 
+  /** 埋め立ての設定を覚える（始めるのは startFill）。埋め立て中は変えない */
+  setFill(settings) {
+    if (this.client.status.fill) throw new Error('埋め立て中は設定を変えられません。いったん終えてから変えてください');
+    this.config.fill = parseFill({ ...this.config.fill, ...settings });
+    this.emitState();
+  }
+
   /**
    * ワールドの設定（昼に固定・天気など）を変える。マイクラにつながっていれば、すぐ入れる。
    * @returns {Promise<boolean>} マイクラに入れられたか（つながっていなければ、つながったときに入れる）

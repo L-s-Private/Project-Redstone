@@ -502,3 +502,16 @@ test('採掘チャレンジ: ゲーム中はモードを切り替えられず、
   assert.equal(engine.state.mining.state, 'aborted');
   assert.equal(engine.state.mining.failureReason, 'world_closed');
 });
+
+test('埋め立ての設定は、始めなくても覚える（マイクラにつながっていなくても）。埋め立て中は変えない', () => {
+  const { engine, client } = setup();
+  client.status = { connected: false, players: null };
+  engine.setFill({ rounds: 20, width: 999 });
+  assert.equal(engine.config.fill.rounds, 20);
+  assert.equal(engine.config.fill.width, 41, '範囲に収める');
+  assert.equal(engine.state.fillSettings.rounds, 20);
+  assert.deepEqual(client.sent, [], 'マイクラには何も送らない');
+  client.status = { connected: true, players: 1, fill: { phase: 'filling' } };
+  assert.throws(() => engine.setFill({ rounds: 5 }), /埋め立て中/);
+  assert.equal(engine.config.fill.rounds, 20);
+});

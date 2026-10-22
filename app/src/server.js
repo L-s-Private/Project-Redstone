@@ -118,6 +118,14 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       }
       await saveConfig(engine.config);
     },
+    'POST /api/fill': async (body) => {
+      try {
+        engine.setFill(body);
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+      await saveConfig(engine.config);
+    },
     'POST /api/world': async (body) => {
       const applied = await engine.setWorld(body);
       await saveConfig(engine.config);

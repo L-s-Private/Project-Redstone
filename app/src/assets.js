@@ -17,7 +17,7 @@ export const ASSET_TYPES = {
  */
 export const KEY_ART = {
   fill: { src: '/assets/art/fill.jpg', position: '50% 42%' },
-  mining_challenge: { src: '/assets/art/mining_challenge.jpg', position: '62% 38%' },
+  mining_challenge: { src: '/assets/art/mining_challenge.jpg', position: '58% 40%' },
 };
 
 /** /assets/ のあとの場所が、配ってよい形か（英小文字・数字・_ - / と拡張子だけ。.. や隠しファイルは不可） */

@@ -3,6 +3,7 @@ import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
 import { MAX_CHOICES, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
 import { PLANS } from '../plan.js';
 import { OVERLAY_WIDGETS } from './overlays.js';
+import { KEY_ART } from '../assets.js';
 import { FILL_ONLY_ACTIONS, MINING_LIMITS, MINING_ONLY_ACTIONS, MINING_PRESETS, MINING_REASONS, MINING_TARGETS } from '../mining.js';
 
 export const PANEL_HTML = String.raw`<!doctype html>
@@ -292,6 +293,26 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .fill-phase.paused { color: var(--warn); }
   .fill-phase.failed { color: var(--bad); }
   .fill-phase.aborted { color: var(--muted); }
+  /* モードの見出し（キーアートの帯）。絵は KEY_ART（src/assets.js）。左から暗くして文字を読みやすく */
+  .mode-hero {
+    position: relative; height: clamp(150px, 19vw, 230px); border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--line-soft); background: var(--surface);
+  }
+  .mode-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mode-hero::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(10, 10, 10, .88) 0%, rgba(10, 10, 10, .55) 34%, rgba(10, 10, 10, 0) 68%),
+      linear-gradient(0deg, rgba(10, 10, 10, .55) 0%, rgba(10, 10, 10, 0) 45%);
+  }
+  .mode-hero-text { position: absolute; z-index: 1; left: 28px; bottom: 22px; right: 40%; color: #ffffff; text-shadow: 0 1px 12px rgba(0, 0, 0, .6); }
+  .mode-hero-text small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .18em; color: rgba(255, 255, 255, .72); }
+  .mode-hero-text h2 { margin: 4px 0 6px; font-size: 26px; line-height: 1.2; font-weight: 800; letter-spacing: .02em; }
+  .mode-hero-text p { margin: 0; font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, .86); }
+  @media (max-width: 720px) {
+    .mode-hero-text { left: 18px; bottom: 14px; right: 18px; }
+    .mode-hero-text h2 { font-size: 21px; }
+    .mode-hero-text p { display: none; }
+  }
   #miningSettings.locked { opacity: .55; }
   #miningPresets { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   #miningPresets .preset { min-width: 0; max-width: none; }
@@ -800,6 +821,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
     </section>
     <p class="hint" id="modeLocked" style="margin: -4px 0 0;" hidden>ゲーム中はモードを切り替えられません。今のゲームを終えてから切り替えてください。</p>
     <div id="modeMining" class="stack" hidden>
+      <section class="mode-hero">
+        <img src="${KEY_ART.mining_challenge.src}" style="object-position: ${KEY_ART.mining_challenge.position};" alt="">
+        <div class="mode-hero-text"><small>GAME MODE</small><h2>採掘・収集チャレンジ</h2><p>制限時間のうちに、決めた資源を決めた数だけ掘って集めればクリア。視聴者のギフトで、モブや TNT のじゃまと収集支援が飛んできます。</p></div>
+      </section>
       <div class="banner" id="miningBusy" hidden>チャレンジ中は設定を変えられません。変えるときは中止してから始め直してください。</div>
       <div class="split">
         <div class="stack">
@@ -831,6 +856,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
       </div>
     </div>
     <div id="modeFill" class="stack">
+      <section class="mode-hero">
+        <img src="${KEY_ART.fill.src}" style="object-position: ${KEY_ART.fill.position};" alt="">
+        <div class="mode-hero-text"><small>GAME MODE</small><h2>埋め立て</h2><p>空中のガラスの枠を、ブロックで埋めきればクリア。視聴者のギフトで、枠が広がったり TNT で崩されたりします。</p></div>
+      </section>
     <div class="banner" id="fillBusy" hidden>埋め立て中です。設定を変えるときは、いったん終えてから始め直してください。</div>
     <div class="split">
     <div class="stack">

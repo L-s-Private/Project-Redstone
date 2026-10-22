@@ -5,6 +5,7 @@ TikTok LIVE のギフト・いいねで、Minecraft Java版 26.3（Fabric）に�
 - `app/` … PCアプリ（Electron＋Node）。TikTok を受けて、MOD に TCP（127.0.0.1:25599, 1行1JSON）で送る。操作画面は http://127.0.0.1:25600/
 - `mod/` … Fabric MOD（Java 25）。26.x は難読化なし（Mojang の名前そのまま・マッピングなし）
 - `docs/protocol.md` … アプリ ↔ MOD の約束ごと。型を足したら必ず更新する
+- `design/` … 外部のグラフィック（キーアートなど）の原本。アプリに入れるのは軽くしたものを `app/assets/` に置き、`app/src/assets.js` に登録する（手順は `design/README.md`）
 
 ## 進め方（ユーザーとの約束）
 

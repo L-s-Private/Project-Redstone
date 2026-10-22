@@ -1,6 +1,7 @@
 // 画面版の Web サーバー。操作画面（/）と LIVE Studio 用オーバーレイ（/overlay）を出す。
 // 同じPCからしか開けないよう 127.0.0.1 にだけ待ち受け、ほかのサイトからの操作（CSRF・DNSリバインディング）も断る。
 import http from 'node:http';
+import { readAsset } from './assets.js';
 import { ConfigError, MOBS, parseConfig } from './config.js';
 import { MAX_COUNT_BY_TYPE } from './rules.js';
 import { OVERLAY_HTML } from './ui/overlay.js';
@@ -223,6 +224,14 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     if (route === 'GET /favicon.ico') {
       res.writeHead(204);
       return res.end();
+    }
+    // 外部のグラフィック（app/assets/。キーアートなど）
+    const asset = route.match(/^GET \/assets\/(.+)$/);
+    if (asset) {
+      const file = await readAsset(asset[1]);
+      if (!file) return send(res, 404, { error: '見つかりません' });
+      res.writeHead(200, { 'Content-Type': file.type, 'Cache-Control': 'max-age=86400' });
+      return res.end(file.body);
     }
     const icon = route.match(/^GET \/icons\/mc\/([a-z0-9_]+)\.png$/);
     if (icon) {

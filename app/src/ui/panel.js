@@ -426,13 +426,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .num-field { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; white-space: nowrap; }
   .num-field .affix { color: var(--muted); }
   /* ギフトを選ぶボタン */
-  .gift-pick { gap: 8px; height: 32px; padding: 3px 10px 3px 6px; background: var(--bg); max-width: 100%; min-width: 0; }
-  .gift-pick .gift-img { width: 22px; height: 22px; }
-  .gift-pick-name { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
-  .gift-pick small { color: var(--faint); font-variant-numeric: tabular-nums; }
-  .gift-pick .caret { color: var(--faint); font-size: 11px; }
-  .gift-pick.unknown { border-color: var(--warn); }
-  .gift-pick.unset { border-style: dashed; color: var(--warn); border-color: var(--warn); padding-left: 10px; }
   .dirty { color: var(--warn); font-size: 13px; }
   /* 最近届いたギフト（横1列。押すとルールを作る） */
   .recent-strip {
@@ -444,45 +437,136 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .recent button { flex: none; padding: 3px 10px 3px 6px; font-size: 13px; }
   .recent-empty { color: var(--faint); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* ルールを作る・変える窓 */
-  #ruleEditor { width: min(780px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; }
+  /* ---- ルールを作る・変える窓: 左で決めて、右に「このルール」のまとめと数・文 ---- */
+  #ruleEditor { width: min(1020px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); max-height: none; padding: 0; overflow: hidden; }
   #ruleEditor[open] { display: flex; flex-direction: column; }
-  .editor-body { overflow-y: auto; padding: 22px 26px 8px; }
-  .editor-foot { display: flex; align-items: center; gap: 8px; padding: 14px 26px; border-top: 1px solid var(--line-soft); }
-  .editor-foot .grow { flex: 1; }
-  .editor-step { margin-bottom: 18px; }
-  .editor-step > h3 { font-size: 13px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
-  .editor-step > h3 b { color: var(--text); margin-right: 6px; }
+  .ed-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px 14px 26px; border-bottom: 1px solid var(--line-soft); }
+  .ed-head h2 { margin: 0 auto 0 0; font-size: 16px; }
+  .ed-close { width: 32px; height: 32px; padding: 0; font-size: 14px; }
+  .ed-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+  .editor-body { overflow-y: auto; padding: 8px 26px 24px; overscroll-behavior: contain; container-type: inline-size; }
+  .ed-side { overflow-y: auto; padding: 20px; border-left: 1px solid var(--line-soft); background: var(--bg); display: flex; flex-direction: column; gap: 18px; }
+  .ed-sec { padding: 18px 0 20px; border-bottom: 1px solid var(--line-soft); }
+  .ed-sec:last-child { border-bottom: 0; }
+  .ed-sec-head, .ed-more > summary { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .ed-sec-head h3, .ed-more > summary h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+  .ed-sec-head small, .ed-more > summary small { color: var(--faint); font-size: 12px; }
+  .ed-num {
+    width: 22px; height: 22px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--invert-bg); color: var(--invert-text); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
   .segmented { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 10px; }
   .segmented button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 6px 14px; }
   .segmented button + button { border-left: 1px solid var(--line); }
   .segmented button.selected { background: var(--invert-bg); color: var(--invert-text); font-weight: 700; }
-  .trigger-value { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--muted); font-size: 13px; }
-  .action-group { margin-bottom: 10px; }
-  .action-group > span { display: block; font-size: 12px; color: var(--faint); margin-bottom: 5px; }
-  .action-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 5px; }
+  .ed-mode { margin: 0 0 0 auto; }
+  .ed-more > summary { margin-bottom: 0; }
+  .ed-more > summary::before { order: 9; margin-left: auto; }
+  .ed-more[open] > summary { margin-bottom: 16px; }
+  /* きっかけ: 絵つきの5つのボタン */
+  .ed-triggers { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .ed-triggers button {
+    flex-direction: column; gap: 4px; height: auto; padding: 10px 6px 9px; font-size: 13px; font-weight: 600;
+    background: var(--bg); border-color: var(--line-soft); color: var(--muted);
+  }
+  .ed-triggers button .ti { font-size: 18px; line-height: 1; height: 20px; }
+  .ed-triggers button:hover { background: var(--raised); color: var(--text); }
+  .ed-triggers button[aria-checked="true"] { border-color: var(--text); background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+  .trigger-value { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 40px; color: var(--muted); font-size: 14px; }
+  .trigger-value .num-field { font-size: 14px; color: var(--muted); }
+  /* ギフトを選ぶ欄 */
+  .gift-field {
+    flex: 1 1 280px; max-width: 420px; height: 48px; justify-content: flex-start; gap: 12px; padding: 0 14px 0 8px;
+    background: var(--bg); border-color: var(--line); font-weight: 400; text-align: left;
+  }
+  .gift-field:hover { background: var(--raised); border-color: #3a3a3a; }
+  .gift-field .gift-img, .gift-field .gf-empty { width: 32px; height: 32px; flex: none; }
+  .gift-field .gf-empty { border-radius: 6px; border: 1px dashed var(--line); display: inline-flex; align-items: center; justify-content: center; color: var(--faint); font-size: 16px; }
+  .gift-field .gf-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+  .gift-field .gf-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .gift-field .gf-text small { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .gift-field .gf-change { color: var(--muted); font-size: 12px; flex: none; }
+  .gift-field.unset .gf-text b { color: var(--muted); font-weight: 600; }
+  .gift-field.unknown { border-color: var(--warn); }
+  .gift-field.invalid { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+  /* 妨害のタイル */
+  .action-group + .action-group { margin-top: 14px; }
+  .action-group > span { display: block; font-size: 12px; color: var(--faint); margin-bottom: 6px; letter-spacing: .02em; }
+  .action-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; }
   .action-tiles button {
-    justify-content: flex-start; gap: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600;
-    background: var(--bg); border-color: var(--line-soft); color: var(--muted); height: 36px;
+    position: relative; justify-content: flex-start; gap: 9px; padding: 0 10px; height: 40px; font-size: 13px; font-weight: 600;
+    background: var(--bg); border-color: var(--line-soft); color: var(--muted); white-space: nowrap; overflow: hidden;
   }
-  .action-tiles button:hover { background: var(--raised); color: var(--text); }
-  .action-tiles button.selected { border-color: var(--text); color: var(--text); background: var(--raised); }
-  .action-tiles .mc { --s: 20px; }
-  .action-desc { margin: 4px 0 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 13px; }
-  .editor-details { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: end; }
-  .editor-details label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--faint); min-width: 0; }
-  .editor-details label input:not([type=number]):not([type=checkbox]) { width: 100%; }
-  .editor-details .wide { grid-column: 1 / -1; }
-  .choices { display: flex; flex-direction: column; gap: 6px; }
+  .action-tiles button > span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .action-tiles button:hover:not(:disabled) { background: var(--raised); color: var(--text); }
+  .action-tiles button.selected { border-color: var(--text); color: var(--text); background: var(--raised); box-shadow: inset 0 0 0 1px var(--text); }
+  .action-tiles button.selected::after {
+    content: "✓"; position: absolute; top: 50%; right: 8px; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%;
+    background: var(--invert-bg); color: var(--invert-text); font-size: 10px; font-weight: 900; line-height: 16px; text-align: center;
+  }
+  .action-tiles button.selected > span { padding-right: 18px; }
+  .action-tiles button.off-mode { opacity: .5; }
+  .action-tiles button.off-mode:hover, .action-tiles button.off-mode.selected { opacity: 1; }
+  .action-tiles .mc { --s: 22px; }
+  /* ランダムの候補 */
+  .choices { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
   .choice {
-    display: grid; grid-template-columns: minmax(120px, 1fr) 150px 150px 3.6em; align-items: center; gap: 12px;
-    padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg);
+    display: grid; grid-template-columns: minmax(110px, 1fr) auto auto minmax(80px, 110px) 28px; align-items: center; gap: 12px;
+    padding: 8px 8px 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg);
   }
-  .choice .name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--text); min-width: 120px; }
-  .choice .mc { --s: 20px; }
-  .choice .odds { text-align: right; color: var(--faint); font-size: 12px; white-space: nowrap; }
-  .editor-details .check-line { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; font-size: 13px; color: var(--muted); }
-  .editor-details label.check-line { cursor: pointer; }
-  .editor-details label.check-line:has(input:disabled) { cursor: default; }
+  .choice .name { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 13px; color: var(--text); min-width: 0; }
+  .choice .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .choice .mc { --s: 22px; }
+  .choice .num-field { font-size: 12px; }
+  .choice .odds { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .choice .odds i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; display: block; }
+  .choice .odds i b { display: block; height: 100%; background: var(--text); transition: width .2s; }
+  .choice .remove { width: 28px; height: 28px; padding: 0; }
+  /* 狭いときは2段: 名前・数・外す / 出やすさ・割合 */
+  @container (max-width: 680px) {
+    .choice { grid-template-columns: minmax(0, 1fr) auto 28px; row-gap: 8px; }
+    .choice > :nth-child(1) { grid-area: 1 / 1; }
+    .choice > :nth-child(2) { grid-area: 1 / 2; }
+    .choice > :nth-child(5) { grid-area: 1 / 3; }
+    .choice > :nth-child(3) { grid-area: 2 / 1; }
+    .choice > :nth-child(4) { grid-area: 2 / 2 / 3 / 4; }
+  }
+  .choices-empty { padding: 14px; border: 1px dashed var(--line); border-radius: var(--radius-sm); color: var(--faint); font-size: 13px; text-align: center; margin-bottom: 16px; }
+  .choices-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: -6px 0 16px; }
+  .check-line { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--text); cursor: pointer; }
+  .check-line:has(input:disabled) { cursor: default; color: var(--muted); }
+  /* 出し方の条件 */
+  .ed-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px 20px; }
+  .ed-field { display: flex; flex-direction: column; gap: 6px; margin: 0; min-width: 0; font-size: 13px; color: var(--text); font-weight: 600; }
+  .ed-field > small { color: var(--faint); font-size: 12px; font-weight: 400; }
+  .ed-field .dd { width: 100%; }
+  .ed-help { grid-column: 1 / -1; margin: 0; font-size: 12px; }
+  /* 右: このルール */
+  .ed-summary { display: flex; flex-direction: column; gap: 10px; }
+  .ed-summary > small { color: var(--faint); font-size: 12px; letter-spacing: .04em; }
+  .ed-flow { display: flex; flex-direction: column; gap: 6px; }
+  .ed-node { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+  .ed-node .ni { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--raised); font-size: 15px; }
+  .ed-node .ni .gift-img, .ed-node .ni .mc { width: 26px; height: 26px; --s: 26px; }
+  .ed-node div { min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+  .ed-node small { color: var(--faint); font-size: 11px; }
+  .ed-node b { font-size: 14px; overflow-wrap: anywhere; }
+  .ed-node.is-empty b { color: var(--faint); font-weight: 600; }
+  .ed-arrow { align-self: center; color: var(--faint); line-height: 1; }
+  .ed-arrow svg { width: 16px; height: 16px; display: block; }
+  .ed-desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+  .ed-warn { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--warn); color: var(--warn); font-size: 12px; font-weight: 600; }
+  .ed-side-fields { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+  .ed-side-fields:empty { display: none; }
+  .editor-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px 12px 26px; border-top: 1px solid var(--line-soft); background: var(--surface); }
+  .editor-foot .grow { flex: 1; }
+  .editor-foot .next { min-width: 112px; }
+  .ed-delete:hover { color: var(--bad); }
+  @media (max-width: 860px) {
+    .ed-main { display: block; overflow-y: auto; }
+    .editor-body { overflow: visible; }
+    .ed-side { border-left: 0; border-top: 1px solid var(--line-soft); }
+  }
   .action-tiles button:disabled { opacity: .35; cursor: not-allowed; }
   .plus-note { font-size: 12px; color: var(--faint); }
   .form-error { color: var(--warn); font-size: 13px; margin: 0; }
@@ -1353,34 +1437,40 @@ ${CONTROLS_CSS}
   <p class="hint" id="giftPickerHint"></p>
 </dialog>
 
-<dialog id="ruleEditor">
-  <div class="editor-body">
+<dialog id="ruleEditor" aria-labelledby="editorTitle">
+  <div class="ed-head">
     <h2 id="editorTitle">ルールを追加</h2>
-    <p class="hint" style="margin: 0 0 18px;">①きっかけ → ②出す妨害 → ③数と見せ方 → ④出す条件 の順に決めます。③④はそのままでも使えます。</p>
-    <div class="editor-step">
-      <h3><b>①</b>きっかけ（何が起きたら）</h3>
-      <div class="segmented" id="editorTriggers"></div>
-      <div class="trigger-value" id="editorTriggerValue"></div>
+    <button type="button" class="icon-only ed-close" id="editorClose" aria-label="閉じる">✕</button>
+  </div>
+  <div class="ed-main">
+    <div class="editor-body">
+      <section class="ed-sec">
+        <div class="ed-sec-head"><span class="ed-num">1</span><h3>きっかけ</h3><small>何が起きたら出すか</small></div>
+        <div class="ed-triggers" id="editorTriggers" role="radiogroup" aria-label="きっかけ"></div>
+        <div class="trigger-value" id="editorTriggerValue"></div>
+      </section>
+      <section class="ed-sec">
+        <div class="ed-sec-head"><span class="ed-num">2</span><h3>出す妨害</h3><div class="segmented ed-mode" id="editorMode"></div></div>
+        <div id="editorChoices"></div>
+        <div id="editorActions"></div>
+      </section>
+      <section class="ed-sec">
+        <details class="ed-more" id="editorMore">
+          <summary><span class="ed-num">3</span><h3>出し方の条件</h3><small id="editorMoreNote">そのままでも使えます</small></summary>
+          <div class="ed-fields" id="editorConditions"></div>
+        </details>
+      </section>
     </div>
-    <div class="editor-step">
-      <h3><b>②</b>出す妨害</h3>
-      <div id="editorActions"></div>
-      <p class="action-desc" id="editorActionDesc"></p>
-    </div>
-    <div class="editor-step">
-      <h3><b>③</b>数と見せ方</h3>
-      <div class="editor-details" id="editorDetails"></div>
-    </div>
-    <div class="editor-step">
-      <h3><b>④</b>出す条件（埋め立て中に使う）</h3>
-      <div class="editor-details" id="editorConditions"></div>
-    </div>
+    <aside class="ed-side" aria-label="このルール">
+      <div id="editorSummary"></div>
+      <div class="ed-side-fields" id="editorDetails"></div>
+    </aside>
   </div>
   <div class="editor-foot">
-    <button class="ghost" id="editorDelete">このルールを削除</button>
+    <button class="ghost ed-delete" id="editorDelete">このルールを削除</button>
     <p class="form-error grow" id="editorError" role="alert"></p>
     <button id="editorCancel">やめる</button>
-    <button class="next" id="editorOk">決定</button>
+    <button class="next" id="editorOk">追加する</button>
   </div>
 </dialog>
 
@@ -2036,22 +2126,17 @@ ${CONTROLS_JS}
     return node;
   }
 
-  /** ギフトを選ぶボタン（絵・名前・コイン数）。押すとギフトの一覧が開く */
+  /** ギフトを選ぶ欄（絵・名前・コイン数）。押すとギフトの一覧が開く */
   function giftPickButton(row, onPicked) {
-    const b = el('button', 'gift-pick' + (row.value.trim() ? '' : ' unset'));
-    b.type = 'button';
+    const name = row.value.trim();
     const gift = giftFor(row.value);
-    if (!row.value.trim()) {
-      b.append(el('span', 'gift-pick-name', 'ギフトを選ぶ'));
-    } else {
-      b.append(giftIcon(row.value), el('span', 'gift-pick-name', gift?.nameJa ?? row.value));
-      if (gift) b.append(el('small', '', '🪙' + gift.diamonds));
-      else b.classList.add('unknown');
-    }
-    b.append(el('span', 'caret', '▾'));
-    b.title = !row.value.trim() ? 'ギフトを一覧から選ぶ'
-      : gift ? (gift.nameJa ?? row.value) + '（🪙' + gift.diamonds + '）。押すと選び直せます'
-      : '「' + row.value + '」はギフトの一覧にない名前です。押して選び直してください';
+    const b = el('button', 'gift-field' + (!name ? ' unset' : gift ? '' : ' unknown'));
+    b.type = 'button';
+    const icon = name ? giftIcon(row.value) : null;
+    b.append(icon?.nodeType === 1 ? icon : el('span', 'gf-empty', '🎁'),
+      el('span', 'gf-text', el('b', '', !name ? 'ギフトを選ぶ' : gift?.nameJa ?? row.value),
+        el('small', '', !name ? '一覧から絵で選べます' : gift ? '🪙 ' + gift.diamonds + ' コイン' : 'ギフトの一覧にない名前です')),
+      el('span', 'gf-change', name ? '変更' : '選ぶ'));
     b.addEventListener('click', () => openGiftPicker(onPicked));
     return b;
   }
@@ -2195,11 +2280,25 @@ ${CONTROLS_JS}
     if (index === null && row.trigger !== 'gift') row.value = row.trigger === 'likes' ? '100' : row.trigger === 'minDiamonds' ? '100' : '';
     editing = { index, row };
     $('editorTitle').textContent = index === null ? 'ルールを追加' : 'ルールを変える';
+    $('editorOk').textContent = index === null ? '追加する' : '変更する';
     $('editorDelete').hidden = index === null;
     $('editorError').textContent = '';
+    $('editorMore').open = false;
     renderEditor();
     $('ruleEditor').showModal();
     $('ruleEditor').querySelector('.editor-body').scrollTop = 0;
+  }
+
+  /** きっかけの絵（一覧と同じ） */
+  const TRIGGER_ICONS = { gift: '🎁', minDiamonds: '🪙', likes: '❤', follow: '＋', share: '↗', giftId: '🎁' };
+  const ARROW_DOWN = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v11M4 9l4 4 4-4"/></svg>';
+  /** この妨害が、今選んでいるゲームモードで出ないなら、その短い説明 */
+  function offModeNote(key) {
+    const type = key.split(':')[0];
+    const mining = state?.gameMode === 'mining_challenge';
+    if (mining && FILL_ONLY.includes(type)) return '埋め立て専用（今の採掘チャレンジでは出ません）';
+    if (!mining && MINING_ONLY.includes(type)) return '採掘チャレンジ専用（今の埋め立てでは出ません）';
+    return '';
   }
 
   function renderEditor() {
@@ -2207,33 +2306,46 @@ ${CONTROLS_JS}
     // ① きっかけ
     const triggers = row.trigger === 'giftId' ? [...TRIGGERS, ['giftId', 'ギフトID']] : TRIGGERS;
     $('editorTriggers').replaceChildren(...triggers.map(([value, text]) => {
-      const b = Object.assign(el('button', row.trigger === value ? 'selected' : '', text), { type: 'button' });
+      const b = Object.assign(el('button', '', el('span', 'ti', TRIGGER_ICONS[value]), text), { type: 'button' });
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(row.trigger === value));
       b.addEventListener('click', () => {
         if (row.trigger === value) return;
         row.trigger = value;
         row.value = value === 'likes' ? '100' : value === 'minDiamonds' ? '100' : '';
+        $('editorError').textContent = '';
         renderEditor();
       });
       return b;
     }));
     const value = $('editorTriggerValue');
+    const live = (key) => (v) => {
+      row[key] = v;
+      renderSummary();
+    };
     if (row.trigger === 'gift') {
-      value.replaceChildren(giftPickButton(row, (name) => { row.value = name; renderEditor(); }), 'が届いたら');
+      value.replaceChildren(giftPickButton(row, (name) => {
+        row.value = name;
+        $('editorError').textContent = '';
+        renderEditor();
+      }), 'が届いたら');
     } else if (row.trigger === 'minDiamonds') {
-      value.replaceChildren(numberField(row.value, (v) => (row.value = v), { min: 1, before: '🪙', after: 'コイン以上のギフトが届いたら', width: 80, label: 'コイン数' }));
+      value.replaceChildren(numberField(row.value, live('value'), { min: 1, before: '🪙', after: 'コイン以上のギフトが届いたら', width: 80, label: 'コイン数' }));
     } else if (row.trigger === 'likes') {
-      value.replaceChildren(numberField(row.value, (v) => (row.value = v), { min: 1, before: 'いいねが', after: '回たまるたびに', width: 80, label: 'いいねの回数' }));
+      value.replaceChildren(numberField(row.value, live('value'), { min: 1, before: 'いいねが', after: '回たまるたびに', width: 80, label: 'いいねの回数' }));
     } else if (row.trigger === 'giftId') {
-      value.replaceChildren(input(row.value, (v) => (row.value = v), { placeholder: 'ギフトID' }));
+      const field = input(row.value, live('value'), { placeholder: 'ギフトID' });
+      field.style.maxWidth = '240px';
+      value.replaceChildren(field, 'が届いたら');
     } else {
       value.replaceChildren(row.trigger === 'follow' ? 'フォローされたら' : 'シェアされたら');
     }
 
     // ② 出す妨害（1つ決める / ランダム）
     const selected = actionKey(row);
-    const mode = el('div', 'segmented');
-    for (const [random, text] of [[false, '1つ決める'], [true, 'ランダム（いくつかから1つ）']]) {
+    $('editorMode').replaceChildren(...[[false, '1つ決める'], [true, 'ランダム']].map(([random, text]) => {
       const b = Object.assign(el('button', row.random === random ? 'selected' : '', text), { type: 'button' });
+      b.title = random ? '選んだ候補の中から、毎回1つを抽選して出します' : '毎回同じ妨害を出します';
       b.addEventListener('click', () => {
         if (row.random === random) return;
         row.random = random;
@@ -2246,18 +2358,22 @@ ${CONTROLS_JS}
         $('editorError').textContent = '';
         renderEditor();
       });
-      mode.append(b);
-    }
+      return b;
+    }));
     const chosen = (key) => (row.random ? row.choices.some((c) => c.key === key) : key === selected);
-    $('editorActions').replaceChildren(mode, ...ACTION_GROUPS.map(([title, list]) => el('div', 'action-group', el('span', '', title),
+    $('editorActions').replaceChildren(...ACTION_GROUPS.map(([title, list]) => el('div', 'action-group', el('span', '', title),
       el('div', 'action-tiles', ...list.map(([key, name, , def]) => {
-        const b = Object.assign(el('button', chosen(key) ? 'selected' : '', mcIcon(iconOf(key), 20), name), { type: 'button' });
+        const off = offModeNote(key);
+        const b = Object.assign(el('button', (chosen(key) ? 'selected' : '') + (off ? ' off-mode' : ''), mcIcon(iconOf(key), 22), el('span', '', name)), { type: 'button' });
+        b.setAttribute('aria-pressed', String(chosen(key)));
+        b.title = (ACTION_INFO[key]?.desc ?? name) + (off ? '。' + off : '');
         // メッセージだけは出す文が要るので、ランダムの候補にはしない
         if (row.random && key === 'message') {
           b.disabled = true;
           b.title = 'メッセージだけは、ランダムの候補にできません';
         }
         b.addEventListener('click', () => {
+          $('editorError').textContent = '';
           if (row.random) {
             if (chosen(key)) {
               row.choices = row.choices.filter((c) => c.key !== key);
@@ -2267,7 +2383,6 @@ ${CONTROLS_JS}
             } else {
               row.choices.push({ key, count: def || 1, weight: 1 });
             }
-            $('editorError').textContent = '';
             renderEditor();
             return;
           }
@@ -2279,72 +2394,134 @@ ${CONTROLS_JS}
         });
         return b;
       })))));
-    const info = row.random ? null : ACTION_INFO[selected];
-    $('editorActionDesc').textContent = row.random
-      ? '選んだ妨害（2〜' + MAX_CHOICES + '個）の中から、毎回1つを抽選して出します。押すと候補に入れる・外すができます'
-      : info?.desc ?? '枠の中の地上に出る（埋め立て中でなければ、プレイヤーのまわり）';
 
-    // ③ 細かい設定
-    const details = [];
-    // 出やすさ・同じものを続けない・何ラウンド目からは有料版の機能（今ある設定は消さずに見せる）
+    // ランダムの候補（選んだものを上に並べる）
     const advanced = !!state.plan?.advancedRules;
     const plusNote = () => (advanced ? [] : [el('span', 'plus-note', '（' + PLUS_NAME + ' の機能）', ...plusLink())]);
     if (row.random) {
-      const total = row.choices.reduce((sum, c) => sum + (Number(c.weight) || 0), 0);
-      const list = el('div', 'choices', ...row.choices.map((c) => {
-        const [action] = c.key.split(':');
-        const cInfo = ACTION_INFO[c.key];
-        const line = el('div', 'choice', el('span', 'name', mcIcon(iconOf(c.key), 20), cInfo?.name ?? c.key));
-        if (cInfo?.unit) {
-          line.append(numberField(c.count, (v) => (c.count = v), { min: 1, max: MAX_COUNT[action], before: cInfo.unit === '秒' ? '' : '×', after: cInfo.unit, width: 64, label: '数' }));
-        } else {
-          line.append(el('span'));
-        }
-        const odds = el('span', 'odds', '');
-        const showOdds = () => {
-          const sum = row.choices.reduce((acc, x) => acc + (Number(x.weight) || 0), 0);
-          for (const [i, node] of [...list.querySelectorAll('.odds')].entries()) {
-            node.textContent = sum > 0 ? '約' + Math.round((Number(row.choices[i].weight) || 0) / sum * 100) + '%' : '';
-          }
-        };
-        const weight = numberField(c.weight, (v) => {
-          c.weight = v;
-          showOdds();
-        }, { min: 1, max: MAX_WEIGHT, before: '出やすさ', width: 52, label: '出やすさ（1〜' + MAX_WEIGHT + '）' });
-        weight.querySelector('input').disabled = !advanced;
-        odds.textContent = total > 0 ? '約' + Math.round((Number(c.weight) || 0) / total * 100) + '%' : '';
-        line.append(weight, odds);
-        return line;
-      }));
-      details.push(el('div', 'wide', el('label', '', '候補（数は1回あたり。出やすさは大きいほど出やすい）', ...plusNote()),
-        row.choices.length ? list : el('p', 'hint', '上の妨害を押して、候補を2つ以上選んでください')));
+      const odds = () => {
+        const sum = row.choices.reduce((acc, x) => acc + (Number(x.weight) || 0), 0);
+        $('editorChoices').querySelectorAll('.odds').forEach((node, i) => {
+          const pct = sum > 0 ? Math.round((Number(row.choices[i].weight) || 0) / sum * 100) : 0;
+          node.querySelector('b').style.width = pct + '%';
+          node.lastChild.textContent = pct + '%';
+        });
+      };
+      const list = row.choices.length === 0
+        ? el('div', 'choices-empty', '下の妨害を押して、候補を2つ以上選んでください（' + MAX_CHOICES + '個まで）')
+        : el('div', 'choices', ...row.choices.map((c) => {
+          const [action] = c.key.split(':');
+          const cInfo = ACTION_INFO[c.key];
+          const line = el('div', 'choice', el('span', 'name', mcIcon(iconOf(c.key), 22), el('span', '', cInfo?.name ?? c.key)));
+          line.append(cInfo?.unit
+            ? numberField(c.count, (v) => {
+              c.count = v;
+              renderSummary();
+            }, { min: 1, max: MAX_COUNT[action], before: cInfo.unit === '秒' ? '' : '×', after: cInfo.unit, width: 52, label: (cInfo?.name ?? '') + 'の数' })
+            : el('span'));
+          const weight = numberField(c.weight, (v) => {
+            c.weight = v;
+            odds();
+          }, { min: 1, max: MAX_WEIGHT, before: '出やすさ', width: 40, label: '出やすさ（1〜' + MAX_WEIGHT + '）' });
+          weight.querySelector('input').disabled = !advanced;
+          if (!advanced) weight.title = PLUS_NAME + ' の機能です';
+          const remove = Object.assign(el('button', 'icon-only remove', '✕'), { type: 'button', title: '候補から外す' });
+          remove.setAttribute('aria-label', (cInfo?.name ?? '') + 'を候補から外す');
+          remove.addEventListener('click', () => {
+            row.choices = row.choices.filter((x) => x !== c);
+            renderEditor();
+          });
+          line.append(weight, el('span', 'odds', el('i', '', el('b')), ''), remove);
+          return line;
+        }));
       const repeat = Object.assign(document.createElement('input'), { type: 'checkbox', checked: row.noRepeat, disabled: !advanced });
       repeat.addEventListener('change', () => (row.noRepeat = repeat.checked));
-      details.push(el('label', 'wide check-line', repeat, '同じ妨害を2回続けて出さない', ...plusNote()));
-    } else if (info?.unit) {
-      const max = MAX_COUNT[row.action];
-      details.push(el('label', '', '数（1回あたり・最大 ' + max + info.unit + '）',
-        numberField(row.count, (v) => (row.count = v), { min: 1, max, before: info.unit === '秒' ? '' : '×', after: info.unit, width: 70, label: '数' })));
+      $('editorChoices').replaceChildren(list, el('div', 'choices-foot', el('label', 'check-line', repeat, '同じ妨害を2回続けて出さない'), ...plusNote()));
+      odds();
+    } else {
+      $('editorChoices').replaceChildren();
     }
-    const needsLabel = row.action === 'message';
-    const label = input(row.label, (v) => (row.label = v), { placeholder: needsLabel ? '出す文（例: ありがとう！）' : '空なら妨害の名前', maxLength: 100 });
-    details.push(el('label', '', needsLabel ? '配信画面に出す文（必須）' : '配信画面に出す文', label));
-    details.push(el('label', '', '待ち時間（続けて出さない）',
-      numberField(row.cooldownSec, (v) => (row.cooldownSec = v), { min: 0, after: '秒', width: 60, label: '待ち時間（秒）' })));
-    $('editorDetails').replaceChildren(...details);
+
+    // 右: 数と、配信画面に出す文（よく変えるもの）
+    const info = row.random ? null : ACTION_INFO[selected];
+    const side = [];
+    if (info?.unit) {
+      const max = MAX_COUNT[row.action];
+      side.push(el('label', 'ed-field', '数', el('small', '', '1回あたり・最大 ' + max + info.unit),
+        numberField(row.count, live('count'), { min: 1, max, before: info.unit === '秒' ? '' : '×', after: info.unit, width: 64, label: '数' })));
+    }
+    const needsLabel = !row.random && row.action === 'message';
+    const label = input(row.label, live('label'), { placeholder: needsLabel ? '例: ありがとう！' : '空なら妨害の名前', maxLength: 100 });
+    side.push(el('label', 'ed-field', needsLabel ? '出す文（必須）' : '配信画面に出す文', el('small', '', 'ギフト通知に出ます。100文字まで'), label));
+    $('editorDetails').replaceChildren(...side);
+
+    // ③ 出し方の条件（そのままでも使える。変えてあれば開いておく）
     const conditions = [];
-    // いつ出すか（埋め立ての状況で切り替える）
+    conditions.push(el('label', 'ed-field', '待ち時間', el('small', '', '一度出したら、この秒数は同じルールを出さない'),
+      numberField(row.cooldownSec, live('cooldownSec'), { min: 0, after: '秒', width: 64, label: '待ち時間（秒）' })));
     const when = document.createElement('select');
-    for (const [value, text] of WHEN_OPTIONS) when.append(Object.assign(document.createElement('option'), { value, textContent: text, selected: row.when === value }));
-    when.addEventListener('change', () => (row.when = when.value));
-    conditions.push(el('label', '', 'いつ出すか', when));
-    const round = numberField(row.minRound, (v) => (row.minRound = v), { min: 1, max: 99, after: 'ラウンド目から', width: 60, label: '何ラウンド目から' });
+    for (const [v, text] of WHEN_OPTIONS) when.append(Object.assign(document.createElement('option'), { value: v, textContent: text, selected: row.when === v }));
+    when.setAttribute('aria-label', 'いつ出すか');
+    when.addEventListener('change', () => {
+      row.when = when.value;
+      renderSummary();
+    });
+    conditions.push(el('label', 'ed-field', 'いつ出すか', el('small', '', '埋め立ての状況で出し分ける'), when));
+    const round = numberField(row.minRound, live('minRound'), { min: 1, max: 99, after: 'ラウンド目から', width: 56, label: '何ラウンド目から' });
     Object.assign(round.querySelector('input'), { placeholder: '最初', disabled: !advanced });
-    conditions.push(el('label', '', '何ラウンド目から（空なら最初から）', round, ...plusNote()));
-    const more = el('details', 'more-info wide', el('summary', '', '条件を決めたルールの使われ方'),
-      el('p', 'hint', '条件を決めたルールは、それに合うときだけ使われ、同じきっかけの「いつでも」のルールより先になります（例: バラは普段ゾンビ、カウントダウン中だけ TNT）。埋め立てをしていないときは使われません。'));
-    conditions.push(more);
+    conditions.push(el('label', 'ed-field', '何ラウンド目から', el('small', '', '空なら最初から', ...plusNote()), round));
+    conditions.push(el('p', 'hint ed-help', '「いつ出すか」「何ラウンド目から」を決めたルールは、それに合うときだけ使われ、同じきっかけの「いつでも」のルールより先になります（例: バラは普段ゾンビ、カウントダウン中だけ TNT）。埋め立てをしていないときは使われません。'));
     $('editorConditions').replaceChildren(...conditions);
+    const changed = Number(row.cooldownSec) > 0 || row.when || row.minRound;
+    if (changed) $('editorMore').open = true;
+    renderSummary();
+  }
+
+  /** 右の「このルール」（きっかけ → 出す妨害）。数や文を打つたびに直す */
+  function renderSummary() {
+    const row = editing.row;
+    const gift = row.trigger === 'gift' ? giftFor(row.value) : null;
+    const giftImg = gift ? giftIcon(row.value) : null;
+    const triggerText = row.trigger === 'gift' ? (row.value.trim() ? (gift?.nameJa ?? row.value) + ' が届いたら' : '')
+      : row.trigger === 'minDiamonds' ? row.value + ' コイン以上のギフトが届いたら'
+      : row.trigger === 'likes' ? 'いいねが ' + row.value + ' 回たまるたびに'
+      : row.trigger === 'giftId' ? (row.value.trim() ? 'ギフトID ' + row.value + ' が届いたら' : '')
+      : row.trigger === 'follow' ? 'フォローされたら' : 'シェアされたら';
+    const node = (cls, icon, small, text) => el('div', 'ed-node' + cls, el('span', 'ni', icon), el('div', '', el('small', '', small), el('b', '', text)));
+    const trigger = triggerText
+      ? node('', giftImg?.nodeType === 1 ? giftImg : TRIGGER_ICONS[row.trigger], 'きっかけ', triggerText)
+      : node(' is-empty', TRIGGER_ICONS[row.trigger], 'きっかけ', row.trigger === 'gift' ? 'ギフトを選んでください' : 'ギフトID を入れてください');
+    let action;
+    let desc = '';
+    let warn = '';
+    if (row.random) {
+      const names = row.choices.map((c) => ACTION_INFO[c.key]?.name ?? c.key);
+      action = row.choices.length
+        ? node('', mcIcon(iconOf(row.choices[0].key), 26), 'ランダムで1つ（' + row.choices.length + '個から）', names.join('・'))
+        : node(' is-empty', '？', '出す妨害', '候補を2つ以上選んでください');
+      desc = '選んだ候補の中から、毎回1つを抽選して出します。';
+      if (row.choices.length && row.choices.every((c) => offModeNote(c.key))) warn = '候補がどれも、今のゲームモードでは出ません';
+    } else {
+      const key = actionKey(row);
+      const info = ACTION_INFO[key];
+      const count = info?.unit ? (info.unit === '秒' ? ' ' : ' ×') + row.count + info.unit : '';
+      action = node('', mcIcon(iconOf(key), 26), '出す妨害', (info?.name ?? key) + count);
+      desc = info?.desc ?? '枠の中の地上に出る（埋め立て中でなければ、プレイヤーのまわり）';
+      warn = offModeNote(key);
+    }
+    const arrow = el('span', 'ed-arrow');
+    arrow.innerHTML = ARROW_DOWN;
+    const conditions = [
+      row.when ? WHEN_OPTIONS.find(([v]) => v === row.when)?.[1] : '',
+      row.minRound ? row.minRound + 'ラウンド目から' : '',
+      Number(row.cooldownSec) > 0 ? '待ち ' + row.cooldownSec + '秒' : '',
+    ].filter(Boolean);
+    $('editorSummary').replaceChildren(el('div', 'ed-summary', el('small', '', 'このルール'),
+      el('div', 'ed-flow', trigger, arrow, action),
+      ...(conditions.length ? [el('p', 'ed-desc', '条件: ' + conditions.join('・'))] : []),
+      el('p', 'ed-desc', desc),
+      ...(warn ? [el('p', 'ed-warn', warn)] : [])));
+    $('editorMoreNote').textContent = conditions.length ? conditions.join('・') : 'そのままでも使えます（待ち時間・いつ出すか）';
   }
 
   /** 決定する前に確かめる。@returns 問題があれば理由 */
@@ -2384,7 +2561,17 @@ ${CONTROLS_JS}
     const problem = editorProblem(row);
     if (problem) {
       $('editorError').textContent = problem;
-      $('ruleEditor').querySelector('.editor-body input:invalid')?.focus();
+      // 直すところへ（閉じている「出し方の条件」なら開く。ギフトがまだなら、ギフトの欄を目立たせる）
+      const bad = $('ruleEditor').querySelector('.ed-main input:invalid');
+      if (bad) {
+        const more = bad.closest('details');
+        if (more) more.open = true;
+        bad.focus();
+      } else if (row.trigger === 'gift' && !row.value.trim()) {
+        const field = $('ruleEditor').querySelector('.gift-field');
+        field?.classList.add('invalid');
+        field?.focus();
+      }
       return;
     }
     if (index === null) rows.push(row);
@@ -2395,6 +2582,7 @@ ${CONTROLS_JS}
     toast(index === null ? 'ルールを追加しました。「保存する」で使われます' : 'ルールを変えました。「保存する」で使われます');
   });
   $('editorCancel').addEventListener('click', () => $('ruleEditor').close());
+  $('editorClose').addEventListener('click', () => $('ruleEditor').close());
   $('editorDelete').addEventListener('click', () => {
     $('ruleEditor').close();
     removeRow(editing.index);

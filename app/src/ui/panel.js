@@ -91,7 +91,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .page-head h1 { font-size: 17px; font-weight: 700; margin: 0 auto 0 0; }
   .page { display: flex; flex-direction: column; gap: 16px; padding: 24px 28px 28px; flex: 1; min-height: 0; width: 100%; }
-  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: stretch; }
+  /* 設定の画面は横に広げすぎない（名前と入力欄が離れないように） */
+  .page.narrow { max-width: 960px; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
   .card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 18px 20px; }
   .card h2 { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
   .card .lead { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
@@ -181,7 +184,38 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .tiles button:hover { background: var(--raised); color: var(--text); }
   .tiles button.selected { border-color: var(--text); color: var(--text); background: var(--raised); }
 
+  /* ---- 設定の行（左に名前と説明、右に入力） ---- */
+  .setting {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 8px 24px; align-items: center;
+    padding: 12px 0; border-top: 1px solid var(--line-soft);
+  }
+  .setting.tall { align-items: start; }
+  .setting-text label { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+  .setting-text small { display: block; margin-top: 2px; font-size: 12px; color: var(--faint); }
+  .setting-control { display: flex; justify-content: flex-end; min-width: 0; }
+  .setting-control select { width: 100%; }
+  .setting-control .tiles { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* 数の入力（− と ＋ のボタンと単位つき） */
+  .stepper {
+    display: inline-flex; align-items: center; height: 32px; overflow: hidden;
+    border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg);
+  }
+  .stepper:hover { border-color: #3a3a3a; }
+  .stepper:focus-within { border-color: var(--text); }
+  .stepper button { width: 32px; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 15px; }
+  .stepper button:hover { background: var(--raised); color: var(--text); }
+  .stepper input { width: 64px; height: 100%; padding: 0 4px; border: 0; border-radius: 0; background: transparent; text-align: right; -moz-appearance: textfield; }
+  .stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .stepper .unit { min-width: 2.6em; padding: 0 8px 0 3px; color: var(--muted); font-size: 12px; }
+  @media (max-width: 720px) {
+    .setting { grid-template-columns: minmax(0, 1fr); }
+    .setting-control { justify-content: flex-start; }
+  }
+
   /* ---- 接続と準備 ---- */
+  .link-card { display: flex; align-items: center; gap: 16px; }
+  .link-card > div { flex: 1; min-width: 0; }
+  .link-card .lead { margin: 0; }
   .checks { list-style: none; margin: 0 0 14px; padding: 0; }
   .checks li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
   .checks li:last-child { border-bottom: 0; }
@@ -309,14 +343,31 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .form-error { color: var(--warn); font-size: 12px; margin: 0; }
 
   /* ---- 配信画面（オーバーレイ） ---- */
-  .widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+  .widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: stretch; }
   .widget { display: flex; flex-direction: column; gap: 12px; }
-  .widget .preview {
-    position: relative; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--line-soft);
+  /* 試し表示の台。どの部品も同じ高さにして、カードの高さをそろえる */
+  .widget .stage {
+    height: 200px; display: grid; place-items: center; overflow: hidden;
+    border-radius: var(--radius-sm); border: 1px solid var(--line-soft);
     /* 透明の背景がわかるよう、ゲーム画面の代わりの市松模様 */
     background: repeating-conic-gradient(#1c1c1f 0 25%, #151517 0 50%) 0 0 / 16px 16px;
-    max-height: 240px; margin: 0 auto; width: 100%;
   }
+  .widget .preview { position: relative; width: min(100%, calc(198px * var(--ratio))); aspect-ratio: var(--ratio); }
+  .widget .card-head { margin: 0; }
+  .widget .card-head h2 { margin-right: auto; }
+  .widget .card-head button { padding: 3px 10px; font-size: 12px; }
+  .widget .url { margin-top: auto; }
+  /* 見た目の設定（色・面と文字・ギフト通知の3つに分ける） */
+  .style-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; }
+  .style-group h3 { margin: 0 0 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .style-group .setting { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 0; }
+  @media (max-width: 1100px) { .style-groups { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+  .swatch { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch input[type="color"] { width: 34px; height: 32px; padding: 2px; flex: none; }
+  .swatch code { flex: none; width: 6.5em; padding: 5px 0; text-align: center; font-variant-numeric: tabular-nums; }
+  .range { display: inline-flex; align-items: center; gap: 10px; }
+  .range input[type="range"] { width: 150px; height: auto; padding: 0; border: 0; background: none; accent-color: var(--text); }
+  .range output { width: 3.4em; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   /* 部品は明るい配色の前提のページなので、枠も同じにしないと白い背景が塗られる（本番の LIVE Studio では透明） */
   .widget .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; color-scheme: normal; }
   .widget h2 { margin: 0; }
@@ -385,6 +436,44 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .gift-grid button:hover { background: var(--raised); border-color: var(--line); }
   .gift-grid small { color: var(--faint); font-variant-numeric: tabular-nums; }
+
+  /* ---- 有料版の画面 ---- */
+  .plan-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .plan-hero.with-terms { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .plan-name { margin: 0; font-size: 13px; font-weight: 700; }
+  .plan-price { margin: 2px 0 10px; color: var(--muted); }
+  .plan-price b { margin-right: 4px; font-size: 34px; font-weight: 600; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+  .plan-hero .lead { margin-bottom: 14px; }
+  .plan-terms {
+    margin: 0; padding-left: 24px; border-left: 1px solid var(--line-soft); align-content: start;
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; font-size: 12px; color: var(--muted);
+  }
+  .plan-terms dt { color: var(--text); white-space: nowrap; }
+  .plan-terms dd { margin: 0; }
+  .section-title { margin: 8px 0 -4px; font-size: 13px; font-weight: 700; }
+  .plan-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .feature { display: flex; flex-direction: column; gap: 8px; }
+  .feature h3 { margin: 0; font-size: 14px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 12px; }
+  .feature .free-note { color: var(--faint); font-size: 11px; }
+  .feature button { margin-top: auto; align-self: flex-start; }
+  .plan-numbers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .plan-numbers .card { display: flex; flex-direction: column; gap: 2px; }
+  .plan-numbers b { font-size: 22px; font-weight: 600; line-height: 1.3; }
+  .plan-numbers span { color: var(--muted); font-size: 12px; }
+  .compare { width: 100%; border-collapse: collapse; }
+  .compare th, .compare td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  .compare tr:last-child th, .compare tr:last-child td { border-bottom: 0; }
+  .compare thead th { font-size: 11px; font-weight: 400; color: var(--faint); border-bottom-color: var(--line); }
+  .compare tbody th { font-weight: 400; color: var(--muted); }
+  .compare td { white-space: nowrap; }
+  .compare td.plus { color: var(--text); font-weight: 600; }
+  .compare td.none { color: var(--faint); }
+  @media (max-width: 1000px) {
+    .plan-hero.with-terms, .plan-features { grid-template-columns: minmax(0, 1fr); }
+    .plan-terms { padding-left: 0; border-left: 0; }
+    .plan-numbers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
 
   /* ---- プラン（販売を始めるまでは出さない） ---- */
   .plan-badge { font-size: 11px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 10px; color: var(--muted); }
@@ -458,13 +547,15 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 1.8h4M6.8 1.8v4.4L2.6 13a.8.8 0 0 0 .7 1.2h9.4a.8.8 0 0 0 .7-1.2L9.2 6.2V1.8"/><path d="M4.4 10h7.2"/></svg>テスト</button>
     <button data-tab="tabSetup">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 1.5v3M10 1.5v3M4 4.5h8v3a4 4 0 0 1-8 0zM8 11.5v3"/></svg>接続と準備</button>
+    <button data-tab="tabPlan">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4.5 2h7L14.5 6 8 14 1.5 6z"/><path d="M1.5 6h13M6 2 5.5 6 8 14l2.5-8L10 2"/></svg>有料版</button>
   </nav>
   <div class="status">
     <span class="chip"><span class="dot" id="pauseDot"></span>妨害<span id="pauseText">—</span></span>
     <span class="chip"><span class="dot" id="tiktokDot"></span>TikTok<span id="tiktokText">—</span></span>
     <span class="chip"><span class="dot" id="modDot"></span>マイクラ<span id="modText">—</span></span>
     <span class="version" id="appVersion"></span>
-    <button class="plan-chip" id="planChip" data-goto="tabSetup" title="有料版について" hidden></button>
+    <button class="plan-chip" id="planChip" data-goto="tabPlan" title="有料版について" hidden></button>
   </div>
 </aside>
 
@@ -520,84 +611,76 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <button class="lg primary" id="fillStart">埋め立てを始める</button>
     <button class="lg" id="fillStop" hidden>埋め立てを終える</button>
   </div>
-  <div class="page">
+  <div class="page narrow">
     <div class="banner" id="fillBusy" hidden>埋め立て中です。設定を変えるときは、いったん終えてから始め直してください。</div>
-    <div id="fillIdle">
-      <div class="grid-2">
-        <section class="card">
-          <h2>見た目</h2>
-          <p class="lead">配信に映るブロックと枠です。</p>
-          <p class="group-label">手に持つブロック</p>
+    <div id="fillIdle" class="stack">
+      <section class="card">
+        <h2>ゲームの決まり</h2>
+        <p class="lead">埋めきって、決めた秒数崩されなければ 1ラウンドクリアです。</p>
+        <div class="setting"><div class="setting-text"><label for="fillRounds">ラウンド数</label></div><div class="setting-control"><input id="fillRounds" type="number" min="1" max="99" data-unit="回"></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillCountdown">埋めきってからクリアまで</label><small>この秒数のあいだ崩されなければクリア</small></div><div class="setting-control"><input id="fillCountdown" type="number" min="0" max="600" data-unit="秒"></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillWidth">枠の幅</label><small>3〜41 の奇数</small></div><div class="setting-control"><input id="fillWidth" type="number" min="3" max="41" step="2" data-unit="マス"></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillHeight">枠の高さ</label></div><div class="setting-control"><input id="fillHeight" type="number" min="1" max="30" data-unit="マス"></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillSkyY">枠を作る高さ</label><small>Y 座標</small></div><div class="setting-control"><input id="fillSkyY" type="number" min="-60" max="300" data-unit=""></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillMobLifetime">モブが消えるまで</label><small>0 にすると消えません</small></div><div class="setting-control"><input id="fillMobLifetime" type="number" min="0" max="600" step="5" data-unit="秒"></div></div>
+      </section>
+      <section class="card">
+        <h2>プレイヤー</h2>
+        <p class="lead">埋め立て中だけ変わり、終えると元に戻ります。</p>
+        <div class="setting"><div class="setting-text"><label for="fillMobsAttack">モブからの攻撃</label></div><div class="setting-control"><select id="fillMobsAttack">
+          <option value="true">モブの攻撃でだけダメージ</option><option value="false">攻撃されない</option>
+        </select></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillPlaceSpeed">置く速さ</label><small>押しっぱなしのとき</small></div><div class="setting-control"><select id="fillPlaceSpeed">
+          <option value="normal">ふつう（1秒に5個）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
+        </select></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillBreakSpeed">壊す速さ</label><small>押しっぱなしのとき</small></div><div class="setting-control"><select id="fillBreakSpeed">
+          <option value="normal">ふつう（バニラと同じ）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
+        </select></div></div>
+        <div class="setting"><div class="setting-text"><label for="fillReach">届く距離</label></div><div class="setting-control"><input id="fillReach" type="number" min="1" max="64" data-unit="マス"></div></div>
+      </section>
+      <section class="card">
+        <h2>見た目</h2>
+        <p class="lead">配信に映るブロックと枠です。</p>
+        <div class="setting tall"><div class="setting-text"><label for="fillHandBlock">手に持つブロック</label></div><div class="setting-control">
           <select id="fillHandBlock" data-tiles aria-label="手に持つブロック">
             <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
             <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
             <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
             <option value="redstone_block">レッドストーン</option><option value="quartz_block">クォーツ</option>
-          </select>
-          <p class="group-label" style="margin-top: 16px;">置かれるブロック（置いた瞬間にこれに変わる。お助けもこれ）</p>
+          </select></div></div>
+        <div class="setting tall"><div class="setting-text"><label for="fillBlock">置かれるブロック</label><small>置いた瞬間にこれに変わります。お助けもこれ</small></div><div class="setting-control">
           <select id="fillBlock" data-tiles aria-label="置かれるブロック">
             <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
             <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
             <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
             <option value="redstone_block">レッドストーン</option><option value="quartz_block">クォーツ</option>
-          </select>
-          <p class="group-label" style="margin-top: 16px;">枠の素材</p>
+          </select></div></div>
+        <div class="setting tall"><div class="setting-text"><label for="fillWall">枠の素材</label></div><div class="setting-control">
           <select id="fillWall" data-tiles aria-label="枠の素材">
             <option value="glass">ガラス</option><option value="white_stained_glass">白色のガラス</option>
             <option value="light_blue_stained_glass">空色のガラス</option><option value="bedrock">岩盤</option>
-          </select>
-        </section>
-        <section class="card">
-          <h2>ゲームの決まり</h2>
-          <p class="lead">埋めきって、決めた秒数崩されなければ 1ラウンドクリアです。</p>
-          <div class="fields">
-            <div><label for="fillRounds">ラウンド数</label><input id="fillRounds" type="number" min="1" max="99"></div>
-            <div><label for="fillMobLifetime">モブが消えるまで（秒・0 で消えない）</label><input id="fillMobLifetime" type="number" min="0" max="600" step="5"></div>
-            <div><label for="fillCountdown">埋めきってからクリアまで（秒）</label><input id="fillCountdown" type="number" min="0" max="600"></div>
-            <div><label for="fillWidth">枠の幅（マス）</label><input id="fillWidth" type="number" min="3" max="41" step="2"></div>
-            <div><label for="fillHeight">枠の高さ（マス）</label><input id="fillHeight" type="number" min="1" max="30"></div>
-            <div><label for="fillSkyY">枠を作る高さ（Y）</label><input id="fillSkyY" type="number" min="-60" max="300"></div>
-          </div>
-        </section>
-        <section class="card">
-          <h2>プレイヤー</h2>
-          <p class="lead">埋め立て中だけ変わり、終えると元に戻ります。</p>
-          <div class="fields">
-            <div><label for="fillMobsAttack">モブからの攻撃</label><select id="fillMobsAttack">
-              <option value="true">モブの攻撃でだけダメージ</option><option value="false">攻撃されない</option>
-            </select></div>
-            <div><label for="fillPlaceSpeed">置く速さ（押しっぱなし）</label><select id="fillPlaceSpeed">
-              <option value="normal">ふつう（1秒に5個）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
-            </select></div>
-            <div><label for="fillBreakSpeed">壊す速さ（押しっぱなし）</label><select id="fillBreakSpeed">
-              <option value="normal">ふつう（バニラと同じ）</option><option value="fast">速い（1秒に10個）</option><option value="fastest">とても速い（1秒に20個）</option>
-            </select></div>
-            <div><label for="fillReach">届く距離（マス）</label><input id="fillReach" type="number" min="1" max="64"></div>
-          </div>
-        </section>
-        <section class="card">
-          <h2>始めるとどうなるか</h2>
-          <p class="hint" style="margin: 6px 0 0;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
-        </section>
-      </div>
+          </select></div></div>
+      </section>
+      <section class="card">
+        <h2>始めるとどうなるか</h2>
+        <p class="hint" style="margin: 6px 0 0;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
+      </section>
     </div>
     <section class="card">
       <h2>ワールド</h2>
       <p class="lead">コマンドの代わりです。変えるとすぐマイクラに入り、ワールドに入るたびにも入れ直します。埋め立て中でも変えられます。</p>
-      <div class="fields">
-        <div><label for="worldTime">時間</label><select id="worldTime">
+        <div class="setting"><div class="setting-text"><label for="worldTime">時間</label></div><div class="setting-control"><select id="worldTime">
           <option value="normal">進む（ふつう）</option><option value="day">昼で止める</option><option value="night">夜で止める</option>
-        </select></div>
-        <div><label for="worldWeather">天気</label><select id="worldWeather">
+        </select></div></div>
+        <div class="setting"><div class="setting-text"><label for="worldWeather">天気</label></div><div class="setting-control"><select id="worldWeather">
           <option value="normal">変わる（ふつう）</option><option value="clear">晴れで止める</option><option value="rain">雨で止める</option>
-        </select></div>
-        <div><label for="worldMobSpawning">モブが自然に湧く</label><select id="worldMobSpawning">
+        </select></div></div>
+        <div class="setting"><div class="setting-text"><label for="worldMobSpawning">モブが自然に湧く</label></div><div class="setting-control"><select id="worldMobSpawning">
           <option value="true">湧く（ふつう）</option><option value="false">湧かない（妨害のモブだけ）</option>
-        </select></div>
-        <div><label for="worldKeepInventory">やられたときの持ち物</label><select id="worldKeepInventory">
+        </select></div></div>
+        <div class="setting"><div class="setting-text"><label for="worldKeepInventory">やられたときの持ち物</label></div><div class="setting-control"><select id="worldKeepInventory">
           <option value="false">落とす（ふつう）</option><option value="true">残る</option>
-        </select></div>
-      </div>
+        </select></div></div>
     </section>
   </div>
 </main>
@@ -647,16 +730,25 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <section class="card" id="styleCard" hidden>
       <div class="card-head"><h2>見た目</h2><button class="ghost" id="styleReset">元に戻す</button></div>
       <p class="lead">4つの部品すべてに効きます。変えると、すぐ配信画面と下の試し表示に映ります。大きさと位置は、LIVE Studio で枠を動かして変えてください。</p>
-      <div class="fields" id="styleFields">
-        <div><label for="styleText">文字の色</label><input type="color" id="styleText" data-style="textColor"></div>
-        <div><label for="styleAccent">強調の色（カウントダウンなど）</label><input type="color" id="styleAccent" data-style="accentColor"></div>
-        <div><label for="stylePanel">面の色</label><input type="color" id="stylePanel" data-style="panelColor"></div>
-        <div><label for="styleOpacity">面の濃さ（%・0 で透明）</label><input type="number" id="styleOpacity" min="0" max="100" step="5" data-style="panelOpacity"></div>
-        <div><label for="styleFont">文字の形</label><select id="styleFont" data-style="font">
-          <option value="gothic">游ゴシック（ふつう）</option><option value="meiryo">メイリオ</option><option value="ud">BIZ UDPゴシック（読みやすい）</option><option value="mincho">游明朝</option>
-        </select></div>
-        <div><label for="styleSeconds">ギフト通知を出しておく秒数</label><input type="number" id="styleSeconds" min="2" max="15" step="0.5" data-style="alertSeconds"></div>
-        <div><label for="styleMax">ギフト通知を同時に出す数</label><input type="number" id="styleMax" min="1" max="5" data-style="alertMax"></div>
+      <div class="style-groups" id="styleFields">
+        <div class="style-group">
+          <h3>色</h3>
+          <div class="setting"><div class="setting-text"><label for="styleText">文字の色</label></div><div class="setting-control"><span class="swatch"><input type="color" id="styleText" data-style="textColor"><code></code></span></div></div>
+          <div class="setting"><div class="setting-text"><label for="styleAccent">強調の色</label><small>カウントダウンなど</small></div><div class="setting-control"><span class="swatch"><input type="color" id="styleAccent" data-style="accentColor"><code></code></span></div></div>
+          <div class="setting"><div class="setting-text"><label for="stylePanel">面の色</label></div><div class="setting-control"><span class="swatch"><input type="color" id="stylePanel" data-style="panelColor"><code></code></span></div></div>
+        </div>
+        <div class="style-group">
+          <h3>面と文字</h3>
+          <div class="setting"><div class="setting-text"><label for="styleOpacity">面の濃さ</label><small>0% で透明</small></div><div class="setting-control"><span class="range"><input type="range" id="styleOpacity" min="0" max="100" step="5" data-style="panelOpacity"><output for="styleOpacity"></output></span></div></div>
+          <div class="setting"><div class="setting-text"><label for="styleFont">文字の形</label></div><div class="setting-control"><select id="styleFont" data-style="font">
+            <option value="gothic">游ゴシック（ふつう）</option><option value="meiryo">メイリオ</option><option value="ud">BIZ UDPゴシック（読みやすい）</option><option value="mincho">游明朝</option>
+          </select></div></div>
+        </div>
+        <div class="style-group">
+          <h3>ギフト通知</h3>
+          <div class="setting"><div class="setting-text"><label for="styleSeconds">出しておく時間</label></div><div class="setting-control"><input type="number" id="styleSeconds" min="2" max="15" step="0.5" data-style="alertSeconds" data-unit="秒"></div></div>
+          <div class="setting"><div class="setting-text"><label for="styleMax">同時に出す数</label></div><div class="setting-control"><input type="number" id="styleMax" min="1" max="5" data-style="alertMax" data-unit="個"></div></div>
+        </div>
       </div>
     </section>
     <div class="widgets" id="widgets"></div>
@@ -668,7 +760,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <div class="page">
     <section class="card">
       <h2>配信ごとの記録</h2>
-      <p class="lead" id="statsLead">TikTok LIVE につないだ配信ごとに、届いたギフトや出した妨害を数えています（テスト送信は数えません）。直近30日分を残します。行を押すと、くわしく見られます。</p>
+      <p class="lead" id="statsLead">TikTok LIVE につないだ配信ごとに、届いたギフトや出した妨害を数えています（テスト送信は数えません）。直近30日分を残します。行を押すと、くわしく見られます。この画面を開いているあいだは、15秒ごとに自動で新しくなります。</p>
       <p class="hint" id="statsPlusNote" hidden></p>
       <div style="overflow-x: auto;"><table class="stream-list" id="streamList"></table></div>
       <div class="empty" id="streamEmpty" hidden><span>まだ記録がありません。TikTok LIVE につないで配信すると、ここに出ます。</span></div>
@@ -790,8 +882,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <h1>接続と準備</h1>
     <button class="lg" id="openWizard">はじめの設定をやり直す</button>
   </div>
-  <div class="page">
-    <div class="grid-2">
+  <div class="page narrow">
       <section class="card">
         <h2>マイクラ（Java版 <span id="mcVersion">26.3</span>）</h2>
         <p class="lead">MOD を動かすのに必要なものです。</p>
@@ -813,28 +904,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
           </div>
         </form>
       </section>
-      <section class="card">
-        <h2>配信画面に表示（オーバーレイ）</h2>
-        <p class="lead">ギフト通知・ギフト表・ラウンド・ランキングを、部品ごとに LIVE Studio に貼れます。</p>
-        <button data-goto="tabOverlay">配信画面の部品を見る</button>
-      </section>
-      <section class="card" id="licenseCard" hidden>
-        <div class="card-head"><h2>有料版（Creator Plus）</h2><span class="plan-badge" id="planBadge"></span></div>
-        <p class="lead" id="licenseText"></p>
-        <div class="row" id="licenseLinks" style="margin-bottom: 12px;">
-          <a class="button next" id="licenseBuy" target="_blank" rel="noopener" hidden>有料版を買う（月額980円）</a>
-          <a class="button ghost" id="licensePortal" target="_blank" rel="noopener" hidden>契約の確認・解約</a>
+      <section class="card link-card">
+        <div>
+          <h2>配信画面に表示（オーバーレイ）</h2>
+          <p class="lead">ギフト通知・ギフト表・ラウンド・ランキングを、部品ごとに LIVE Studio に貼れます。</p>
         </div>
-        <p class="hint" id="licenseCompare" style="margin: 0 0 14px;"></p>
-        <form id="licenseForm">
-          <label for="licenseKey">ライセンスキー</label>
-          <div class="row">
-            <input id="licenseKey" autocomplete="off" spellcheck="false" placeholder="購入したときにメールで届いたキー">
-            <button type="submit" class="next" id="licenseActivate">有効にする</button>
-          </div>
-          <p class="hint">キーは、いま保存している TikTok ID 用になります。使える PC は2台までです。</p>
-        </form>
-        <button class="ghost" id="licenseDeactivate" hidden>この PC で解除する</button>
+        <button data-goto="tabOverlay">配信画面の部品を見る</button>
       </section>
       <section class="card">
         <h2>対応している環境</h2>
@@ -857,7 +932,95 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\ProjectRedstone</code> を消してください。設定・ログ・ランキング・分析がすべて消えます</li>
         </ul>
       </section>
+  </div>
+</main>
+
+<main id="tabPlan" hidden>
+  <div class="page-head"><h1>有料版</h1><span class="plan-badge" id="planBadge"></span></div>
+  <div class="page narrow">
+    <section class="card plan-hero" id="licenseCard">
+      <div>
+        <p class="plan-name">${PLANS.plus.name}</p>
+        <p class="plan-price"><b>980</b>円 / 月（税込）</p>
+        <p class="lead" id="licenseText"></p>
+        <div class="row" id="licenseLinks">
+          <a class="button next lg" id="licenseBuy" target="_blank" rel="noopener" hidden>有料版を申し込む</a>
+          <a class="button lg" id="licensePortal" target="_blank" rel="noopener" hidden>契約の確認・解約</a>
+        </div>
+      </div>
+      <dl class="plan-terms" id="planTerms" hidden>
+        <dt>内容</dt><dd>有料版の利用権1か月分。解約するまで1か月ごとに自動で更新します</dd>
+        <dt>お支払い</dt><dd>クレジットカード。お申し込みのときと、毎月の更新日に請求します（決済は販売代行の Polar）</dd>
+        <dt>使える時期</dt><dd>お支払いのあとすぐ。ライセンスキーをメールでお送りします</dd>
+        <dt>解約</dt><dd>いつでも「契約の確認・解約」から。次の更新日の前日までに解約すると、次回から請求されません。途中で解約しても日割りの返金はなく、支払い済みの期間の終わりまで有料版を使えます</dd>
+      </dl>
+    </section>
+
+    <h2 class="section-title">有料版でできること</h2>
+    <div class="plan-features">
+      <article class="card feature">
+        <h3>配信ごとの分析</h3>
+        <p>どの時間に、どのギフトで盛り上がったか。30日分の配信を、1分ごとのグラフと内訳（ギフト・送ってくれた人・出した妨害・出なかった理由）で見られます。</p>
+        <p class="free-note">無料版: 直近の配信のまとめだけ</p>
+        <button data-goto="tabStats">分析を開く</button>
+      </article>
+      <article class="card feature">
+        <h3>ルールの作りこみ</h3>
+        <p>ランダムの候補ごとの出やすさ（1〜10）、同じものを続けて出さない、何ラウンド目から出すか。配信の山場をルールで作れます。</p>
+        <p class="free-note">無料版: ランダムと「いつ出すか」は使えます</p>
+        <button data-goto="tabRules">妨害の設定を開く</button>
+      </article>
+      <article class="card feature">
+        <h3>変更の履歴</h3>
+        <p>妨害の設定を保存するたびに、何を変えたかを残します。30件までさかのぼって、前の設定にすぐ戻せます。</p>
+        <p class="free-note">無料版: 新しい3件まで</p>
+        <button data-goto="tabRules">妨害の設定を開く</button>
+      </article>
     </div>
+    <div class="plan-numbers">
+      <div class="card"><b>${PLANS.plus.userPresets}個</b><span>保存できる自分のプリセット（無料版は${PLANS.free.userPresets}個）</span></div>
+      <div class="card"><b>${PLANS.plus.rulesPerPreset}件</b><span>1つのプリセットに入れられるルール（無料版は${PLANS.free.rulesPerPreset}件）</span></div>
+      <div class="card"><b>見た目</b><span>配信画面の部品の色・文字・通知の秒数を変えられる</span></div>
+      <div class="card"><b>書き出し</b><span>設定をファイルにして、別の PC へ持っていける</span></div>
+    </div>
+
+    <section class="card">
+      <h2>無料版とくらべる</h2>
+      <div style="overflow-x: auto; margin-top: 8px;">
+        <table class="compare">
+          <thead><tr><th></th><th>無料版</th><th>${PLANS.plus.name}</th></tr></thead>
+          <tbody>
+            <tr><th>妨害14種類・埋め立て・配信画面の部品4つ</th><td>○</td><td class="plus">○</td></tr>
+            <tr><th>一時停止・全妨害ストップ・テスト</th><td>○</td><td class="plus">○</td></tr>
+            <tr><th>ランダムの妨害・「いつ出すか」</th><td>○</td><td class="plus">○</td></tr>
+            <tr><th>自分のプリセット</th><td>${PLANS.free.userPresets}個</td><td class="plus">${PLANS.plus.userPresets}個</td></tr>
+            <tr><th>ルールの数</th><td>${PLANS.free.rulesPerPreset}件</td><td class="plus">${PLANS.plus.rulesPerPreset}件</td></tr>
+            <tr><th>ランダムの出やすさ・同じものを続けない・何ラウンド目から</th><td class="none">—</td><td class="plus">○</td></tr>
+            <tr><th>配信画面の部品の見た目</th><td class="none">—</td><td class="plus">○</td></tr>
+            <tr><th>設定の書き出し・読み込み</th><td class="none">—</td><td class="plus">○</td></tr>
+            <tr><th>配信ごとの分析</th><td>直近の配信のまとめ</td><td class="plus">30日分・グラフと内訳</td></tr>
+            <tr><th>妨害の設定の変更の履歴</th><td>新しい3件</td><td class="plus">30件</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">有料版をやめても、設定は消えません。無料版の上限を超えた分もそのまま残り、新しく足すことだけができなくなります。</p>
+    </section>
+
+    <section class="card" id="licenseKeyCard" hidden>
+      <h2>ライセンスキー</h2>
+      <form id="licenseForm">
+        <p class="lead">購入したときにメールで届いたキーを入れると、有料版になります。</p>
+        <div class="row">
+          <input id="licenseKey" autocomplete="off" spellcheck="false" placeholder="購入したときにメールで届いたキー" aria-label="ライセンスキー">
+          <button type="submit" class="next" id="licenseActivate">有効にする</button>
+        </div>
+        <p class="hint">キーは、いま保存している TikTok ID 用になります。使える PC は2台までです。</p>
+      </form>
+      <div class="link-card" id="licenseDeactivateRow" hidden>
+        <div><p class="lead">PC を買い替えるときは、前の PC で解除すると、新しい PC で使えます（設定は消えません）。</p></div>
+        <button id="licenseDeactivate">この PC で解除する</button>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -1234,9 +1397,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     // 末尾の .html がないと LIVE Studio のリンク欄に「正しいURLを入力してください」と言われる
     const url = location.origin + '/overlay/' + w.id + '.html';
     const preview = el('div', 'preview');
-    // おすすめの大きさの縦横比で見せる（縦長のものは幅を狭く）
-    preview.style.aspectRatio = w.size[0] + ' / ' + w.size[1];
-    preview.style.maxWidth = Math.round(240 * w.size[0] / w.size[1]) + 'px';
+    // おすすめの大きさの縦横比で、同じ高さの台に収める（縦長のものは幅を狭く）
+    preview.style.setProperty('--ratio', String(w.size[0] / w.size[1]));
     const frame = Object.assign(document.createElement('iframe'), { src: '/overlay/' + w.id + '#demo', title: w.name + 'の試しの表示', loading: 'lazy' });
     frame.tabIndex = -1;
     preview.append(frame);
@@ -1246,17 +1408,17 @@ export const PANEL_HTML = String.raw`<!doctype html>
       copy.textContent = 'コピーしました';
       setTimeout(() => (copy.textContent = 'コピー'), 1500);
     });
-    const card = el('section', 'card widget', preview, el('h2', '', w.name), el('p', 'lead', w.description),
-      el('div', 'url', el('code', '', url), copy), el('span', 'size', 'おすすめの大きさ: 幅' + w.size[0] + '×高さ' + w.size[1]));
+    const head = el('div', 'card-head', el('h2', '', w.name));
     if (w.id === 'ranking') {
-      const reset = Object.assign(el('button', '', 'ランキングをリセット'), { type: 'button' });
+      const reset = Object.assign(el('button', 'ghost', 'リセット'), { type: 'button', title: 'この配信のギフトの合計を0に戻します' });
       reset.addEventListener('click', async () => {
         const ok = await askConfirm({ title: 'ランキングをリセットしますか？', text: 'この配信のギフトの合計が0に戻ります。', ok: 'リセットする' });
         if (ok) post('/api/ranking/reset', {}, { button: reset, done: 'ランキングをリセットしました' });
       });
-      card.append(reset);
+      head.append(reset);
     }
-    return card;
+    return el('section', 'card widget', el('div', 'stage', preview), head, el('p', 'lead', w.description),
+      el('div', 'url', el('code', '', url), copy), el('span', 'size', 'おすすめの大きさ: 幅' + w.size[0] + '×高さ' + w.size[1]));
   }));
 
   function storage(key, value) {
@@ -1316,7 +1478,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
   const MAX_CHOICES = ${MAX_CHOICES};
   const MAX_WEIGHT = ${MAX_WEIGHT};
   const PLUS_NAME = ${JSON.stringify(PLANS.plus.name)};
-  const PLANS_INFO = ${JSON.stringify(PLANS)};
   const TRIGGERS = [['gift', 'ギフト'], ['minDiamonds', 'コイン数で'], ['likes', 'いいね'], ['follow', 'フォロー'], ['share', 'シェア']];
   /** 一覧のグループ（きっかけの種類ごと） */
   const RULE_GROUPS = [
@@ -1928,6 +2089,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
     });
   }
   $('statsReload').addEventListener('click', () => loadStreams());
+  // 開いているあいだは、配信中の数が増えていくのが見えるよう自動で読み直す（グラフに重ねているときは待つ）
+  setInterval(() => {
+    if ($('tabStats').hidden || document.hidden || document.querySelector('#tabStats .chart:hover')) return;
+    loadStreams();
+  }, 15000);
   // 履歴に残す「何で変えたか」（プリセット・履歴から読み込んだあと、そのまま保存したとき）
   let pendingReason = 'edit';
   $('revertRules').addEventListener('click', () => {
@@ -2057,11 +2223,19 @@ export const PANEL_HTML = String.raw`<!doctype html>
       // 入力中のものは上書きしない
       if (document.activeElement !== input) input.value = String(saved[input.dataset.style]);
     }
+    syncStyleLabels();
   }
+  /** 色の横の「#ffffff」と、濃さの「80%」 */
+  function syncStyleLabels() {
+    document.querySelectorAll('#styleFields .swatch').forEach((sw) => (sw.querySelector('code').textContent = sw.querySelector('input').value.toUpperCase()));
+    const opacity = Number($('styleOpacity').value);
+    $('styleOpacity').nextElementSibling.textContent = opacity === 0 ? '透明' : opacity + '%';
+  }
+  $('styleFields').addEventListener('input', syncStyleLabels);
   $('styleFields').addEventListener('change', (e) => {
     const key = e.target.dataset?.style;
     if (!key) return;
-    const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
+    const value = e.target.type === 'number' || e.target.type === 'range' ? Number(e.target.value) : e.target.value;
     post('/api/overlay/style', { style: { [key]: value } });
   });
   $('styleReset').addEventListener('click', async () => {
@@ -2072,8 +2246,18 @@ export const PANEL_HTML = String.raw`<!doctype html>
   // ---- 有料版のライセンス（販売を始めるまでは出さない） ----
   function renderLicense() {
     const lic = state.license ?? { enabled: false };
-    $('licenseCard').hidden = !lic.enabled;
-    if (!lic.enabled) return;
+    if (!lic.enabled) {
+      // 販売を始めるまでは無料ベータ。申し込みとキーの入力は出さない
+      $('planBadge').textContent = '無料ベータ中';
+      $('planBadge').classList.add('plus');
+      $('licenseText').textContent = '今は無料ベータ中のため、有料版の機能もすべて使えます。販売が始まったら、ここから申し込めます。';
+      $('licenseLinks').hidden = true;
+      $('planTerms').hidden = true;
+      $('licenseCard').classList.remove('with-terms');
+      $('licenseKeyCard').hidden = true;
+      return;
+    }
+    $('licenseKeyCard').hidden = false;
     const when = (t) => new Date(t).toLocaleString('ja-JP', { hour12: false });
     const texts = {
       none: '無料版で動いています。有料版を買うと、プリセットやルールをたくさん保存できます。',
@@ -2089,7 +2273,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     }
     $('licenseText').textContent = text;
     $('licenseForm').hidden = lic.state !== 'none';
-    $('licenseDeactivate').hidden = lic.state === 'none';
+    $('licenseDeactivateRow').hidden = lic.state === 'none';
     const plus = state.plan?.id === 'plus';
     $('planBadge').textContent = plus ? '今は有料版' : '今は無料版';
     $('planBadge').classList.toggle('plus', plus);
@@ -2102,8 +2286,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('licensePortal').hidden = lic.state === 'none' || !lic.portalUrl;
     if (lic.portalUrl) $('licensePortal').href = lic.portalUrl;
     $('licenseLinks').hidden = $('licenseBuy').hidden && $('licensePortal').hidden;
-    $('licenseCompare').textContent = '有料版でできること: 自分のプリセット' + PLANS_INFO.plus.userPresets + '個（無料版は' + PLANS_INFO.free.userPresets + '個）・ルール' + PLANS_INFO.plus.rulesPerPreset
-      + '件（無料版は' + PLANS_INFO.free.rulesPerPreset + '件）・設定の書き出しと読み込み・配信画面の見た目・ランダムの出やすさと何ラウンド目から・30日分の分析・30件の変更の履歴。一時停止・全妨害ストップ・テストは無料版でも同じように使えます。';
+    // 月額の契約なので、申し込むボタンの横に契約の中身を出す
+    $('planTerms').hidden = $('licenseBuy').hidden;
+    $('licenseCard').classList.toggle('with-terms', !$('licenseBuy').hidden);
   }
 
   /** 有料版の機能の案内に付ける「有料版について」（販売を始めるまでは出さない） */
@@ -2112,8 +2297,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const b = Object.assign(el('button', 'plus-link', '有料版について'), { type: 'button' });
     b.addEventListener('click', () => {
       document.querySelectorAll('dialog[open]').forEach((d) => d.close());
-      showTab('tabSetup');
-      $('licenseCard').scrollIntoView({ block: 'center' });
+      showTab('tabPlan');
     });
     return [b];
   }
@@ -2273,6 +2457,26 @@ export const PANEL_HTML = String.raw`<!doctype html>
   document.querySelectorAll('[data-test]').forEach((b) => b.addEventListener('click', () =>
     post('/api/test', { kind: b.dataset.test, count: Number(b.dataset.count ?? 1) }, { button: b, done: '「' + buttonText(b) + '」が届いたことにしました' })));
   document.querySelectorAll('button[data-icon]').forEach((b) => b.prepend(mcIcon(b.dataset.icon)));
+
+  // 設定の行の数の入力は、− と ＋ のボタンと単位をつける
+  document.querySelectorAll('.setting input[type=number]').forEach((input) => {
+    const box = el('div', 'stepper');
+    const step = (dir) => {
+      try {
+        if (dir > 0) input.stepUp(); else input.stepDown();
+      } catch {
+        return;
+      }
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const minus = Object.assign(el('button', '', '−'), { type: 'button', tabIndex: -1, title: '減らす' });
+    const plus = Object.assign(el('button', '', '＋'), { type: 'button', tabIndex: -1, title: '増やす' });
+    minus.addEventListener('click', () => step(-1));
+    plus.addEventListener('click', () => step(1));
+    input.before(box);
+    box.append(minus, input, el('span', 'unit', input.dataset.unit ?? ''), plus);
+  });
 
   // 置くブロック・枠の素材は、絵のタイルで選ぶ（値は隠した select に持つ）
   document.querySelectorAll('select[data-tiles]').forEach((sel) => {

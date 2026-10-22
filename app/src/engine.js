@@ -312,6 +312,8 @@ export class Engine extends EventEmitter {
       tiktok: this.tiktok.status,
       tiktokUsername: this.config.tiktokUsername,
       mod: this.client.status,
+      // アプリに入っている MOD の版（マイクラの MOD と比べる。わからなければ空）
+      appModVersion: this.modVersion,
       fill: this.client.status.fill ?? null,
       fillSettings: this.config.fill ?? parseFill(),
       gameMode: this.config.gameMode ?? 'fill',

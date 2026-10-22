@@ -24,6 +24,8 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
   // 配る版（exe）では、テストの画面を隠す（開発用の画面のため）
   const panelHtml = debug ? PANEL_HTML : PANEL_HTML.replace('<body>', '<body class="release">');
   const clients = new Set();
+  /** 配信画面の部品のつながり → 部品の id */
+  const overlayClients = new Map();
   const allowedHosts = () => {
     const actual = server.address()?.port ?? port;
     return new Set([`127.0.0.1:${actual}`, `localhost:${actual}`]);
@@ -139,6 +141,12 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
         }
       }
       const result = await engine.manualAction(action);
+      if (result.status === 'failed') return { status: 400, error: result.error };
+      if (result.status === 'paused') return { status: 400, error: '一時停止中です' };
+    },
+    // 配信前のチェック: マイクラの画面に文字を出して、届くか確かめる（ギフト通知の部品にも出る）
+    'POST /api/check': async () => {
+      const result = await engine.manualAction({ type: 'message', count: 1, from: '', label: 'STATIC ARC 配信前チェック OK' });
       if (result.status === 'failed') return { status: 400, error: result.error };
       if (result.status === 'paused') return { status: 400, error: '一時停止中です' };
     },
@@ -293,8 +301,20 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       res.write(`event: snapshot\ndata: ${JSON.stringify({ state: engine.state, logs: engine.logs, activity: engine.activity })}\n\n`);
       clients.add(res);
-      req.on('close', () => clients.delete(res));
+      // 配信画面の部品（LIVE Studio に貼られて開いているもの）を数える。試しの表示（demo）は数えない
+      const overlay = url.searchParams.get('overlay');
+      if (overlay && Object.hasOwn(OVERLAY_PAGES, overlay) && !url.searchParams.has('demo')) overlayClients.set(res, overlay);
+      req.on('close', () => {
+        clients.delete(res);
+        overlayClients.delete(res);
+      });
       return;
+    }
+    // 配信前のチェック: 今開いている配信画面の部品の数（部品ごと）
+    if (route === 'GET /api/overlays') {
+      const open = Object.fromEntries(Object.keys(OVERLAY_PAGES).map((id) => [id, 0]));
+      for (const id of overlayClients.values()) open[id] += 1;
+      return send(res, 200, { open });
     }
 
     const action = actions[route];

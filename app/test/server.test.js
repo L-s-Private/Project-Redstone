@@ -355,3 +355,29 @@ test('設定ファイルの書き出しはダウンロードとして返し、�
     assert.equal((await json(port, '/api/settings/import', {})).status, 400);
   });
 });
+
+test('配信前のチェック: 開いている配信画面の部品を数え（試しの表示は数えない）、マイクラに文字を出す', async () => {
+  await withServer(async ({ engine, port }) => {
+    const open = (path) => new Promise((resolve) => {
+      const req = http.get({ host: '127.0.0.1', port, path, headers: { Host: `127.0.0.1:${port}` } }, (res) => resolve({ req, res }));
+    });
+    const live = await open('/events?overlay=alerts');
+    const demo = await open('/events?overlay=gifts&demo=1');
+    const panel = await open('/events');
+    assert.deepEqual((await request(port, { path: '/api/overlays' })).json().open, { alerts: 1, gifts: 0, round: 0, ranking: 0 });
+    live.req.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal((await request(port, { path: '/api/overlays' })).json().open.alerts, 0);
+    demo.req.destroy();
+    panel.req.destroy();
+
+    const sent = [];
+    engine.manualAction = async (action) => (sent.push(action), { status: 'sent' });
+    assert.equal((await json(port, '/api/check', {})).status, 200);
+    assert.equal(sent[0].type, 'message');
+    engine.manualAction = async () => ({ status: 'failed', error: 'マイクラ（MOD）につながっていません' });
+    const failed = await json(port, '/api/check', {});
+    assert.equal(failed.status, 400);
+    assert.match(failed.json().error, /つながっていません/);
+  });
+});

@@ -356,6 +356,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .link-card { display: flex; align-items: center; gap: 16px; }
   .link-card > div { flex: 1; min-width: 0; }
   .link-card .lead { margin: 0; }
+  /* 配信前のチェック */
+  .check-summary { margin: 4px 0 14px; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); font-weight: 700; }
+  .check-summary.ok { border-color: var(--ok); color: var(--ok); }
+  .check-summary.warn { border-color: var(--warn); color: var(--warn); }
+  .check-summary.bad { border-color: var(--bad); color: var(--bad); }
+  .check-list { list-style: none; margin: 0; padding: 0; }
+  .check-list li { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+  .check-list li:last-child { border-bottom: 0; }
+  .check-list .mark { width: 22px; height: 22px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; border: 1px solid var(--line); color: var(--faint); }
+  .check-list .ok .mark { background: var(--ok); border-color: var(--ok); color: #0a0a0a; }
+  .check-list .warn .mark { border-color: var(--warn); color: var(--warn); }
+  .check-list .bad .mark { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .check-list .wait .mark::after { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--faint); border-top-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .check-list .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .check-list .body b { font-size: 14px; }
+  .check-list .body small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .check-list li > button { flex: none; height: 30px; padding: 0 12px; font-size: 12px; }
   /* 配信の準備（足りないものだけ。そろうと消える） */
   .ready-card { border-color: var(--warn); }
   .ready-card .card-head small { color: var(--faint); font-size: 12px; }
@@ -907,6 +925,7 @@ ${CONTROLS_CSS}
 <main id="tabLive">
   <div class="page-head">
     <h1>配信</h1>
+    <button class="lg ghost" id="openCheck" title="マイクラ・TikTok・配信画面の部品・妨害の設定を、まとめて確かめます">配信前のチェック</button>
     <button class="lg" id="toggle">一時停止</button>
     <button class="lg danger" id="stop">全妨害ストップ</button>
   </div>
@@ -1570,6 +1589,16 @@ ${CONTROLS_CSS}
   </div>
 </dialog>
 
+<dialog id="checkDialog" aria-labelledby="checkTitle" style="width: min(600px, calc(100vw - 32px));">
+  <h2 id="checkTitle">配信前のチェック</h2>
+  <p class="check-summary" id="checkSummary"></p>
+  <ul class="check-list" id="checkList"></ul>
+  <div class="wizard-actions" style="justify-content: flex-end;">
+    <button id="checkAgain">もう一度確かめる</button>
+    <button id="checkClose" class="next">閉じる</button>
+  </div>
+</dialog>
+
 <dialog id="historyDialog" style="width: min(640px, calc(100vw - 32px));">
   <h2>妨害の設定の変更の履歴</h2>
   <p class="hint" style="margin: 0 0 6px;">「保存する」を押すたびに残しています（新しい順）。読み込むと、その時の設定に入れ替わります。「保存する」を押すまでは確定しません。</p>
@@ -1766,6 +1795,105 @@ ${CONTROLS_JS}
     if (page) page.prepend($('alertBar'));
     $('alertBar').querySelectorAll('[data-to]').forEach((b) => (b.hidden = b.dataset.to === id));
   }
+
+  // ---- 配信前のチェック（ボタン1つで、配信に要るものを順に確かめる） ----
+  // 決まり: ok = 大丈夫 / warn = 配信はできるが見ておきたい / bad = このままだと妨害が出ない
+  const CHECK_SUMMARY = {
+    ok: '配信できます。全部そろっています',
+    warn: '配信はできます。! の項目を見ておくと安心です',
+    bad: '直したほうがいいものがあります（✕ の項目）',
+  };
+  let checking = false;
+  async function runCheck() {
+    if (checking) return;
+    checking = true;
+    $('checkAgain').disabled = true;
+    const items = [];
+    const draw = () => {
+      $('checkList').replaceChildren(...items.map((item) => {
+        const li = el('li', item.level, el('span', 'mark', { ok: '✓', warn: '!', bad: '✕', wait: '' }[item.level]),
+          el('div', 'body', el('b', '', item.title), ...(item.text ? [el('small', '', item.text)] : [])));
+        if (item.fix && item.level !== 'ok' && item.level !== 'wait') {
+          const b = Object.assign(el('button', '', item.fix[0]), { type: 'button' });
+          b.addEventListener('click', item.fix[1]);
+          li.append(b);
+        }
+        return li;
+      }));
+      const levels = items.map((i) => i.level);
+      const done = !levels.includes('wait');
+      const level = levels.includes('bad') ? 'bad' : levels.includes('warn') ? 'warn' : 'ok';
+      $('checkSummary').className = 'check-summary ' + (done ? level : '');
+      $('checkSummary').textContent = done ? CHECK_SUMMARY[level] : '確かめています…';
+    };
+    const add = (item) => {
+      items.push(item);
+      draw();
+      return item;
+    };
+    const goto = (tab) => () => {
+      $('checkDialog').close();
+      showTab(tab);
+    };
+    const inWorld = state.mod.connected && state.mod.players > 0;
+    // 1. マイクラ
+    add(inWorld ? { level: 'ok', title: 'マイクラのワールドに入っている' }
+      : { level: 'bad', title: 'マイクラのワールドに入っていません', text: 'ランチャーで「fabric-loader」を選んで起動し、ワールドに入ってください', fix: ['接続と準備へ', goto('tabSetup')] });
+    // 2. MOD の版
+    if (inWorld && state.appModVersion) {
+      add(state.mod.version === state.appModVersion ? { level: 'ok', title: 'マイクラの MOD は最新' }
+        : { level: 'bad', title: 'マイクラの MOD が古い版です', text: 'マイクラを閉じてアプリを起動し直すと、新しい MOD に入れ替わります' });
+    }
+    // 3. マイクラに届くか（文字を出して確かめる）
+    if (inWorld && !state.paused) {
+      const item = add({ level: 'wait', title: 'マイクラに妨害が届くか', text: 'マイクラの画面に「配信前チェック OK」と出します' });
+      try {
+        const res = await fetch('/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const data = await res.json().catch(() => ({}));
+        Object.assign(item, res.ok ? { level: 'ok', title: 'マイクラに妨害が届く', text: 'マイクラの画面の下に「STATIC ARC 配信前チェック OK」と出ていれば大丈夫です' }
+          : { level: 'bad', title: 'マイクラに届きませんでした', text: data.error ?? '' });
+      } catch {
+        Object.assign(item, { level: 'bad', title: 'マイクラに届きませんでした', text: 'アプリとの接続が切れています' });
+      }
+      draw();
+    }
+    // 4. 一時停止
+    add(state.paused ? { level: 'bad', title: '一時停止中です', text: 'このままだと、ギフトが来ても妨害が出ません', fix: ['再開する', () => post('/api/resume', {}).then(() => setTimeout(runCheckAgain, 300))] }
+      : { level: 'ok', title: '妨害を受け付けている（一時停止していない）' });
+    // 5. TikTok
+    if (state.mock) add({ level: 'warn', title: 'テストモードで動いています', text: 'TikTok にはつながりません。本番は「npm run app」か配る版で起動してください' });
+    else if (!state.tiktokUsername) add({ level: 'bad', title: 'TikTok ID が入っていません', fix: ['接続と準備へ', goto('tabSetup')] });
+    else if (state.tiktok.state === 'connected') add({ level: 'ok', title: 'TikTok LIVE につながっている（@' + state.tiktokUsername + '）' });
+    else if (state.tiktok.state === 'retrying') add({ level: 'bad', title: 'TikTok LIVE との接続が切れています', text: 'つなぎ直しています。しばらく待ってください' });
+    else add({ level: 'warn', title: 'TikTok LIVE はまだ始まっていません（@' + state.tiktokUsername + '）', text: 'LIVE を始めると自動でつながります。ID が合っているかだけ確かめてください' });
+    // 6. 妨害の設定
+    if (rows.length === 0) add({ level: 'bad', title: '妨害のルールがありません', text: 'ギフトが来ても何も起きません', fix: ['妨害の設定へ', goto('tabRules')] });
+    else if (rulesDirty) add({ level: 'warn', title: '妨害の設定に、保存していない変更があります', text: '「保存する」を押すまで、変更は使われません', fix: ['妨害の設定へ', goto('tabRules')] });
+    else add({ level: 'ok', title: '妨害のルールがある（' + rows.length + '件）' });
+    // 7. 配信画面の部品（LIVE Studio に貼って開いているか）
+    try {
+      const { open } = await (await fetch('/api/overlays')).json();
+      const names = OVERLAY_WIDGETS.filter((w) => open[w.id] > 0).map((w) => w.name);
+      add(names.length ? { level: 'ok', title: '配信画面の部品が開いている', text: names.join('・') }
+        : { level: 'warn', title: '配信画面の部品が開いていません', text: 'LIVE Studio に部品を貼っていないか、LIVE Studio を開いていません。使わないなら、このままで大丈夫です', fix: ['配信画面へ', goto('tabOverlay')] });
+    } catch {}
+    // 8. ゲーム
+    const playing = !!state.fill || MINING_ACTIVE.includes(state.mining?.state);
+    add(playing ? { level: 'ok', title: 'ゲームが始まっている' }
+      : { level: 'warn', title: 'ゲームはまだ始まっていません', text: '配信の画面の「始める」で始められます。始めなくても、妨害は出ます' });
+    checking = false;
+    $('checkAgain').disabled = false;
+  }
+  const runCheckAgain = () => {
+    if ($('checkDialog').open) runCheck();
+  };
+  $('openCheck').addEventListener('click', () => {
+    $('checkList').replaceChildren();
+    $('checkDialog').showModal();
+    runCheck();
+  });
+  $('checkAgain').addEventListener('click', runCheck);
+  $('checkClose').addEventListener('click', () => $('checkDialog').close());
 
   // ---- 配信の準備（足りないものを、上から順に） ----
   let readyKey = '';

@@ -93,7 +93,8 @@ const BASE_JS = String.raw`
   }
   /** アプリにつなぐ（つながらなければ自動でつなぎ直す） */
   function connect({ onState, onAlert }) {
-    const events = new EventSource('/events');
+    // どの部品かを名乗る（配信前のチェックで、LIVE Studio に貼られているかを見る）。試しの表示は数えない
+    const events = new EventSource('/events?overlay=' + WIDGET + (DEMO ? '&demo=1' : ''));
     const handle = (state) => {
       applyStyle(state.overlayStyle);
       onState(state);
@@ -120,7 +121,7 @@ const BASE_JS = String.raw`
  * size: おすすめの大きさ。文字や絵の大きさの単位 --u は「幅の1%」だが、枠がおすすめより横長のときは高さに合わせて小さくする
  * （LIVE Studio で枠をどんな形にしても、はみ出さないように）
  */
-function page({ title, size, css, body, script }) {
+function page({ id, title, size, css, body, script }) {
   return `<!doctype html>
 <html lang="ja">
 <head>
@@ -135,6 +136,7 @@ function page({ title, size, css, body, script }) {
 ${body}
 <script>
 const FONTS = ${JSON.stringify(OVERLAY_FONTS)};
+const WIDGET = ${JSON.stringify(id)};
 let STYLE = ${JSON.stringify(DEFAULT_OVERLAY_STYLE)};
 ${MC_ICON_JS}
 ${BASE_JS}
@@ -150,6 +152,7 @@ ${script}
 // ---- ギフト通知 ----
 const ALERTS = page({
   title: 'ギフト通知',
+  id: 'alerts',
   size: widgetSize('alerts'),
   css: String.raw`
   #stack { position: fixed; inset: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: calc(2.4 * var(--u)); padding: calc(3 * var(--u)) calc(4 * var(--u)); box-sizing: border-box; }
@@ -256,6 +259,7 @@ const ALERTS = page({
 // 基本は横5列×縦3行の大きさ。多いときは列と行を増やしてカードを小さくし、それでも PAGE_MAX を超えたらページを分ける
 const GIFTS = page({
   title: 'ギフト表',
+  id: 'gifts',
   size: widgetSize('gifts'),
   css: String.raw`
   #box { position: fixed; inset: calc(1.2 * var(--u)); display: flex; flex-direction: column; padding: calc(1.6 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)); box-sizing: border-box; }
@@ -391,6 +395,7 @@ const GIFTS = page({
 // URL は前と同じ round.html（LIVE Studio に貼り直さなくてよいように）
 const ROUND = page({
   title: 'ゲーム状況',
+  id: 'round',
   size: widgetSize('round'),
   css: String.raw`
   #box { position: fixed; inset: calc(2 * var(--u)); padding: calc(3.4 * var(--u)) calc(4.4 * var(--u)) calc(4 * var(--u)); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
@@ -637,6 +642,7 @@ const ROUND = page({
 // ---- ギフトランキング ----
 const RANKING = page({
   title: 'ギフトランキング',
+  id: 'ranking',
   size: widgetSize('ranking'),
   css: String.raw`
   #box { position: fixed; inset: calc(2 * var(--u)); padding: calc(4 * var(--u)) calc(4.4 * var(--u)); box-sizing: border-box; }

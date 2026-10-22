@@ -32,10 +32,10 @@ class FakeEngine extends EventEmitter {
   }
 }
 
-async function withServer(fn, { setup, icons } = {}) {
+async function withServer(fn, { setup, icons, debug } = {}) {
   const engine = new FakeEngine();
   const saved = [];
-  const ui = createUiServer({ engine, port: 0, setup, icons, saveConfig: async (c) => saved.push({ ...c }) });
+  const ui = createUiServer({ engine, port: 0, setup, icons, debug, saveConfig: async (c) => saved.push({ ...c }) });
   const port = await ui.listen();
   try {
     await fn({ engine, saved, port });
@@ -69,6 +69,17 @@ test('操作画面とオーバーレイを返す', async () => {
     assert.match((await request(port, { path: '/overlay' })).text, /オーバーレイ/);
     assert.equal((await request(port, { path: '/nope' })).status, 404);
   });
+});
+
+test('配る版（debug: false）では、テストの画面を隠す', async () => {
+  await withServer(async ({ port }) => {
+    assert.doesNotMatch((await request(port)).text, /<body class="release">/);
+  });
+  await withServer(async ({ port }) => {
+    const panel = (await request(port)).text;
+    assert.match(panel, /<body class="release">/);
+    assert.match(panel, /body\.release \[data-tab="tabDebug"\]/);
+  }, { debug: false });
 });
 
 test('マイクラのアイコンとギフトの一覧を返す', async () => {

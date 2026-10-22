@@ -20,7 +20,9 @@ const MAX_BODY_BYTES = 512 * 1024;
  * @param {{status: () => Promise<object>, install: () => Promise<object>}} [options.setup] マイクラ側の準備（setup.js）
  * @param {{get: (name: string) => Promise<Buffer | null>}} [options.icons] マイクラのアイコン（mcIcons.js）
  */
-export function createUiServer({ engine, saveConfig = async () => {}, setup, icons, port = DEFAULT_UI_PORT }) {
+export function createUiServer({ engine, saveConfig = async () => {}, setup, icons, port = DEFAULT_UI_PORT, debug = true }) {
+  // 配る版（exe）では、テストの画面を隠す（開発用の画面のため）
+  const panelHtml = debug ? PANEL_HTML : PANEL_HTML.replace('<body>', '<body class="release">');
   const clients = new Set();
   const allowedHosts = () => {
     const actual = server.address()?.port ?? port;
@@ -214,7 +216,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     const url = new URL(req.url, 'http://localhost');
     const route = `${req.method} ${url.pathname}`;
 
-    if (route === 'GET /') return sendHtml(res, PANEL_HTML);
+    if (route === 'GET /') return sendHtml(res, panelHtml);
     // 配信画面の部品（ギフト通知・ギフト表・ラウンド・ランキング）。
     // LIVE Studio のリンク欄は「.html のような、点＋英字」がない URL をはねる（127.0.0.1 だけだと通らない）ので、末尾 .html でも開ける。
     // また LIVE Studio は貼られた URL を一度読んで確かめるので、表示用のこのページだけはほかのアプリからも読めるようにする

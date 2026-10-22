@@ -138,6 +138,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   details.more-info > :not(summary) { margin-top: 8px; }
   details.more-info ul { margin: 8px 0 0; padding-left: 20px; color: var(--muted); font-size: 13px; line-height: 1.8; }
   /* どの画面でも上に出す注意（マイクラにつながっていない、など） */
+  /* 配る版（exe）では、テストの画面を出さない（開発用） */
+  body.release [data-tab="tabDebug"], body.release #tabDebug { display: none !important; }
   .alert-bar { display: flex; flex-direction: column; gap: 8px; }
   .alert { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid; font-weight: 600; }
   .alert span { flex: 1; min-width: 0; }
@@ -1510,7 +1512,7 @@ ${CONTROLS_CSS}
       <li>ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動</li>
       <li>ワールドを開く（左下の「マイクラ」が緑になります）</li>
       <li>枠を作りたい場所に立って、「埋め立て」の画面で「埋め立てを始める」</li>
-      <li>「テスト」の画面で妨害が出るか試す</li>
+      <li>「妨害の設定」の「▶ 試す」で、妨害が出るか試す</li>
       <li>TikTok LIVE を始める</li>
     </ol>
     <p class="hint">どのギフトで何が起きるかは「妨害の設定」で変えられます。</p>
@@ -2151,6 +2153,7 @@ ${CONTROLS_JS}
 
   // ---- タブ ----
   function showTab(id) {
+    if (id === 'tabDebug' && document.body.classList.contains('release')) id = 'tabLive';
     document.querySelectorAll('nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     document.querySelectorAll('body > main').forEach((page) => (page.hidden = page.id !== id));
     placeAlerts(id);

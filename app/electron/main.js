@@ -31,7 +31,8 @@ if (!app.requestSingleInstanceLock()) {
       process.env.REDSTONE_MOD_DIR ??= join(process.resourcesPath, 'mod');
     }
     try {
-      running = await startApp({ mock: process.argv.includes('--mock'), onLog: ({ level, text }) => console.log(`[${level}] ${text}`) });
+      // テストの画面は開発のときだけ（exe では隠す）
+      running = await startApp({ mock: process.argv.includes('--mock'), debug: !app.isPackaged, onLog: ({ level, text }) => console.log(`[${level}] ${text}`) });
     } catch (e) {
       const message = e instanceof ConfigError ? e.message
         : e.code === 'EADDRINUSE' ? 'ポート 25600 がほかのソフトに使われています。そのソフトを閉じてから起動してください。'

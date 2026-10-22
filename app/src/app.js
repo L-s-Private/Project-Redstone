@@ -21,7 +21,7 @@ import { loadUserConfig, saveUserConfig } from './userConfig.js';
  * @returns {Promise<{url: string, engine: Engine, configPath: string, shutdown: () => Promise<void>}>}
  *   ポートが使えないときは code = 'EADDRINUSE' の Error を投げる
  */
-export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = () => {} } = {}) {
+export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = () => {}, debug = true } = {}) {
   const { config, path: configPath, created, removed } = await loadUserConfig();
   const logFile = join(dirname(configPath), 'app.log');
 
@@ -75,7 +75,7 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const icons = createIconSource({ dir });
   // マイクラ本体から先に読んでおく（最初に開いた画面で絵が遅れないように）
   icons.get('tnt_side').catch(() => {});
-  const ui = createUiServer({ engine, port, setup, icons, saveConfig: (c) => saveUserConfig(configPath, c) });
+  const ui = createUiServer({ engine, port, setup, icons, debug, saveConfig: (c) => saveUserConfig(configPath, c) });
   await ui.listen();
 
   engine.log('info', `STATIC ARC v${pkg.version} / 設定ファイル: ${configPath}${created ? '（新しく作りました）' : ''}`);

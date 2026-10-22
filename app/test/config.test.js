@@ -100,9 +100,15 @@ test('プリセット: 壊れたものは捨て、名前の長さを確かめる
   assert.throws(() => parsePreset({ name: 'あ'.repeat(21), rules: ok.rules }));
 });
 
-test('入っているプリセットは、いったん無し（初めてのルールは設定例のもの）', async () => {
+test('入っているプリセットは、どれもそのまま読めて、無料版のルールの上限に収まる', async () => {
   const { BUILTIN_PRESETS } = await import('../src/presets.js');
-  assert.deepEqual(BUILTIN_PRESETS, []);
+  const { parseConfig } = await import('../src/config.js');
+  const { PLANS } = await import('../src/plan.js');
+  assert.deepEqual(BUILTIN_PRESETS.map((p) => p.id), ['standard', 'easy', 'hard']);
+  for (const preset of BUILTIN_PRESETS) {
+    assert.doesNotThrow(() => parseConfig({ rules: preset.rules }), preset.name);
+    assert.ok(preset.rules.length <= PLANS.free.rulesPerPreset, preset.name);
+  }
 });
 
 test('ランダムと条件のルールを読む。おかしいものは理由つきで断る', async () => {

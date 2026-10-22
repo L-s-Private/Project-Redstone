@@ -245,7 +245,7 @@ test('今のルールを自分のプリセットとして保存し、同じ名�
   engine.config.rules = [{ gift: 'バラ', action: 'jail', count: 10 }];
   engine.savePreset(' いつもの ');
   assert.deepEqual(engine.state.presets.mine, [{ name: 'いつもの', rules: [{ gift: 'バラ', action: 'jail', count: 10 }] }]);
-  assert.deepEqual(engine.state.presets.builtin, []);
+  assert.deepEqual(engine.state.presets.builtin.map((p) => p.name), ['定番', 'やさしめ', '激辛']);
   assert.throws(() => engine.savePreset(''), /名前/);
   engine.deletePreset('いつもの');
   assert.deepEqual(engine.state.presets.mine, []);

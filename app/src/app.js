@@ -8,6 +8,7 @@ import { writeFileSafely } from './files.js';
 import { GiftCatalog } from './giftCatalog.js';
 import { License, licenseConfig } from './license.js';
 import { createIconSource } from './mcIcons.js';
+import { createMediaStore } from './media.js';
 import { createUiServer, DEFAULT_UI_PORT } from './server.js';
 import { getSetupStatus, installAll, minecraftDir, updateModIfOutdated } from './setup.js';
 import pkg from '../package.json' with { type: 'json' };
@@ -75,7 +76,9 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const icons = createIconSource({ dir });
   // マイクラ本体から先に読んでおく（最初に開いた画面で絵が遅れないように）
   icons.get('tnt_side').catch(() => {});
-  const ui = createUiServer({ engine, port, setup, icons, debug, saveConfig: (c) => saveUserConfig(configPath, c) });
+  // ルールの演出（音・画像・動画）のファイル
+  const media = createMediaStore(join(dirname(configPath), 'media'));
+  const ui = createUiServer({ engine, port, setup, icons, media, debug, saveConfig: (c) => saveUserConfig(configPath, c) });
   await ui.listen();
 
   engine.log('info', `STATIC ARC v${pkg.version} / 設定ファイル: ${configPath}${created ? '（新しく作りました）' : ''}`);

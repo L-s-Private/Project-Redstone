@@ -178,6 +178,9 @@ const ALERTS = page({
   .gift-name .num { margin-left: calc(1 * var(--u)); }
   .what { display: flex; align-items: center; gap: calc(2.4 * var(--u)); margin-top: calc(1.6 * var(--u)); font-size: calc(8.4 * var(--u)); line-height: 1.1; color: var(--ov-text); }
   .what .mc { --s: calc(9 * var(--u)); }
+  /* ルールの演出（画像・動画）。カードのいちばん上に大きく */
+  .alert .media { grid-column: 1 / -1; display: flex; justify-content: center; margin: calc(-1 * var(--u)) 0 calc(.6 * var(--u)); }
+  .alert .media img, .alert .media video { display: block; max-width: 100%; max-height: calc(34 * var(--u)); border-radius: calc(1.6 * var(--u)); object-fit: contain; }
   @keyframes pop { from { transform: translateY(calc(-4 * var(--u))) scale(.6); opacity: 0; filter: blur(6px); } to { transform: none; opacity: 1; filter: none; } }
   @keyframes glow { from { box-shadow: 0 0 0 calc(.6 * var(--u)) rgba(255, 255, 255, .55), 0 calc(1 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, .4); } to { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 calc(1 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, .4); } }
   @keyframes shine { to { transform: translateX(100%); } }
@@ -220,6 +223,33 @@ const ALERTS = page({
     what.append(el('span', 'clamp2 fit', alert.action + '！'));
     text.append(what);
     const card = el('div', 'alert panel', picture, text);
+    // ルールの演出: 画像・動画はカードの上に出し、音は鳴らす
+    let holdMs = STYLE.alertSeconds * 1000;
+    const media = alert.media ?? {};
+    const volume = (media.volume ?? 80) / 100;
+    if (media.visual) {
+      const src = '/media/' + encodeURIComponent(media.visual);
+      if (/\.(mp4|webm)$/.test(media.visual)) {
+        const video = Object.assign(document.createElement('video'), { src, autoplay: true, playsInline: true, volume });
+        // 音つきで始められないとき（ブラウザの決まり）は、音なしで流す
+        video.play().catch(() => {
+          video.muted = true;
+          video.play().catch(() => {});
+        });
+        // 動画は終わるまで出しておく（長くても30秒）
+        video.addEventListener('loadedmetadata', () => {
+          if (Number.isFinite(video.duration)) holdMs = Math.max(holdMs, Math.min(30, video.duration) * 1000);
+        });
+        card.prepend(el('div', 'media', video));
+      } else {
+        card.prepend(el('div', 'media', Object.assign(document.createElement('img'), { src, alt: '' })));
+      }
+    }
+    if (media.sound) {
+      const sound = new Audio('/media/' + encodeURIComponent(media.sound));
+      sound.volume = volume;
+      sound.play().catch(() => {});
+    }
     const stack = $('stack');
     // いちばん上に新しい通知を入れ、前の通知は元の位置から新しい位置まで、するっと下へずらす
     const before = new Map(shown().map((c) => [c, c.getBoundingClientRect().top]));
@@ -234,7 +264,8 @@ const ALERTS = page({
       }
       if (offset) c.animate([{ transform: 'translateY(' + offset + 'px)' }, { transform: 'none' }], { duration: SLIDE_MS, easing: EASE });
     });
-    setTimeout(() => dismiss(card), STYLE.alertSeconds * 1000);
+    // 動画の長さがわかるまで待ってから、消す時間を決める
+    setTimeout(() => setTimeout(() => dismiss(card), Math.max(0, holdMs - 1000)), 1000);
   }
   if (DEMO) {
     demoGiftImages().then((images) => {

@@ -116,7 +116,8 @@ export class Dispatcher {
       const response = await this.client.send(action);
       if (response.ok) {
         this.stats.sent++;
-        return { status: 'sent', action, ...(random && { random }) };
+        // rule: どのルールで出したか（画面のボタンなら無し）。配信画面の演出に使う
+        return { status: 'sent', action, ...(random && { random }), ...(index >= 0 && { rule: index }) };
       }
       this.stats.failed++;
       return { status: 'failed', action, ...(random && { random }), error: response.error };

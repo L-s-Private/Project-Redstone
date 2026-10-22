@@ -690,7 +690,9 @@ export class Engine extends EventEmitter {
       const who = event.kind === 'like' ? `いいね${result.likes}回` : event.kind === 'manual' ? '配信者' : `${event.from || '誰か'}さん`;
       const giftImage = event.kind === 'gift' ? event.image ?? '' : '';
       const giftName = event.kind === 'gift' ? event.giftNameJa || event.giftName || '' : '';
-      this.emit('alert', { who, action: describeAction(result.action), icon, giftImage, giftName, count: event.kind === 'gift' ? event.count : 1 });
+      // ルールの演出（音・画像・動画）があれば、ギフト通知で鳴らす・出す
+      const media = result.rule !== undefined ? this.dispatcher.rules[result.rule]?.media : undefined;
+      this.emit('alert', { who, action: describeAction(result.action), icon, giftImage, giftName, count: event.kind === 'gift' ? event.count : 1, ...(media && { media }) });
     } else if (result.status === 'failed') {
       this.log('error', `  → 出せませんでした: ${result.error}`);
     } else {

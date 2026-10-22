@@ -3,13 +3,14 @@ import { ACTION_TYPES, MAX_CHOICES, MAX_WEIGHT, RANDOM_ACTION, SOCIAL_EVENTS, WH
 import { MAX_PRESET_NAME } from './presets.js';
 import { MAX_RULES, MAX_USER_PRESETS } from './plan.js';
 import { DEFAULT_GAME_MODE, GAME_MODES, parseMining } from './mining.js';
+import { isMediaName } from './media.js';
 
 export const DEFAULT_MOD_PORT = 25599;
 
 const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event'];
 // MOD が出せるもの（docs/protocol.md）
 export const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
-const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec', 'choices', 'noRepeat', 'when', 'minRound'];
+const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec', 'choices', 'noRepeat', 'when', 'minRound', 'media'];
 const CHOICE_KEYS = ['action', 'count', 'mob', 'weight'];
 /** 「何ラウンド目から」の上限（埋め立てのラウンド数の上限と同じ） */
 const MAX_MIN_ROUND = 99;
@@ -228,8 +229,36 @@ function validateRule(rule, number) {
   if (rule.cooldownSec !== undefined && !(Number.isFinite(rule.cooldownSec) && rule.cooldownSec >= 0)) {
     throw new ConfigError(`${where}: cooldownSec は0以上の数にしてください`);
   }
+  if (rule.media !== undefined) {
+    const media = parseMedia(rule.media);
+    if (!media) throw new ConfigError(`${where}: 演出（音・画像・動画）の指定が正しくありません`);
+    rule = { ...rule, media };
+  }
   // 知らない項目は捨てる
   return Object.fromEntries(RULE_KEYS.filter((key) => rule[key] !== undefined).map((key) => [key, key === 'gift' ? rule.gift.trim() : rule[key]]));
+}
+
+/**
+ * ルールの演出: {sound?: 音のファイル名, visual?: 画像・動画のファイル名, volume?: 0〜100}（media.js）。
+ * @returns 読めなければ null。音も画像も無ければ null
+ */
+function parseMedia(raw) {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const media = {};
+  if (raw.sound !== undefined) {
+    if (!isMediaName(raw.sound, 'sound')) return null;
+    media.sound = raw.sound;
+  }
+  if (raw.visual !== undefined) {
+    if (!isMediaName(raw.visual, 'visual')) return null;
+    media.visual = raw.visual;
+  }
+  if (!media.sound && !media.visual) return null;
+  if (raw.volume !== undefined) {
+    if (!(Number.isInteger(raw.volume) && raw.volume >= 0 && raw.volume <= 100)) return null;
+    media.volume = raw.volume;
+  }
+  return media;
 }
 
 /** ランダムの候補1つ（{action, count, mob, weight}） */

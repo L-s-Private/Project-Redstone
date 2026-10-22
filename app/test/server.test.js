@@ -32,10 +32,10 @@ class FakeEngine extends EventEmitter {
   }
 }
 
-async function withServer(fn, { setup, icons, debug } = {}) {
+async function withServer(fn, { setup, icons, debug, media } = {}) {
   const engine = new FakeEngine();
   const saved = [];
-  const ui = createUiServer({ engine, port: 0, setup, icons, debug, saveConfig: async (c) => saved.push({ ...c }) });
+  const ui = createUiServer({ engine, port: 0, setup, icons, debug, media, saveConfig: async (c) => saved.push({ ...c }) });
   const port = await ui.listen();
   try {
     await fn({ engine, saved, port });
@@ -380,4 +380,31 @@ test('配信前のチェック: 開いている配信画面の部品を数え（
     assert.equal(failed.status, 400);
     assert.match(failed.json().error, /つながっていません/);
   });
+});
+
+test('演出のファイルを受け取って写し、配信画面から読めるように返す。ほかのサイトからは断る', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { createMediaStore } = await import('../src/media.js');
+  const dir = await mkdtemp(join(tmpdir(), 'redstone-media-'));
+  try {
+    await withServer(async ({ port }) => {
+      const upload = (ext, body, headers = {}) => request(port, { method: 'POST', path: '/api/media?ext=' + ext, headers: { 'Content-Type': 'application/octet-stream', ...headers }, body });
+      const ok = await upload('png', 'PNGDATA');
+      assert.equal(ok.status, 200);
+      const { name, kind } = ok.json();
+      assert.equal(kind, 'visual');
+      const file = await request(port, { path: '/media/' + name });
+      assert.equal(file.status, 200);
+      assert.equal(file.headers['content-type'], 'image/png');
+      assert.equal(file.text, 'PNGDATA');
+      assert.equal((await upload('exe', 'x')).status, 400);
+      assert.equal((await upload('png', 'x', { Origin: 'http://evil.example' })).status, 403);
+      assert.equal((await request(port, { method: 'POST', path: '/api/media?ext=png', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 415);
+      assert.equal((await request(port, { path: '/media/nothing.png' })).status, 404);
+    }, { media: createMediaStore(dir) });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

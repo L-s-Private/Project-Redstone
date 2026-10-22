@@ -67,7 +67,7 @@ test('ランダムのルールは候補から1つ出し、条件のあるルー�
     { likes: 10, action: 'freeze', count: 5, when: 'filling' },
   ];
   const dispatcher = new Dispatcher({ rules, client, game: () => game, random: () => 0 });
-  assert.deepEqual(await dispatcher.handle(rose), { status: 'sent', action: { type: 'tnt', count: 1, from: 'たろう' }, random: true });
+  assert.deepEqual(await dispatcher.handle(rose), { status: 'sent', action: { type: 'tnt', count: 1, from: 'たろう' }, random: true, rule: 0 });
   await dispatcher.handle(rose);
   assert.equal(sent[1].type, 'mob', '同じものを続けない');
   game = { phase: 'countdown', round: 0 };

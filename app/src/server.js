@@ -2,6 +2,7 @@
 // 同じPCからしか開けないよう 127.0.0.1 にだけ待ち受け、ほかのサイトからの操作（CSRF・DNSリバインディング）も断る。
 import http from 'node:http';
 import { readAsset } from './assets.js';
+import { MAX_MEDIA_BYTES } from './media.js';
 import { ConfigError, MOBS, parseConfig } from './config.js';
 import { MAX_COUNT_BY_TYPE } from './rules.js';
 import { OVERLAY_HTML } from './ui/overlay.js';
@@ -19,8 +20,9 @@ const MAX_BODY_BYTES = 512 * 1024;
  * @param {(config: object) => Promise<void>} [options.saveConfig] TikTok ID を変えたときに保存する
  * @param {{status: () => Promise<object>, install: () => Promise<object>}} [options.setup] マイクラ側の準備（setup.js）
  * @param {{get: (name: string) => Promise<Buffer | null>}} [options.icons] マイクラのアイコン（mcIcons.js）
+ * @param {ReturnType<import('./media.js').createMediaStore>} [options.media] ルールの演出（音・画像・動画）のファイル
  */
-export function createUiServer({ engine, saveConfig = async () => {}, setup, icons, port = DEFAULT_UI_PORT, debug = true }) {
+export function createUiServer({ engine, saveConfig = async () => {}, setup, icons, media, port = DEFAULT_UI_PORT, debug = true }) {
   // 配る版（exe）では、テストの画面を隠す（開発用の画面のため）
   const panelHtml = debug ? PANEL_HTML : PANEL_HTML.replace('<body>', '<body class="release">');
   const clients = new Set();
@@ -250,6 +252,34 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
       return res.end(png);
     }
+    // ルールの演出のファイル（配信画面のギフト通知が鳴らす・出す）
+    const mediaFile = route.match(/^GET \/media\/([^/]+)$/);
+    if (mediaFile) {
+      const file = await media?.read(mediaFile[1]);
+      if (!file) return send(res, 404, { error: '見つかりません' });
+      res.writeHead(200, { 'Content-Type': file.mime, 'Cache-Control': 'max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*' });
+      return res.end(file.body);
+    }
+    // ルールの演出のファイルを受け取る（中身そのまま。拡張子は ?ext=mp3 のように渡す）
+    if (route === 'POST /api/media') {
+      const origin = req.headers.origin;
+      if (origin !== undefined && !allowedHosts().has(origin.replace(/^http:\/\//, ''))) {
+        return send(res, 403, { error: 'ほかのサイトからは操作できません' });
+      }
+      if (req.headers['content-type'] !== 'application/octet-stream') return send(res, 415, { error: 'ファイルの中身を送ってください' });
+      if (!media) return send(res, 404, { error: '見つかりません' });
+      let body;
+      try {
+        body = await readBody(req, MAX_MEDIA_BYTES);
+      } catch (e) {
+        return send(res, 400, { error: e.message });
+      }
+      try {
+        return send(res, 200, await media.save(body, url.searchParams.get('ext')));
+      } catch (e) {
+        return send(res, 400, { error: e.message });
+      }
+    }
     if (route === 'GET /api/settings/export') {
       let data;
       try {
@@ -379,6 +409,25 @@ function testEvent(body) {
   const diamonds = Math.min(100000, Math.max(0, Math.floor(Number(body.diamonds)) || 0));
   if (!giftName) return null;
   return { kind: 'gift', giftId: '', giftName, diamonds, count, from, test: true };
+}
+
+/** 送られた中身をそのまま読む（大きすぎれば断る） */
+function readBody(req, limit) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error(`ファイルが大きすぎます（${Math.round(limit / 1024 / 1024)}MB まで）`));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
 }
 
 function readJson(req) {

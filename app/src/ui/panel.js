@@ -660,6 +660,18 @@ export const PANEL_HTML = String.raw`<!doctype html>
   @keyframes rule-flash { 0%, 35% { background: var(--hover); box-shadow: inset 0 0 0 1px var(--text); } 100% { box-shadow: inset 0 0 0 1px transparent; } }
   .ed-side-fields { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
   .ed-side-fields:empty { display: none; }
+  .media-field { gap: 8px; }
+  .media-slot { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+  .media-kind { width: 5.5em; flex: none; font-size: 12px; color: var(--muted); font-weight: 400; }
+  .media-slot .media-choose { flex: 1; min-width: 0; height: 34px; font-size: 12px; }
+  .media-slot.set .media-choose { flex: none; }
+  .media-slot .icon-only { width: 30px; height: 30px; padding: 0; flex: none; }
+  .media-thumb { flex: 1; min-width: 0; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
+  .media-thumb img, .media-thumb video { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .media-thumb.sound { color: var(--muted); font-size: 16px; }
+  .media-slot .range { flex: 1; max-width: none; }
+  .media-slot .range input { flex: 1; width: auto; }
+  .media-slot output { width: 3em; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .editor-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px 12px 26px; border-top: 1px solid var(--line-soft); background: var(--surface); }
   .editor-foot .grow { flex: 1; }
   .editor-foot .next { min-width: 112px; }
@@ -1410,7 +1422,7 @@ ${CONTROLS_CSS}
           <li>TikTok のパスワードやログインは使いません。入れるのは TikTok ID だけです</li>
           <li>TikTok LIVE には、非公式のしくみ（tiktok-live-connector）でつなぎます。つなぐとき、TikTok ID が外部のサービス Euler Stream（eulerstream.com）に送られます</li>
           <li>ギフトの一覧は TikTok から、マイクラの準備に使うものは Fabric と Modrinth から取ってきます</li>
-          <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、妨害の設定の変更の履歴（30件）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、配信ごとの分析（直近30日分。視聴者の名前とコイン数を含む）、ログ（視聴者の名前と届いたギフト）</li>
+          <li>保存するのはこの PC の中だけです: 設定（TikTok ID・妨害の設定・プリセット）、妨害の設定の変更の履歴（30件）、ギフトの一覧、ギフトランキング（視聴者の名前とコイン数）、配信ごとの分析（直近30日分。視聴者の名前とコイン数を含む）、ログ（視聴者の名前と届いたギフト）、ルールの演出に選んだ音・画像・動画の写し（media フォルダ）</li>
           <li>これらを作者などに送ることはありません</li>
           <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\ProjectRedstone</code> を消してください。設定・ログ・ランキング・分析がすべて消えます</li>
         </ul>
@@ -2363,7 +2375,8 @@ ${CONTROLS_JS}
     return { trigger, value: String(value), action: single.action, mob: single.mob ?? 'zombie',
       label: rule.label ?? '', count: single.count ?? 1, cooldownSec: rule.cooldownSec ?? 0, maxCount: rule.maxCount,
       random, choices: (rule.choices ?? []).map((c) => ({ key: choiceKey(c), count: c.count ?? 1, weight: c.weight ?? 1 })),
-      noRepeat: rule.noRepeat ?? false, when: rule.when ?? '', minRound: rule.minRound ? String(rule.minRound) : '' };
+      noRepeat: rule.noRepeat ?? false, when: rule.when ?? '', minRound: rule.minRound ? String(rule.minRound) : '',
+      media: rule.media ? { ...rule.media } : {} };
   }
 
   function toRule(row) {
@@ -2392,6 +2405,7 @@ ${CONTROLS_JS}
     if (row.when) rule.when = row.when;
     if (row.minRound) rule.minRound = Number(row.minRound);
     if (row.label) rule.label = row.label;
+    if (row.media?.sound || row.media?.visual) rule.media = row.media;
     if (Number(row.cooldownSec) > 0) rule.cooldownSec = Number(row.cooldownSec);
     if (row.maxCount !== undefined) rule.maxCount = row.maxCount;
     return rule;
@@ -2577,6 +2591,7 @@ ${CONTROLS_JS}
       row.minRound ? row.minRound + 'ラウンド目から' : '',
       row.when === 'filling' ? '埋め立て中' : row.when === 'countdown' ? 'カウントダウン中' : '',
       Number(row.cooldownSec) > 0 ? '待ち ' + row.cooldownSec + '秒' : '',
+      mediaText(row.media),
     ].filter(Boolean);
     const note = ruleModeNote(row);
     const tag = note ? el('span', 'rule-tag warn', [...tags, note].join('・')) : tags.length ? el('span', 'rule-tag', tags.join('・')) : el('span');
@@ -2935,6 +2950,7 @@ ${CONTROLS_JS}
     const needsLabel = !row.random && row.action === 'message';
     const label = input(row.label, live('label'), { placeholder: needsLabel ? '例: ありがとう！' : '空なら妨害の名前', maxLength: 100 });
     side.push(el('label', 'ed-field', needsLabel ? '出す文（必須）' : '配信画面に出す文', el('small', '', 'ギフト通知に出ます。100文字まで'), label));
+    side.push(mediaField(row));
     $('editorDetails').replaceChildren(...side);
 
     // ③ 出し方の条件（そのままでも使える。変えてあれば開いておく）
@@ -2957,6 +2973,101 @@ ${CONTROLS_JS}
     const changed = Number(row.cooldownSec) > 0 || row.when || row.minRound;
     if (changed) $('editorMore').open = true;
     renderSummary();
+  }
+
+  /** 演出の短い説明（「音・画像」など） */
+  function mediaText(media) {
+    if (!media?.sound && !media?.visual) return '';
+    return [media.sound ? '♪ 音' : '', media.visual ? (/\.(mp4|webm)$/.test(media.visual) ? '動画' : '画像') : ''].filter(Boolean).join('・');
+  }
+
+  /** ファイルをアプリに写す。@returns {Promise<{name, kind} | null>} */
+  async function uploadMedia(file, button) {
+    const ext = (file.name.match(/\.([a-z0-9]+)$/i)?.[1] ?? '').toLowerCase();
+    button?.classList.add('busy');
+    try {
+      const res = await fetch('/api/media?ext=' + encodeURIComponent(ext), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error ?? 'ファイルを入れられませんでした', 'error');
+        return null;
+      }
+      return data;
+    } catch {
+      toast('ファイルを入れられませんでした（アプリとの接続が切れています）', 'error');
+      return null;
+    } finally {
+      button?.classList.remove('busy');
+    }
+  }
+
+  /** 右の欄の「演出」: ギフト通知で鳴らす音と、出す画像・動画 */
+  let previewSound = null;
+  function mediaField(row) {
+    row.media ??= {};
+    const box = el('div', 'ed-field media-field', el('span', '', '演出'), el('small', '', '配信画面の「ギフト通知」で、音を鳴らす・画像や動画を出します'));
+    const slot = (kind) => {
+      const name = row.media[kind];
+      const isSound = kind === 'sound';
+      const pick = Object.assign(document.createElement('input'), { type: 'file', hidden: true,
+        accept: isSound ? '.mp3,.wav,.ogg,.m4a,audio/*' : '.png,.jpg,.jpeg,.gif,.webp,.mp4,.webm,image/*,video/*' });
+      const choose = Object.assign(el('button', 'media-choose', name ? '変える' : isSound ? '音を選ぶ' : '画像・動画を選ぶ'), { type: 'button' });
+      choose.addEventListener('click', () => pick.click());
+      pick.addEventListener('change', async () => {
+        const file = pick.files?.[0];
+        if (!file) return;
+        const saved = await uploadMedia(file, choose);
+        if (!saved) return;
+        if (saved.kind !== kind) {
+          toast(isSound ? 'ここには音のファイル（mp3・wav など）を選んでください' : 'ここには画像か動画のファイルを選んでください', 'error');
+          return;
+        }
+        row.media[kind] = saved.name;
+        renderEditor();
+      });
+      const parts = [pick];
+      if (name && isSound) {
+        const play = Object.assign(el('button', 'icon-only', '▶'), { type: 'button', title: '鳴らしてみる' });
+        play.setAttribute('aria-label', '音を鳴らしてみる');
+        play.addEventListener('click', () => {
+          previewSound?.pause();
+          previewSound = new Audio('/media/' + encodeURIComponent(name));
+          previewSound.volume = (row.media.volume ?? 80) / 100;
+          previewSound.play().catch(() => {});
+        });
+        parts.push(el('span', 'media-thumb sound', '♪'), play);
+      } else if (name) {
+        const src = '/media/' + encodeURIComponent(name);
+        const thumb = /\.(mp4|webm)$/.test(name)
+          ? Object.assign(document.createElement('video'), { src, muted: true, loop: true, autoplay: true, playsInline: true })
+          : Object.assign(document.createElement('img'), { src, alt: '' });
+        parts.push(el('span', 'media-thumb', thumb));
+      }
+      parts.push(choose);
+      if (name) {
+        const remove = Object.assign(el('button', 'icon-only', '✕'), { type: 'button', title: '外す' });
+        remove.setAttribute('aria-label', isSound ? '音を外す' : '画像・動画を外す');
+        remove.addEventListener('click', () => {
+          delete row.media[kind];
+          renderEditor();
+        });
+        parts.push(remove);
+      }
+      return el('div', 'media-slot' + (name ? ' set' : ''), el('span', 'media-kind', isSound ? '音' : '画像・動画'), ...parts);
+    };
+    box.append(slot('sound'), slot('visual'));
+    if (row.media.sound || /\.(mp4|webm)$/.test(row.media.visual ?? '')) {
+      const volume = Object.assign(document.createElement('input'), { type: 'range', min: 0, max: 100, step: 5, value: String(row.media.volume ?? 80) });
+      volume.setAttribute('aria-label', '音の大きさ');
+      const out = el('output', '', (row.media.volume ?? 80) + '%');
+      volume.addEventListener('input', () => {
+        row.media.volume = Number(volume.value);
+        out.textContent = volume.value + '%';
+        if (previewSound) previewSound.volume = row.media.volume / 100;
+      });
+      box.append(el('div', 'media-slot', el('span', 'media-kind', '音の大きさ'), el('span', 'range', volume, out)));
+    }
+    return box;
   }
 
   /** 右の「このルール」（きっかけ → 出す妨害）。数や文を打つたびに直す */
@@ -3011,6 +3122,7 @@ ${CONTROLS_JS}
     $('editorSummary').replaceChildren(el('div', 'ed-summary', el('small', '', 'このルール'),
       el('div', 'ed-flow', trigger, arrow, action),
       ...(conditions.length ? [el('p', 'ed-desc', '条件: ' + conditions.join('・'))] : []),
+      ...(mediaText(row.media) ? [el('p', 'ed-desc', '演出: ' + mediaText(row.media))] : []),
       el('p', 'ed-desc', desc),
       ...(warn ? [el('p', 'ed-warn', warn)] : []),
       ...(dupNote ? [dupNote] : [])));
@@ -3095,6 +3207,7 @@ ${CONTROLS_JS}
     return true;
   }
   $('editorCancel').addEventListener('click', leaveEditor);
+  $('ruleEditor').addEventListener('close', () => previewSound?.pause());
   $('editorClose').addEventListener('click', leaveEditor);
   // Esc でも同じ（いきなり消えないように）
   $('ruleEditor').addEventListener('cancel', (e) => {

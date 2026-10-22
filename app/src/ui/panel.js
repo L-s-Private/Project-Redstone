@@ -1530,8 +1530,8 @@ ${CONTROLS_CSS}
     <ol class="hint" style="font-size: 15px; line-height: 1.9; color: var(--text);">
       <li>ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動</li>
       <li>ワールドを開く（左下の「マイクラ」が緑になります）</li>
-      <li>枠を作りたい場所に立って、「埋め立て」の画面で「埋め立てを始める」</li>
-      <li>「妨害の設定」の「▶ 試す」で、妨害が出るか試す</li>
+      <li>枠を作りたい場所に立って、「配信」の画面の「埋め立てを始める」</li>
+      <li>「配信」の画面の「配信前のチェック」で、全部 ✓ になっているか確かめる</li>
       <li>TikTok LIVE を始める</li>
     </ol>
     <p class="hint">どのギフトで何が起きるかは「妨害の設定」で変えられます。</p>

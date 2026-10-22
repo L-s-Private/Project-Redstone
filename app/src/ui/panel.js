@@ -101,8 +101,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: 16px; align-items: start; }
   .split-side { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  /* 左に一覧、右に中身（分析） */
+  .split.list-first { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); }
+  .split.list-first > .split-side { order: -1; }
+  .split.single { grid-template-columns: minmax(0, 1fr); }
   @media (max-width: 980px) {
-    .split { grid-template-columns: minmax(0, 1fr); }
+    .split, .split.list-first { grid-template-columns: minmax(0, 1fr); }
     .split-side { position: static; }
   }
   /* くわしい説明は、開いたときだけ */
@@ -162,6 +166,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .quick + .quick { margin-top: 6px; }
   code { flex: 1; background: var(--bg); border: 1px solid var(--line); padding: 6px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--muted); word-break: break-all; }
   .group-label { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .group-label.test-group { margin-top: 16px; }
+  /* テストのギフトの入力は、狭い右の列では2段にする */
+  #testForm .row { flex-wrap: wrap; }
+  #testForm #giftName { flex: 1 1 100%; }
 
   /* ---- 配信 ---- */
   #toggle.paused { background: var(--invert-bg); color: var(--invert-text); border-color: var(--invert-bg); }
@@ -287,6 +295,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .checks .no .mark { color: var(--bad); }
   .checks small { color: var(--faint); display: block; font-size: 12px; word-break: break-all; }
   .ready { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); font-size: 13px; }
+  .setup-ready { border-color: var(--ok); color: var(--ok); font-weight: 600; }
 
   /* ---- 妨害の設定 ---- */
   .count { color: var(--faint); font-weight: 600; margin-left: 4px; }
@@ -408,25 +417,33 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .form-error { color: var(--warn); font-size: 13px; margin: 0; }
 
   /* ---- 配信画面（オーバーレイ） ---- */
-  .widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: stretch; }
-  .widget { display: flex; flex-direction: column; gap: 12px; }
+  /* 部品の一覧（押すと右の試し表示が切り替わる） */
+  .widget-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+  @media (max-width: 1200px) { .widget-list { grid-template-columns: minmax(0, 1fr); } }
+  .widget { display: flex; flex-direction: column; gap: 10px; cursor: pointer; }
+  .widget:hover { border-color: var(--line); }
+  .widget.selected { border-color: var(--text); }
+  .widget .showing { font-size: 12px; color: var(--muted); }
+  .widget-size { color: var(--faint); font-size: 13px; }
+  .preview-card .stage { height: 380px; }
+  .preview-card .preview { width: min(100%, calc(378px * var(--ratio))); }
   /* 試し表示の台。どの部品も同じ高さにして、カードの高さをそろえる */
-  .widget .stage {
+  .stage {
     height: 200px; display: grid; place-items: center; overflow: hidden;
     border-radius: var(--radius-sm); border: 1px solid var(--line-soft);
     /* 透明の背景がわかるよう、ゲーム画面の代わりの市松模様 */
     background: repeating-conic-gradient(#1c1c1f 0 25%, #151517 0 50%) 0 0 / 16px 16px;
   }
-  .widget .preview { position: relative; width: min(100%, calc(198px * var(--ratio))); aspect-ratio: var(--ratio); }
+  .stage .preview { position: relative; aspect-ratio: var(--ratio); }
+  .stage .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; color-scheme: normal; }
   .widget .card-head { margin: 0; }
   .widget .card-head h2 { margin-right: auto; }
   .widget .card-head button { padding: 3px 10px; font-size: 13px; }
   .widget .url { margin-top: auto; }
   /* 見た目の設定（色・面と文字・ギフト通知の3つに分ける） */
-  .style-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; }
+  .style-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 32px; }
   .style-group h3 { margin: 0 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
   .style-group .setting { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 0; }
-  @media (max-width: 1100px) { .style-groups { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
   .swatch { display: inline-flex; align-items: center; gap: 8px; }
   .swatch input[type="color"] { width: 34px; height: 32px; padding: 2px; flex: none; }
   .swatch code { flex: none; width: 6.5em; padding: 5px 0; text-align: center; font-variant-numeric: tabular-nums; }
@@ -568,7 +585,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .stream-list tbody tr:hover { background: var(--raised); }
   .stream-list tbody tr.selected { background: var(--raised); box-shadow: inset 2px 0 0 var(--text); }
   .stream-detail { display: flex; flex-direction: column; gap: 16px; }
-  .detail-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  .detail-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+  .key-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .key-stats .stat b.warn { color: var(--warn); }
+  .key-stats .stat b.bad { color: var(--bad); }
+  .sub-stats { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .stream-list td.bad { color: var(--bad); }
+  .stream-list td.warn { color: var(--warn); }
   @media (max-width: 900px) { .detail-lists { grid-template-columns: minmax(0, 1fr); } }
   .stats.wide { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); row-gap: 12px; }
   .chart { position: relative; margin-bottom: 14px; }
@@ -808,73 +831,88 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <main id="tabOverlay" hidden>
   <div class="page-head"><h1>配信画面</h1></div>
   <div class="page">
-    <section class="card">
-      <h2>配信画面に出す部品</h2>
-      <p class="lead" style="margin-bottom: 0;">部品の「コピー」を押し、TikTok LIVE Studio の「ソースを追加」→「リンク」に貼ります。部品ごとに好きな位置・大きさに置けます。</p>
-      <details class="more-info">
-        <summary>大きさについて</summary>
-        <p class="hint">おすすめの大きさは、縦画面（1080×1920）のときのものです。枠を大きくすると、文字や絵も大きくなります。下の絵は試しの表示です。</p>
-      </details>
-    </section>
-    <section class="card" id="styleCard" hidden>
-      <div class="card-head"><h2>見た目</h2><button class="ghost" id="styleReset">元に戻す</button></div>
-      <p class="lead">4つの部品すべてに効きます。変えると、すぐ配信画面と下の試し表示に映ります。大きさと位置は、LIVE Studio で枠を動かして変えてください。</p>
-      <div class="style-groups" id="styleFields">
-        <div class="style-group">
-          <h3>色</h3>
-          <div class="setting"><div class="setting-text"><label for="styleText">文字の色</label></div><div class="setting-control"><span class="swatch"><input type="color" id="styleText" data-style="textColor"><code></code></span></div></div>
-          <div class="setting"><div class="setting-text"><label for="styleAccent">強調の色</label><small>カウントダウンなど</small></div><div class="setting-control"><span class="swatch"><input type="color" id="styleAccent" data-style="accentColor"><code></code></span></div></div>
-          <div class="setting"><div class="setting-text"><label for="stylePanel">面の色</label></div><div class="setting-control"><span class="swatch"><input type="color" id="stylePanel" data-style="panelColor"><code></code></span></div></div>
-        </div>
-        <div class="style-group">
-          <h3>面と文字</h3>
-          <div class="setting"><div class="setting-text"><label for="styleOpacity">面の濃さ</label><small>0% で透明</small></div><div class="setting-control"><span class="range"><input type="range" id="styleOpacity" min="0" max="100" step="5" data-style="panelOpacity"><output for="styleOpacity"></output></span></div></div>
-          <div class="setting"><div class="setting-text"><label for="styleFont">文字の形</label></div><div class="setting-control"><select id="styleFont" data-style="font">
-            <option value="gothic">游ゴシック（ふつう）</option><option value="meiryo">メイリオ</option><option value="ud">BIZ UDPゴシック（読みやすい）</option><option value="mincho">游明朝</option>
-          </select></div></div>
-        </div>
-        <div class="style-group">
-          <h3>ギフト通知</h3>
-          <div class="setting"><div class="setting-text"><label for="styleSeconds">出しておく時間</label></div><div class="setting-control"><input type="number" id="styleSeconds" min="2" max="15" step="0.5" data-style="alertSeconds" data-unit="秒"></div></div>
-          <div class="setting"><div class="setting-text"><label for="styleMax">同時に出す数</label></div><div class="setting-control"><input type="number" id="styleMax" min="1" max="5" data-style="alertMax" data-unit="個"></div></div>
-        </div>
+    <div class="split">
+      <div class="stack">
+        <section class="card">
+          <h2>配信画面に出す部品</h2>
+          <p class="lead" style="margin-bottom: 0;">部品の「コピー」を押し、TikTok LIVE Studio の「ソースを追加」→「リンク」に貼ります。部品ごとに好きな位置・大きさに置けます。</p>
+          <details class="more-info">
+            <summary>大きさについて</summary>
+            <p class="hint">おすすめの大きさは、縦画面（1080×1920）のときのものです。枠を大きくすると、文字や絵も大きくなります。下の絵は試しの表示です。</p>
+          </details>
+        </section>
+        <div class="widget-list" id="widgets"></div>
+        <section class="card" id="styleCard" hidden>
+          <div class="card-head"><h2>見た目</h2><button class="ghost" id="styleReset">元に戻す</button></div>
+          <p class="lead">4つの部品すべてに効きます。変えると、すぐ配信画面と下の試し表示に映ります。大きさと位置は、LIVE Studio で枠を動かして変えてください。</p>
+          <div class="style-groups" id="styleFields">
+            <div class="style-group">
+              <h3>色</h3>
+              <div class="setting"><div class="setting-text"><label for="styleText">文字の色</label></div><div class="setting-control"><span class="swatch"><input type="color" id="styleText" data-style="textColor"><code></code></span></div></div>
+              <div class="setting"><div class="setting-text"><label for="styleAccent">強調の色</label><small>カウントダウンなど</small></div><div class="setting-control"><span class="swatch"><input type="color" id="styleAccent" data-style="accentColor"><code></code></span></div></div>
+              <div class="setting"><div class="setting-text"><label for="stylePanel">面の色</label></div><div class="setting-control"><span class="swatch"><input type="color" id="stylePanel" data-style="panelColor"><code></code></span></div></div>
+            </div>
+            <div class="style-group">
+              <h3>面と文字</h3>
+              <div class="setting"><div class="setting-text"><label for="styleOpacity">面の濃さ</label><small>0% で透明</small></div><div class="setting-control"><span class="range"><input type="range" id="styleOpacity" min="0" max="100" step="5" data-style="panelOpacity"><output for="styleOpacity"></output></span></div></div>
+              <div class="setting"><div class="setting-text"><label for="styleFont">文字の形</label></div><div class="setting-control"><select id="styleFont" data-style="font">
+                <option value="gothic">游ゴシック（ふつう）</option><option value="meiryo">メイリオ</option><option value="ud">BIZ UDPゴシック（読みやすい）</option><option value="mincho">游明朝</option>
+              </select></div></div>
+            </div>
+            <div class="style-group">
+              <h3>ギフト通知</h3>
+              <div class="setting"><div class="setting-text"><label for="styleSeconds">出しておく時間</label></div><div class="setting-control"><input type="number" id="styleSeconds" min="2" max="15" step="0.5" data-style="alertSeconds" data-unit="秒"></div></div>
+              <div class="setting"><div class="setting-text"><label for="styleMax">同時に出す数</label></div><div class="setting-control"><input type="number" id="styleMax" min="1" max="5" data-style="alertMax" data-unit="個"></div></div>
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
-    <div class="widgets" id="widgets"></div>
+      <aside class="split-side">
+        <section class="card preview-card">
+          <div class="card-head"><h2 id="previewTitle"></h2><span class="widget-size" id="previewSize"></span></div>
+          <div class="stage" id="previewStage"><div class="preview" id="previewBox"><iframe id="previewFrame" title="試しの表示" tabindex="-1"></iframe></div></div>
+          <p class="hint">試しの表示です。見た目を変えると、すぐここと配信画面に映ります。左の部品を押すと切り替わります。</p>
+        </section>
+      </aside>
+    </div>
   </div>
 </main>
 
 <main id="tabStats" hidden>
   <div class="page-head"><h1>分析</h1><button class="ghost" id="statsReload">最新にする</button></div>
   <div class="page">
-    <section class="card">
-      <h2>配信ごとの記録</h2>
-      <p class="lead" id="statsLead">TikTok LIVE の配信ごとの記録です（直近30日分・テスト送信は数えません）。行を押すと、くわしく見られます。開いているあいだは15秒ごとに新しくなります。</p>
-      <p class="hint" id="statsPlusNote" hidden></p>
-      <div style="overflow-x: auto;"><table class="stream-list" id="streamList"></table></div>
-      <div class="empty" id="streamEmpty" hidden><span>まだ記録がありません。TikTok LIVE につないで配信すると、ここに出ます。</span></div>
-    </section>
-    <div class="stream-detail" id="streamDetail" hidden>
-      <section class="card">
-        <div class="card-head"><h2 id="detailTitle"></h2></div>
-        <div class="stats wide" id="detailStats"></div>
-      </section>
-      <section class="card">
-        <h2>流れ（1分ごと）</h2>
-        <p class="lead">配信のどのあたりで盛り上がったかがわかります。グラフに重ねると数が出ます。</p>
-        <h3 class="chart-title">届いたコイン</h3>
-        <div class="chart" id="chartCoins"></div>
-        <h3 class="chart-title">出した妨害</h3>
-        <div class="chart" id="chartActions"></div>
-        <h3 class="chart-title">埋まった割合（%）</h3>
-        <div class="chart" id="chartFill"></div>
-      </section>
-      <div class="detail-lists">
-        <section class="card"><h2>よく届いたギフト</h2><ul class="rank-list" id="detailGifts"></ul></section>
-        <section class="card"><h2>ギフトを送ってくれた人</h2><ul class="rank-list" id="detailSupporters"></ul></section>
-        <section class="card"><h2>出した妨害</h2><ul class="rank-list" id="detailActions"></ul></section>
-        <section class="card"><h2>出なかった理由</h2><ul class="rank-list" id="detailFailures"></ul></section>
+    <div class="split list-first" id="statsSplit">
+      <div class="stream-detail" id="streamDetail" hidden>
+        <section class="card">
+          <div class="card-head"><h2 id="detailTitle"></h2></div>
+          <div class="key-stats" id="detailStats"></div>
+          <p class="sub-stats" id="detailSub"></p>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>流れ（1分ごと）</h2><div class="segmented" id="chartSwitch" style="margin: 0;">
+            <button type="button" data-chart="chartCoins" class="selected">届いたコイン</button><button type="button" data-chart="chartActions">出した妨害</button><button type="button" data-chart="chartFill">埋まった割合</button>
+          </div></div>
+          <p class="lead">配信のどのあたりで盛り上がったかがわかります。グラフに重ねると数が出ます。</p>
+          <div class="chart" id="chartCoins"></div>
+          <div class="chart" id="chartActions" hidden></div>
+          <div class="chart" id="chartFill" hidden></div>
+        </section>
+        <div class="detail-lists">
+          <section class="card"><h2>よく届いたギフト</h2><ul class="rank-list" id="detailGifts"></ul></section>
+          <section class="card"><h2>ギフトを送ってくれた人</h2><ul class="rank-list" id="detailSupporters"></ul></section>
+          <section class="card"><h2>出した妨害</h2><ul class="rank-list" id="detailActions"></ul></section>
+          <section class="card"><h2>出なかった理由</h2><ul class="rank-list" id="detailFailures"></ul></section>
+        </div>
       </div>
+      <aside class="split-side">
+        <section class="card">
+          <h2>配信ごとの記録</h2>
+          <p class="lead" id="statsLead">直近30日分（テスト送信は数えません）。押すと右にくわしく出ます。開いているあいだは15秒ごとに新しくなります。</p>
+          <p class="hint" id="statsPlusNote" hidden></p>
+          <div style="overflow-x: auto;"><table class="stream-list" id="streamList"></table></div>
+          <div class="empty" id="streamEmpty" hidden><span>まだ記録がありません。TikTok LIVE につないで配信すると、ここに出ます。</span></div>
+        </section>
+      </aside>
     </div>
   </div>
 </main>
@@ -882,11 +920,54 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <main id="tabDebug" hidden>
   <div class="page-head"><h1>テスト</h1></div>
   <div class="page">
-    <div class="grid-2">
+    <div class="split">
       <section class="card">
-        <h2>ギフトを送ったことにする</h2>
-        <p class="lead">「妨害の設定」のルールどおりに妨害が出ます。</p>
-        <form id="testForm">
+        <h2>妨害をそのまま出す</h2>
+        <p class="lead">ルールを通さずにマイクラに出します。マイクラに届くかの確認に使えます（一時停止中は出ません）。</p>
+        <p class="group-label">敵・爆発</p>
+        <div class="quick">
+          <button data-action="tnt" data-icon="tnt">TNT ×1</button>
+          <button data-action="tnt" data-count="5" data-icon="tnt">TNT ×5</button>
+          <button data-action="tnt" data-count="20" data-icon="tnt">TNT ×20</button>
+          <button data-action="lightning" data-count="3" data-icon="lightning">雷 ×3</button>
+          <button data-action="mob" data-mob="zombie" data-icon="zombie">ゾンビ</button>
+          <button data-action="mob" data-mob="skeleton" data-icon="skeleton">スケルトン</button>
+          <button data-action="mob" data-mob="creeper" data-icon="creeper">クリーパー</button>
+          <button data-action="mob" data-mob="spider" data-icon="spider">クモ</button>
+          <button data-action="mob" data-mob="witch" data-icon="witch">ウィッチ</button>
+          <button data-action="mob" data-mob="silverfish" data-icon="silverfish">シルバーフィッシュ</button>
+          <button data-action="mob" data-mob="pig" data-icon="pig">ブタ</button>
+        </div>
+        <p class="group-label test-group">動きをじゃまする</p>
+        <div class="quick">
+          <button data-action="jail" data-count="10" data-icon="jail">逮捕 10秒</button>
+          <button data-action="freeze" data-count="5" data-icon="freeze">操作禁止 5秒</button>
+          <button data-action="levitate" data-count="3" data-icon="levitate">浮遊 3秒</button>
+          <button data-action="night" data-count="30" data-icon="night">夜にする 30秒</button>
+        </div>
+        <p class="group-label test-group">埋め立て中だけ</p>
+        <div class="quick">
+          <button data-action="fill_expand" data-icon="fill_expand">枠 +1</button>
+          <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
+          <button data-action="fill_raise" data-icon="fill_raise">枠を高く +1段</button>
+          <button data-action="fill_help" data-count="10" data-icon="fill_help">お助け +10</button>
+          <button data-action="fill_help" data-count="64" data-icon="fill_help">お助け +64</button>
+          <button data-action="fill_layer" data-icon="fill_layer">一段埋め</button>
+          <button data-action="fill_clear" data-icon="fill_clear">全消し</button>
+        </div>
+        <p class="group-label test-group">埋め立てを進める（下の段から順に埋めます）</p>
+        <div class="quick">
+          <button data-action="fill_set" data-percent="100" data-icon="fill_set">一気に埋める（100%）</button>
+          <button data-action="fill_set" data-percent="90" data-icon="fill_set">90% まで</button>
+          <button data-action="fill_set" data-percent="50" data-icon="fill_set">50% まで</button>
+          <button data-action="fill_set" data-percent="0" data-icon="glass">枠の中を空にする</button>
+        </div>
+      </section>
+      <aside class="split-side">
+        <section class="card">
+          <h2>ギフト・反応が届いたことにする</h2>
+          <p class="lead">「妨害の設定」のルールどおりに出ます。ルールごとに試すなら、「妨害の設定」の「▶ 試す」が便利です。</p>
+          <form id="testForm">
           <div class="row">
             <button type="button" id="pickTestGift" title="ギフトを絵から選ぶ">絵から選ぶ</button>
             <input id="giftName" list="giftList" placeholder="ギフト名" autocomplete="off">
@@ -895,74 +976,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
           </div>
           <datalist id="giftList"></datalist>
         </form>
-        <div class="quick" id="quick" style="margin-top: 10px;"></div>
-      </section>
-      <section class="card">
-        <h2>視聴者の反応</h2>
-        <p class="lead">いいね・フォロー・シェアが届いたことにします。</p>
-        <div class="quick">
-          <button data-test="like" data-count="100">いいね +100</button>
-          <button data-test="like" data-count="1000">いいね +1000</button>
-          <button data-test="like" data-count="10000">いいね +10000</button>
-          <button data-test="follow">フォロー</button>
-          <button data-test="share">シェア</button>
-        </div>
-      </section>
+          <div class="quick" id="quick" style="margin-top: 10px;"></div>
+          <p class="group-label test-group">視聴者の反応</p>
+          <div class="quick">
+            <button data-test="like" data-count="100">いいね +100</button>
+            <button data-test="like" data-count="1000">いいね +1000</button>
+            <button data-test="like" data-count="10000">いいね +10000</button>
+            <button data-test="follow">フォロー</button>
+            <button data-test="share">シェア</button>
+          </div>
+        </section>
+        <section class="card">
+          <details>
+            <summary>いまの状態（困ったときに見る）</summary>
+            <pre id="debugState"></pre>
+          </details>
+        </section>
+      </aside>
     </div>
-    <section class="card">
-      <h2>妨害をそのまま出す</h2>
-      <p class="lead">ルールを通さずに出します。一時停止中は出ません。</p>
-      <div class="quick">
-        <button data-action="tnt" data-icon="tnt">TNT ×1</button>
-        <button data-action="tnt" data-count="5" data-icon="tnt">TNT ×5</button>
-        <button data-action="tnt" data-count="20" data-icon="tnt">TNT ×20</button>
-        <button data-action="fill_help" data-count="10" data-icon="fill_help">お助け +10</button>
-        <button data-action="fill_help" data-count="64" data-icon="fill_help">お助け +64</button>
-        <button data-action="fill_expand" data-icon="fill_expand">枠 +1</button>
-        <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
-      </div>
-      <div class="quick">
-        <button data-action="mob" data-mob="zombie" data-icon="zombie">ゾンビ</button>
-        <button data-action="mob" data-mob="skeleton" data-icon="skeleton">スケルトン</button>
-        <button data-action="mob" data-mob="creeper" data-icon="creeper">クリーパー</button>
-        <button data-action="mob" data-mob="spider" data-icon="spider">クモ</button>
-        <button data-action="mob" data-mob="witch" data-icon="witch">ウィッチ</button>
-        <button data-action="mob" data-mob="silverfish" data-icon="silverfish">シルバーフィッシュ</button>
-        <button data-action="mob" data-mob="pig" data-icon="pig">ブタ</button>
-      </div>
-    </section>
-    <section class="card">
-      <h2>ほかの妨害・お助けをそのまま出す</h2>
-      <p class="lead">逮捕・一段埋め・全消し・枠を高くは、埋め立て中だけ使えます。</p>
-      <div class="quick">
-        <button data-action="jail" data-count="10" data-icon="jail">逮捕 10秒</button>
-        <button data-action="freeze" data-count="5" data-icon="freeze">操作禁止 5秒</button>
-        <button data-action="lightning" data-count="3" data-icon="lightning">雷 ×3</button>
-        <button data-action="levitate" data-count="3" data-icon="levitate">浮遊 3秒</button>
-        <button data-action="night" data-count="30" data-icon="night">夜にする 30秒</button>
-      </div>
-      <div class="quick">
-        <button data-action="fill_layer" data-icon="fill_layer">一段埋め</button>
-        <button data-action="fill_clear" data-icon="fill_clear">全消し</button>
-        <button data-action="fill_raise" data-icon="fill_raise">枠を高く +1段</button>
-      </div>
-    </section>
-    <section class="card">
-      <h2>埋め立てを進める</h2>
-      <p class="lead">埋め立て中に使えます。下の段から順に埋めます。</p>
-      <div class="quick">
-        <button data-action="fill_set" data-percent="100" data-icon="fill_set">一気に埋める（100%）</button>
-        <button data-action="fill_set" data-percent="90" data-icon="fill_set">90% まで</button>
-        <button data-action="fill_set" data-percent="50" data-icon="fill_set">50% まで</button>
-        <button data-action="fill_set" data-percent="0" data-icon="glass">枠の中を空にする</button>
-      </div>
-    </section>
-    <section class="card">
-      <details>
-        <summary>いまの状態（困ったときに見る）</summary>
-        <pre id="debugState"></pre>
-      </details>
-    </section>
   </div>
 </main>
 
@@ -977,12 +1008,15 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <section class="card">
         <h2>マイクラ（Java版 <span id="mcVersion">26.3</span>）</h2>
         <p class="lead">MOD を動かすのに必要なものです。</p>
-        <ul class="checks setup-checks"></ul>
-        <div class="ready setup-ready" hidden>準備できています。ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動してください。</div>
+        <div class="ready setup-ready" hidden>✓ 準備できています。ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動してください。</div>
         <div class="setup-todo" hidden>
+          <p class="hint" style="margin: 0 0 10px; color: var(--warn);">足りないものがあります。マイクラを閉じた状態で押すと、足りないものだけ入れます。</p>
           <button class="primary install-btn" style="width: 100%;">まとめて導入する</button>
-          <p class="hint">マイクラを閉じた状態で押してください。足りないものだけ入れます。</p>
         </div>
+        <details class="more-info" id="setupChecks">
+          <summary>入っているもの</summary>
+          <ul class="checks setup-checks"></ul>
+        </details>
       </section>
       <section class="card">
         <h2>TikTok</h2>
@@ -1559,7 +1593,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
     document.querySelectorAll('.mcv').forEach((el) => (el.textContent = setup.minecraftVersion));
     document.querySelectorAll('.setup-ready').forEach((el) => (el.hidden = !setup.ready));
     document.querySelectorAll('.setup-todo').forEach((el) => (el.hidden = setup.ready));
+    // 全部そろっていれば中身はしまう。足りないときは開いて見せる（そろったかどうかが変わったときだけ）
+    if (setupReady !== setup.ready) $('setupChecks').open = !setup.ready;
+    setupReady = setup.ready;
   }
+  let setupReady = null;
 
   async function loadSetup() {
     try {
@@ -1581,22 +1619,31 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   // ---- 配信画面の部品（URL・おすすめの大きさ・試しの表示） ----
   const OVERLAY_WIDGETS = ${JSON.stringify(OVERLAY_WIDGETS)};
+  // 右の大きな試し表示（選んだ部品）
+  function showPreview(id) {
+    const w = OVERLAY_WIDGETS.find((x) => x.id === id) ?? OVERLAY_WIDGETS[0];
+    storage('redstone.preview', w.id);
+    $('previewTitle').textContent = w.name;
+    $('previewSize').textContent = '幅' + w.size[0] + '×高さ' + w.size[1];
+    $('previewBox').style.setProperty('--ratio', String(w.size[0] / w.size[1]));
+    const src = '/overlay/' + w.id + '#demo';
+    if ($('previewFrame').getAttribute('src') !== src) $('previewFrame').setAttribute('src', src);
+    document.querySelectorAll('#widgets .widget').forEach((card) => {
+      const on = card.dataset.id === w.id;
+      card.classList.toggle('selected', on);
+      card.querySelector('.showing').hidden = !on;
+    });
+  }
   $('widgets').replaceChildren(...OVERLAY_WIDGETS.map((w) => {
     // 末尾の .html がないと LIVE Studio のリンク欄に「正しいURLを入力してください」と言われる
     const url = location.origin + '/overlay/' + w.id + '.html';
-    const preview = el('div', 'preview');
-    // おすすめの大きさの縦横比で、同じ高さの台に収める（縦長のものは幅を狭く）
-    preview.style.setProperty('--ratio', String(w.size[0] / w.size[1]));
-    const frame = Object.assign(document.createElement('iframe'), { src: '/overlay/' + w.id + '#demo', title: w.name + 'の試しの表示', loading: 'lazy' });
-    frame.tabIndex = -1;
-    preview.append(frame);
     const copy = Object.assign(el('button', '', 'コピー'), { type: 'button' });
     copy.addEventListener('click', async () => {
       await navigator.clipboard.writeText(url);
       copy.textContent = 'コピーしました';
       setTimeout(() => (copy.textContent = 'コピー'), 1500);
     });
-    const head = el('div', 'card-head', el('h2', '', w.name));
+    const head = el('div', 'card-head', el('h2', '', w.name), el('span', 'showing', '右に表示中'));
     if (w.id === 'ranking') {
       const reset = Object.assign(el('button', 'ghost', 'リセット'), { type: 'button', title: 'この配信のギフトの合計を0に戻します' });
       reset.addEventListener('click', async () => {
@@ -1605,8 +1652,17 @@ export const PANEL_HTML = String.raw`<!doctype html>
       });
       head.append(reset);
     }
-    return el('section', 'card widget', el('div', 'stage', preview), head, el('p', 'lead', w.description),
+    const card = el('section', 'card widget', head, el('p', 'lead', w.description),
       el('div', 'url', el('code', '', url), copy), el('span', 'size', 'おすすめの大きさ: 幅' + w.size[0] + '×高さ' + w.size[1]));
+    card.dataset.id = w.id;
+    card.tabIndex = 0;
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('button')) showPreview(w.id);
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target === card) showPreview(w.id);
+    });
+    return card;
   }));
 
   function storage(key, value) {
@@ -1630,6 +1686,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   document.querySelectorAll('nav [data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
   document.querySelectorAll('[data-goto]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.goto)));
+  showPreview(storage('redstone.preview'));
   // 前に開いていた画面を開く
   const lastTab = storage('redstone.tab');
   if (lastTab && $(lastTab)?.tagName === 'MAIN') showTab(lastTab);
@@ -2136,6 +2193,18 @@ export const PANEL_HTML = String.raw`<!doctype html>
     return min < 60 ? min + '分' : Math.floor(min / 60) + '時間' + (min % 60 ? (min % 60) + '分' : '');
   }
 
+  /** 失敗の割合の色（2割以上は赤、少しでもあれば黄） */
+  function failClass(rate) {
+    return rate >= 20 ? 'bad' : rate > 0 ? 'warn' : '';
+  }
+  // グラフは1つずつ切り替えて見る
+  $('chartSwitch').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-chart]');
+    if (!b) return;
+    $('chartSwitch').querySelectorAll('button').forEach((x) => x.classList.toggle('selected', x === b));
+    for (const id of ['chartCoins', 'chartActions', 'chartFill']) $(id).hidden = id !== b.dataset.chart;
+  });
+
   async function loadStreams() {
     let data;
     try {
@@ -2150,12 +2219,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('statsPlusNote').hidden = full;
     $('statsPlusNote').replaceChildren('30日分の一覧と、くわしい中身（流れのグラフ・内訳）は ' + PLUS_NAME + ' の機能です。無料版では直近の配信のまとめだけ見られます'
       + (total > 1 ? '（記録は続けているので、ほかに ' + (total - 1) + '回分あります）' : ''), ...plusLink());
-    const head = el('tr', '', ...['日時', '長さ', 'コイン', 'ギフト', 'いいね', 'フォロー', '妨害', '失敗'].map((t) => el('th', '', t)));
+    const head = el('tr', '', ...['日時', '長さ', 'コイン', '失敗'].map((t) => el('th', '', t)));
     const rows = streams.map((st) => {
       const tr = el('tr', st.id === selectedStream ? 'selected' : '',
         el('td', '', fmtDate(st.startedAt)), el('td', '', fmtDuration(st.endedAt - st.startedAt)),
-        el('td', '', '🪙' + fmtNum(st.coins)), el('td', '', fmtNum(st.gifts)), el('td', '', fmtNum(st.likes)), el('td', '', fmtNum(st.follows)),
-        el('td', '', fmtNum(st.actions.sent)), el('td', '', st.failureRate + '%'));
+        el('td', '', '🪙' + fmtNum(st.coins)), el('td', failClass(st.failureRate), st.failureRate + '%'));
       if (full) {
         tr.tabIndex = 0;
         const open = () => showStream(st.id);
@@ -2167,6 +2235,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
       return tr;
     });
     $('streamList').replaceChildren(el('thead', '', head), el('tbody', '', ...rows));
+    // 無料版は一覧だけなので1列
+    $('statsSplit').classList.toggle('single', !full);
     if (!full) $('streamDetail').hidden = true;
     else if (selectedStream && streams.some((st) => st.id === selectedStream)) showStream(selectedStream);
     else if (streams[0]) showStream(streams[0].id);
@@ -2188,12 +2258,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('streamList').querySelectorAll('tbody tr').forEach((tr, i) => tr.classList.toggle('selected', i === index));
     $('streamDetail').hidden = false;
     $('detailTitle').textContent = fmtDate(d.startedAt) + ' 〜 ' + fmtClock(d.endedAt) + '（' + fmtDuration(d.endedAt - d.startedAt) + '）';
-    const stat = (label, value) => el('div', 'stat', el('small', '', label), el('b', '', value));
+    const stat = (label, value, cls = '') => el('div', 'stat', el('small', '', label), el('b', cls, value));
+    // 大事な4つを大きく。失敗が多いときは色で知らせる
     $('detailStats').replaceChildren(
-      stat('コイン', fmtNum(d.coins)), stat('ギフト', fmtNum(d.gifts)), stat('送ってくれた人', fmtNum(d.supporterCount)),
-      stat('いいね', fmtNum(d.likes)), stat('フォロー', fmtNum(d.follows)), stat('シェア', fmtNum(d.shares)),
-      stat('妨害を出した', fmtNum(d.actions.sent)), stat('失敗', fmtNum(d.actions.failed) + '（' + d.failureRate + '%）'),
-      stat('クリアしたラウンド', fmtNum(d.rounds)));
+      stat('コイン', fmtNum(d.coins)), stat('ギフト', fmtNum(d.gifts)), stat('妨害を出した', fmtNum(d.actions.sent)),
+      stat('失敗', fmtNum(d.actions.failed) + '（' + d.failureRate + '%）', failClass(d.failureRate)));
+    $('detailSub').textContent = '送ってくれた人 ' + fmtNum(d.supporterCount) + '人 ・ いいね ' + fmtNum(d.likes) + ' ・ フォロー ' + fmtNum(d.follows)
+      + ' ・ シェア ' + fmtNum(d.shares) + ' ・ クリアしたラウンド ' + fmtNum(d.rounds);
     // 分ごとの記録（抜けている分は0）
     const minutes = (d.timeline.at(-1)?.m ?? 0) + 1;
     const at = new Map(d.timeline.map((b) => [b.m, b]));

@@ -89,7 +89,7 @@ export const OVERLAY_HTML = String.raw`<!doctype html>
     if (!fill) return;
     box.className = fill.phase;
     const texts = {
-      filling: '埋め立て ' + fill.filled + ' / ' + fill.total,
+      filling: '埋め立て ' + fill.filled.toLocaleString('ja-JP') + ' / ' + fill.total.toLocaleString('ja-JP'),
       countdown: '完成！ あと ' + fill.countdownSecondsLeft + ' 秒',
       cleared: '全ラウンドクリア！',
     };

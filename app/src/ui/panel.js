@@ -79,7 +79,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .status { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px; }
   /* 接続状態: 1行目に名前、2行目にいまの状態 */
   .chip { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; column-gap: 9px; font-size: 13px; color: var(--muted); }
-  .chip span:last-child { grid-column: 2; color: var(--text); line-height: 1.5; }
+  .chip span:last-child { grid-column: 2; color: var(--text); line-height: 1.5; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
   .dot.ok { background: var(--ok); }
   .dot.warn { background: var(--warn); }
@@ -195,6 +195,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .live-top > * + * { border-left: 1px solid var(--line-soft); }
   .status-tile { display: flex; align-items: center; gap: 12px; }
   .status-tile .dot { width: 10px; height: 10px; flex: none; }
+  .status-tile > div { min-width: 0; }
+  .status-tile small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status-tile small, .counts small { display: block; color: var(--muted); font-size: 12px; }
   .status-tile b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
@@ -324,6 +326,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .preset-mine .del { border: 1px solid var(--line-soft); border-left: 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 0 9px; }
   .preset-mine .del:hover { color: var(--bad); }
   .preset-save { border-style: dashed; color: var(--muted); background: transparent; }
+  .show-more { align-self: center; color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
   /* ルールの一覧（きっかけの種類ごと） */
   .rules-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
   .rules-top h2 { font-size: 15px; margin: 0 auto 0 0; }
@@ -344,6 +347,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .rule-when, .rule-then { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
   .rule-when > span, .rule-then > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rule-when small, .rule-then small { color: var(--faint); font-weight: 400; margin-left: 2px; }
+  .rule-when small.coin { flex: none; margin-left: -4px; white-space: nowrap; }
   .rule-when .gift-img { width: 26px; height: 26px; }
   .rule-when .unknown { color: var(--warn); }
   .rule-arrow { color: var(--faint); display: flex; justify-content: center; }
@@ -412,10 +416,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .editor-details label input:not([type=number]) { width: 100%; }
   .editor-details .wide { grid-column: 1 / -1; }
   .choices { display: flex; flex-direction: column; gap: 6px; }
-  .choice { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); }
+  .choice {
+    display: grid; grid-template-columns: minmax(120px, 1fr) 150px 150px 3.6em; align-items: center; gap: 12px;
+    padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg);
+  }
   .choice .name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--text); min-width: 120px; }
   .choice .mc { --s: 20px; }
-  .choice .odds { margin-left: auto; color: var(--faint); font-size: 12px; white-space: nowrap; }
+  .choice .odds { text-align: right; color: var(--faint); font-size: 12px; white-space: nowrap; }
   .editor-details .check-line { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; font-size: 13px; color: var(--muted); }
   .editor-details label.check-line input[type=checkbox] { width: 16px; height: 16px; flex: none; margin: 0; }
   .action-tiles button:disabled { opacity: .35; cursor: not-allowed; }
@@ -574,6 +581,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   /* ---- 妨害の設定の履歴 ---- */
   .history-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: min(60vh, 520px); overflow-y: auto; }
   .history-list > li { padding: 12px 2px; border-bottom: 1px solid var(--line-soft); }
+  .history-list:focus-visible { outline: none; }
   .history-list > li:last-child { border-bottom: 0; }
   .history-head { display: flex; align-items: center; gap: 10px; }
   .history-head b { font-variant-numeric: tabular-nums; }
@@ -1339,6 +1347,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     else tiktok = TIKTOK[state.tiktok.state] ?? ['', '停止中'];
     $('tiktokDot').className = 'dot ' + tiktok[0];
     $('tiktokText').textContent = tiktok[1] + (state.tiktokUsername && !state.mock ? '（@' + state.tiktokUsername + '）' : '');
+    $('tiktokText').title = $('tiktokText').textContent;
 
     const mod = !state.mod.connected ? ['bad', 'ワールドを開いてください']
       : state.mod.players === 0 ? ['warn', 'ワールドに入っていません']
@@ -1355,7 +1364,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
       $(id).querySelector('.dot').className = 'dot ' + level;
       $(id).querySelector('b').textContent = text;
     };
-    tile('tileTiktok', tiktok[0], $('tiktokText').textContent);
+    tile('tileTiktok', tiktok[0], tiktok[1]);
+    const tiktokId = state.tiktokUsername && !state.mock ? '@' + state.tiktokUsername : '';
+    $('tileTiktok').querySelector('small').textContent = 'TikTok' + (tiktokId ? ' ' + tiktokId : '');
+    $('tileTiktok').title = tiktokId;
     tile('tileMod', mod[0], mod[1]);
     tile('tilePause', state.paused ? 'warn' : 'ok', state.paused ? '一時停止中' : '受け付け中');
     for (const key of ['received', 'sent', 'skipped', 'failed']) $(key).textContent = state.stats[key];
@@ -1365,13 +1377,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const buttonsKey = JSON.stringify(state.testButtons);
     if ($('quick').dataset.key !== buttonsKey) {
       $('quick').dataset.key = buttonsKey;
-      $('quick').replaceChildren(...state.testButtons.map(({ label, body }) => {
+      $('quick').replaceChildren(...showSome(state.testButtons.map(({ label, body }) => {
         const b = document.createElement('button');
         if (body.kind === 'gift' && !body.diamonds) b.append(giftIcon(body.giftName));
         b.append(label);
         b.addEventListener('click', () => post('/api/test', body, { button: b, done: '「' + label + '」が届いたことにしました' }));
         return b;
-      }));
+      }), QUICK_SHOWN, 'quick'));
     }
     if (state.giftCatalogVersion !== giftsVersion) loadGifts(state.giftCatalogVersion);
 
@@ -1483,6 +1495,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     else if (a.kind === 'share') src.append(el('span', 'trigger-icon', '↗'), el('b', '', who), el('span', 'muted', 'がシェア'));
     else src.append(el('span', 'trigger-icon', '●'), el('span', '', '配信者のボタン'));
     if (a.test) src.append(el('span', 'rule-tag', 'テスト'));
+    src.title = src.textContent;
     const kind = a.status === 'sent' ? 'sent' : a.status === 'failed' ? 'failed' : 'skip';
     // 結果が出たら、同じ行を書き換える
     const res = el('div', 'feed-res ' + kind);
@@ -1654,7 +1667,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       copy.textContent = 'コピーしました';
       setTimeout(() => (copy.textContent = 'コピー'), 1500);
     });
-    const head = el('div', 'card-head', el('h2', '', w.name), el('span', 'showing', '右に表示中'));
+    const head = el('div', 'card-head', el('h2', '', w.name), el('span', 'showing', '試し表示中'));
     if (w.id === 'ranking') {
       const reset = Object.assign(el('button', 'ghost', 'リセット'), { type: 'button', title: 'この配信のギフトの合計を0に戻します' });
       reset.addEventListener('click', async () => {
@@ -1884,8 +1897,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
       const gift = giftFor(row.value);
       const icon = giftIcon(row.value);
       box.append(icon.nodeType === 1 ? icon : badge('🎁'), el('span', gift ? '' : 'unknown', gift?.nameJa ?? row.value));
-      if (gift) box.lastChild.append(el('small', '', '🪙' + gift.diamonds));
-      else box.title = '「' + row.value + '」はギフトの一覧にない名前です';
+      if (gift) {
+        box.append(el('small', 'coin', '🪙' + gift.diamonds));
+        box.title = gift.nameJa + '（' + gift.diamonds + 'コイン）';
+      } else {
+        box.title = '「' + row.value + '」はギフトの一覧にない名前です';
+      }
     } else if (row.trigger === 'giftId') {
       box.append(badge('🎁'), el('span', '', 'ギフトID ' + row.value));
     } else if (row.trigger === 'minDiamonds') {
@@ -2092,6 +2109,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
         const line = el('div', 'choice', el('span', 'name', mcIcon(iconOf(c.key), 20), cInfo?.name ?? c.key));
         if (cInfo?.unit) {
           line.append(numberField(c.count, (v) => (c.count = v), { min: 1, max: MAX_COUNT[action], before: cInfo.unit === '秒' ? '' : '×', after: cInfo.unit, width: 64, label: '数' }));
+        } else {
+          line.append(el('span'));
         }
         const odds = el('span', 'odds', '');
         const showOdds = () => {
@@ -2296,6 +2315,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
 
   /** グラフの枠（目盛り・横軸の時刻・重ねたときの数）。draw(w, h, x) で中身を描く */
+  /** 目盛り用の短い数（12,345 → 1.2万、123,456,789 → 1.2億） */
+  function fmtShort(v) {
+    const n = Math.round(v);
+    if (n >= 1e8) return (n / 1e8).toFixed(n >= 1e9 ? 0 : 1).replace(/\.0$/, '') + '億';
+    if (n >= 1e4) return (n / 1e4).toFixed(n >= 1e5 ? 0 : 1).replace(/\.0$/, '') + '万';
+    return fmtNum(n);
+  }
+
   function chartFrame(box, values, label, format, max, draw) {
     const width = Math.max(240, box.clientWidth || 600);
     const height = 140;
@@ -2319,7 +2346,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     // 横の目盛り（0・半分・最大）
     for (const v of [max / 2, max]) {
       add('line', { class: 'grid', x1: pad.l, x2: width - pad.r, y1: y(v), y2: y(v) });
-      add('text', { class: 'axis', x: pad.l - 6, y: y(v) + 3, 'text-anchor': 'end' }, fmtNum(Math.round(v)));
+      add('text', { class: 'axis', x: pad.l - 6, y: y(v) + 3, 'text-anchor': 'end' }, fmtShort(v));
     }
     add('text', { class: 'axis', x: pad.l - 6, y: y(0) + 3, 'text-anchor': 'end' }, '0');
     draw({ add, x, y, w, h, n, pad, height });
@@ -2481,6 +2508,20 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   // ---- プリセット ----
   let presetsKey = '';
+  /** たくさん並ぶときは、はじめは limit 個だけ出して「すべて表示」を付ける（開いたかどうかは覚えておく） */
+  const PRESETS_SHOWN = 8;
+  const QUICK_SHOWN = 12;
+  const expanded = new Set();
+  function showSome(items, limit, key) {
+    if (items.length <= limit + 1 || expanded.has(key)) return items;
+    const more = Object.assign(el('button', 'ghost show-more', 'すべて表示（ほか ' + (items.length - limit) + '個）'), { type: 'button' });
+    more.addEventListener('click', () => {
+      expanded.add(key);
+      more.replaceWith(...items.slice(limit));
+    });
+    return [...items.slice(0, limit), more];
+  }
+
   function renderPresets() {
     if (!state?.presets) return;
     $('settingsFile').hidden = !state.plan?.importExport;
@@ -2511,7 +2552,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
       $('presetDialog').showModal();
       $('presetName').focus();
     });
-    $('presets').replaceChildren(...state.presets.builtin.map((p) => chip(p, p.description)), ...mine, save);
+    const all = [...state.presets.builtin.map((p) => chip(p, p.description)), ...mine];
+    $('presets').replaceChildren(...showSome(all, PRESETS_SHOWN, 'presets'), save);
   }
 
   // ---- 配信画面の見た目（有料版の機能） ----
@@ -2688,7 +2730,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('fillPercent').textContent = fill.percent + '%';
     $('fillBar').className = 'fill-progress ' + fill.phase;
     $('fillBar').firstElementChild.style.width = (fill.total ? (fill.filled / fill.total) * 100 : 0) + '%';
-    $('fillDetail').textContent = fill.filled + ' / ' + fill.total + ' マス（幅' + fill.width + '・高さ' + fill.height + '）';
+    $('fillDetail').textContent = fill.filled.toLocaleString('ja-JP') + ' / ' + fill.total.toLocaleString('ja-JP') + ' マス（幅' + fill.width + '・高さ' + fill.height + '）';
   }
 
   // 前回の設定を入れる（入力中は上書きしない）

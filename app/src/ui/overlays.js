@@ -452,7 +452,7 @@ const ROUND = page({
     $('box').className = 'panel ' + fill.phase;
     const total = el('span', '', '/' + fill.rounds);
     $('round').replaceChildren(String(Math.min(fill.round + (fill.phase === 'cleared' ? 0 : 1), fill.rounds)), total);
-    const status = fill.phase === 'cleared' ? '全ラウンドクリア！' : '埋め立て ' + fill.filled + ' / ' + fill.total;
+    const status = fill.phase === 'cleared' ? '全ラウンドクリア！' : fill.filled.toLocaleString('ja-JP') + ' / ' + fill.total.toLocaleString('ja-JP');
     if ($('status').textContent !== status) {
       $('status').textContent = status;
       fitText($('box'));

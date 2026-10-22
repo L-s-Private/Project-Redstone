@@ -1,5 +1,6 @@
 // アプリに入れる外部のグラフィック（キーアートなど）。ファイルは app/assets/ に置き、/assets/<場所> で画面から読む。
 // 原本（大きいままの絵）は リポジトリ直下の design/ に置き、ここには画面用に軽くしたものだけを入れる（design/README.md）。
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +19,15 @@ export const ASSET_TYPES = {
 export const KEY_ART = {
   fill: { src: '/assets/art/fill.jpg', position: '50% 42%' },
   mining_challenge: { src: '/assets/art/mining_challenge.jpg', position: '58% 40%' },
+};
+
+/**
+ * ロゴ（app/assets/brand/）。色は文字の色（currentColor）なので、置く場所の CSS の color で白にも黒にもなる。
+ * 画面に直接埋め込む（読み込みを待たずに出るように）
+ */
+export const BRAND = {
+  mark: readFileSync(new URL('../assets/brand/mark.svg', import.meta.url), 'utf8').trim(),
+  logotype: readFileSync(new URL('../assets/brand/logotype.svg', import.meta.url), 'utf8').trim(),
 };
 
 /** /assets/ のあとの場所が、配ってよい形か（英小文字・数字・_ - / と拡張子だけ。.. や隠しファイルは不可） */

@@ -8,6 +8,7 @@
 | フォルダ | 中身 | 画面用（app/assets/） |
 | --- | --- | --- |
 | `key-art/` | ゲームモードのキーアート。ファイル名はゲームモードの id（`fill` / `mining_challenge`） | `art/<id>.jpg`（長い辺 1600px・JPEG 品質84） |
+| `logo/` | ロゴ。`mark-*`（マークだけ）・`logotype-*`（マーク＋STATIC ARC）の黒と白 | `brand/mark.svg`・`brand/logotype.svg`（余計な情報を消し、色を文字の色にしたもの）、`brand/icon.svg`・`brand/icon.png`（アプリのアイコン。黒の角丸にマーク） |
 
 種類が増えたら、ここにフォルダを足して、この表に1行足す（例: `logo/`・`overlay/`・`thumbnail/`）。
 
@@ -17,3 +18,9 @@
 2. 画面用に軽くして `app/assets/<種類>/` に置く（写真のような絵は JPEG、透明が要る絵は PNG か WebP、線の絵は SVG）
 3. どこで使うかを `app/src/assets.js` に書き、画面からは `/assets/<種類>/<名前>` で読む
 4. アプリの `version` を上げる
+
+## ロゴを変えたとき
+
+1. `logo/` の原本を差し替える
+2. `app/assets/brand/mark.svg`・`logotype.svg` を作り直す（原本の `<path>` だけを残し、`fill="currentColor"` にする）
+3. `app/assets/brand/icon.svg` のマークを差し替えて、`cd app; npx electron scripts/make-icon.cjs` で `icon.png` を作る

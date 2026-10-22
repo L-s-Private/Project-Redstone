@@ -1,9 +1,10 @@
 // 操作画面。exe に入れるため、HTML ごと文字列で持つ。
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
+import { CONTROLS_CSS, CONTROLS_JS } from './controls.js';
 import { MAX_CHOICES, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
 import { PLANS } from '../plan.js';
 import { OVERLAY_WIDGETS } from './overlays.js';
-import { KEY_ART } from '../assets.js';
+import { BRAND, KEY_ART } from '../assets.js';
 import { FILL_ONLY_ACTIONS, MINING_LIMITS, MINING_ONLY_ACTIONS, MINING_PRESETS, MINING_REASONS, MINING_TARGETS } from '../mining.js';
 
 export const PANEL_HTML = String.raw`<!doctype html>
@@ -12,6 +13,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STATIC ARC</title>
+<link rel="icon" href="/assets/brand/icon.svg" type="image/svg+xml">
 <style>
   /*
    * デスクトップアプリの形: 左にメニュー、右に画面。ウィンドウいっぱいを使い、画面ごとに役割を分ける。
@@ -62,10 +64,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     display: flex; flex-direction: column; min-height: 0; overflow-y: auto;
     background: var(--sidebar); border-right: 1px solid var(--line-soft); padding: 16px 10px 12px;
   }
-  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 18px; }
-  .brand-mark { width: 22px; height: 22px; border-radius: 5px; background: var(--invert-bg); position: relative; flex: none; }
-  .brand-mark::after { content: ""; position: absolute; inset: 6px; border-radius: 2px; background: var(--bg); }
-  .brand b { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
+  /* ロゴ（マーク＋STATIC ARC）。色は文字の色 */
+  .brand { display: flex; align-items: center; padding: 4px 10px 20px; color: var(--text); }
+  .brand svg { display: block; height: 33px; width: auto; }
   nav { display: flex; flex-direction: column; gap: 2px; }
   /* 使う場面ごとの小さな見出し */
   .nav-group { padding: 12px 10px 4px; font-size: 12px; color: var(--faint); letter-spacing: .04em; }
@@ -81,11 +82,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .status { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px; }
   /* 低いウィンドウ（ノートの拡大150%など）でも、左下の接続状態まで見えるように詰める */
   @media (max-height: 720px) {
-    .brand { padding-bottom: 10px; }
-    .nav-group { padding: 6px 10px 2px; }
-    .nav-gap { height: 6px; }
+    .brand { padding-top: 0; padding-bottom: 11px; }
+    .brand svg { height: 21px; }
+    .nav-group { padding: 4px 10px 2px; }
+    .nav-gap { height: 2px; }
     nav button { padding: 5px 10px; }
-    .status { padding-top: 8px; gap: 4px; }
+    .status { padding-top: 5px; gap: 4px; }
   }
   /* 接続状態: 1行目に名前、2行目にいまの状態 */
   .chip { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; column-gap: 9px; font-size: 13px; color: var(--muted); }
@@ -175,7 +177,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
   input:hover, select:hover { border-color: #3a3a3a; }
   input:focus, select:focus { outline: none; border-color: var(--text); }
   input[type="number"] { font-variant-numeric: tabular-nums; }
-  input[type="color"] { height: 38px; padding: 3px; cursor: pointer; }
   .row { display: flex; gap: 8px; }
   .row > * { min-width: 0; }
   .row > button { flex: none; }
@@ -342,18 +343,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .setting-control { display: flex; justify-content: flex-end; min-width: 0; }
   .setting-control select { width: 100%; }
   .setting-control .tiles { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  /* 数の入力（− と ＋ のボタンと単位つき） */
-  .stepper {
-    display: inline-flex; align-items: center; height: 32px; overflow: hidden;
-    border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg);
-  }
-  .stepper:hover { border-color: #3a3a3a; }
-  .stepper:focus-within { border-color: var(--text); }
-  .stepper button { width: 32px; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 15px; }
-  .stepper button:hover { background: var(--raised); color: var(--text); }
-  .stepper input { width: 64px; height: 100%; padding: 0 4px; border: 0; border-radius: 0; background: transparent; text-align: right; -moz-appearance: textfield; }
-  .stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  .stepper .unit { min-width: 2.6em; padding: 0 8px 0 3px; color: var(--muted); font-size: 13px; }
   @media (max-width: 720px) {
     .setting { grid-template-columns: minmax(0, 1fr); }
     .setting-control { justify-content: flex-start; }
@@ -481,7 +470,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .action-desc { margin: 4px 0 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 13px; }
   .editor-details { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: end; }
   .editor-details label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--faint); min-width: 0; }
-  .editor-details label input:not([type=number]) { width: 100%; }
+  .editor-details label input:not([type=number]):not([type=checkbox]) { width: 100%; }
   .editor-details .wide { grid-column: 1 / -1; }
   .choices { display: flex; flex-direction: column; gap: 6px; }
   .choice {
@@ -492,7 +481,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .choice .mc { --s: 20px; }
   .choice .odds { text-align: right; color: var(--faint); font-size: 12px; white-space: nowrap; }
   .editor-details .check-line { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; font-size: 13px; color: var(--muted); }
-  .editor-details label.check-line input[type=checkbox] { width: 16px; height: 16px; flex: none; margin: 0; }
+  .editor-details label.check-line { cursor: pointer; }
+  .editor-details label.check-line:has(input:disabled) { cursor: default; }
   .action-tiles button:disabled { opacity: .35; cursor: not-allowed; }
   .plus-note { font-size: 12px; color: var(--faint); }
   .form-error { color: var(--warn); font-size: 13px; margin: 0; }
@@ -527,10 +517,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .style-group h3 { margin: 0 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
   .style-group .setting { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 0; }
   .swatch { display: inline-flex; align-items: center; gap: 8px; }
-  .swatch input[type="color"] { width: 34px; height: 32px; padding: 2px; flex: none; }
   .swatch code { flex: none; width: 6.5em; padding: 5px 0; text-align: center; font-variant-numeric: tabular-nums; }
-  .range { display: inline-flex; align-items: center; gap: 10px; }
-  .range input[type="range"] { width: 150px; height: auto; padding: 0; border: 0; background: none; accent-color: var(--text); }
+  .range { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 240px; }
+  .range input[type="range"] { flex: 1; min-width: 80px; width: auto; }
   .range output { width: 3.4em; text-align: right; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
   /* 部品は明るい配色の前提のページなので、枠も同じにしないと白い背景が塗られる（本番の LIVE Studio では透明） */
   .widget .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; color-scheme: normal; }
@@ -552,6 +541,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   dialog::backdrop { background: rgba(0, 0, 0, .75); }
   dialog h2 { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
   .steps { color: var(--faint); font-size: 13px; margin-bottom: 18px; }
+  /* はじめの案内の上のロゴ */
+  .wiz-brand { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: -2px 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--line-soft); color: var(--text); }
+  .wiz-brand svg { display: block; height: 34px; width: auto; }
+  .wiz-brand span { color: var(--faint); font-size: 12px; letter-spacing: .08em; }
   .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 24px; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
@@ -705,11 +698,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .rank-list .value { color: var(--muted); }
   .rank-list .gift-img { width: 22px; height: 22px; }
   .rank-list .mc { --s: 20px; }
+${CONTROLS_CSS}
 </style>
 </head>
 <body>
 <aside>
-  <div class="brand"><span class="brand-mark"></span><b>STATIC ARC</b></div>
+  <div class="brand" role="img" aria-label="STATIC ARC">${BRAND.logotype}</div>
   <nav>
     <span class="nav-group">配信中</span>
     <button class="active" data-tab="tabLive">
@@ -838,8 +832,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
             <div class="presets" id="miningPresets" style="margin-bottom: 14px;"></div>
             <div class="setting tall"><div class="setting-text"><label for="miningItem">対象アイテム</label><small id="miningNote"></small></div><div class="setting-control">
               <select id="miningItem" data-tiles aria-label="対象アイテム">${MINING_TARGETS.map((t) => '<option value="' + t.icon + '">' + t.name + '</option>').join('')}</select></div></div>
-            <div class="setting"><div class="setting-text"><label for="miningCount">目標数</label><small>${MINING_LIMITS.minCount}〜${MINING_LIMITS.maxCount}個</small></div><div class="setting-control"><input id="miningCount" type="number" min="${MINING_LIMITS.minCount}" max="${MINING_LIMITS.maxCount}" data-unit="個"></div></div>
-            <div class="setting"><div class="setting-text"><label for="miningSeconds">制限時間</label><small id="miningClock"></small></div><div class="setting-control"><input id="miningSeconds" type="number" min="${MINING_LIMITS.minSeconds}" max="${MINING_LIMITS.maxSeconds}" step="30" data-unit="秒"></div></div>
+            <div class="setting"><div class="setting-text"><label for="miningCount">目標数</label><small>${MINING_LIMITS.minCount}〜${MINING_LIMITS.maxCount}個</small></div><div class="setting-control"><input id="miningCount" type="number" min="${MINING_LIMITS.minCount}" max="${MINING_LIMITS.maxCount}" data-unit="個" data-strict></div></div>
+            <div class="setting"><div class="setting-text"><label for="miningSeconds">制限時間</label><small id="miningClock"></small></div><div class="setting-control"><input id="miningSeconds" type="number" min="${MINING_LIMITS.minSeconds}" max="${MINING_LIMITS.maxSeconds}" step="1" data-step="30" data-unit="秒" data-strict></div></div>
           </section>
         </div>
         <aside class="split-side">
@@ -1130,7 +1124,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <form id="testForm">
           <div class="row">
             <button type="button" id="pickTestGift" title="ギフトを絵から選ぶ">絵から選ぶ</button>
-            <input id="giftName" list="giftList" placeholder="ギフト名" autocomplete="off">
+            <input id="giftName" list="giftList" placeholder="ギフト名（打つと候補が出ます）" autocomplete="off" spellcheck="false" aria-label="ギフト名">
             <input id="giftCount" type="number" min="1" max="100" value="1" style="width: 64px; flex: none;" aria-label="個数">
             <button type="submit" class="next">送る</button>
           </div>
@@ -1318,6 +1312,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 </main>
 
 <dialog id="wizard">
+  <div class="wiz-brand"><div role="img" aria-label="STATIC ARC">${BRAND.logotype}</div><span>はじめの準備</span></div>
   <div class="steps" id="wizSteps"></div>
   <div data-step="0">
     <h2>マイクラの準備</h2>
@@ -1383,7 +1378,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   </div>
   <div class="editor-foot">
     <button class="ghost" id="editorDelete">このルールを削除</button>
-    <p class="form-error grow" id="editorError"></p>
+    <p class="form-error grow" id="editorError" role="alert"></p>
     <button id="editorCancel">やめる</button>
     <button class="next" id="editorOk">決定</button>
   </div>
@@ -1400,7 +1395,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <dialog id="presetDialog" style="width: min(420px, calc(100vw - 32px));">
   <h2>今の設定をプリセットに保存</h2>
   <p class="hint" style="margin: 0 0 14px;">今のルールに名前を付けて取っておきます。同じ名前なら上書きします。</p>
-  <input id="presetName" maxlength="20" placeholder="名前（例: 土曜の配信）" autocomplete="off" style="width: 100%;">
+  <input id="presetName" maxlength="20" placeholder="名前（例: 土曜の配信）" autocomplete="off" spellcheck="false" aria-label="プリセットの名前" style="width: 100%;">
   <div class="wizard-actions" style="justify-content: flex-end;">
     <button id="presetCancel">やめる</button>
     <button id="presetOk" class="next">保存する</button>
@@ -1421,6 +1416,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <div id="offline">アプリとの接続が切れました。アプリを起動し直してください。</div>
 
 <script>
+${CONTROLS_JS}
   const $ = (id) => document.getElementById(id);
   const TIKTOK = {
     connecting: ['warn', '接続中…'],
@@ -1441,6 +1437,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     img.addEventListener('error', () => img.remove());
     return img;
   }
+  // テストのギフト名の候補に、ギフトの絵を付ける（controls.js）
+  window.comboIcon = (list, value) => (list === 'giftList' ? giftIcon(value) : null);
   let gifts = [];
   let giftsVersion = -1;
   /** 名前（日本語・英語の小文字）→ ギフト。ルールの一覧を描くたびに引くので、一覧を読んだときに作っておく */
@@ -1721,15 +1719,33 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   $('toggle').addEventListener('click', () => post(state?.paused ? '/api/resume' : '/api/pause', {}, { button: $('toggle') }));
   $('stop').addEventListener('click', () => post('/api/stop', {}, { button: $('stop'), done: '妨害を止めて、一時停止しました' }));
-  // TikTok ID は24文字まで。先頭の @ は外してから数える（貼り付けた「@id」の最後が切れないように）
+  // TikTok ID は24文字まで。先頭の @ は外してから数える（貼り付けた「@id」の最後が切れないように）。
+  // プロフィールや LIVE の URL（https://www.tiktok.com/@id/live）を貼っても ID だけにする。空白は入れない
+  function normalizeTikTokId(value) {
+    const url = value.match(/tiktok\.com\/@([^/?#\s]+)/i);
+    // 全角で打った英数字（ｍｙ＿ｉｄ）は半角に
+    return (url ? url[1] : value).normalize('NFKC').replace(/\s+/g, '').replace(/^@+/, '').slice(0, 24);
+  }
+  /** TikTok ID に使えない文字があれば、その説明（英数字・_ と . だけ） */
+  const tiktokIdProblem = (value) => (/[^A-Za-z0-9_.]/.test(value) ? 'TikTok ID に使えるのは、半角の英数字と _ . だけです' : '');
   for (const id of ['username', 'wizUsername']) {
-    $(id).addEventListener('input', () => {
-      const value = $(id).value.replace(/^@+/, '').slice(0, 24);
+    const fix = () => {
+      const value = normalizeTikTokId($(id).value);
       if (value !== $(id).value) $(id).value = value;
-    });
+      $(id).setCustomValidity(tiktokIdProblem(value));
+      $(id).classList.toggle('invalid', !!tiktokIdProblem(value));
+    };
+    $(id).addEventListener('input', (e) => !e.isComposing && fix());
+    $(id).addEventListener('compositionend', fix);
   }
   $('tiktokForm').addEventListener('submit', (e) => {
     e.preventDefault();
+    const problem = tiktokIdProblem($('username').value);
+    if (problem) {
+      toast(problem, 'error');
+      $('username').focus();
+      return;
+    }
     const button = e.submitter ?? $('tiktokForm').querySelector('button');
     post('/api/tiktok', { username: $('username').value }, { button, done: 'TikTok ID を保存しました' });
     $('username').blur();
@@ -1742,7 +1758,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
       $('giftName').focus();
       return;
     }
-    const count = Number($('giftCount').value);
+    const count = Math.min(100, Math.max(1, Math.floor(Number($('giftCount').value)) || 1));
+    $('giftCount').value = String(count);
     post('/api/test', { kind: 'gift', giftName: name, count }, { button: e.submitter, done: '「' + name + ' ×' + count + '」を送ったことにしました' });
   });
 
@@ -1998,9 +2015,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('saveRules').disabled = !value;
     $('revertRules').disabled = !value;
     // 試すは保存したルールで動くので、変更があるあいだは押せなくする
-    document.querySelectorAll('.rule .try').forEach((b) => {
-      if (b.title !== 'このきっかけは試せません') b.disabled = value;
-      if (b.title !== 'このきっかけは試せません') b.title = value ? '「保存する」を押すと試せます' : 'このきっかけが届いたことにして、マイクラに出します';
+    document.querySelectorAll('.rule .try:not([data-untestable])').forEach((b) => {
+      b.disabled = value;
+      b.title = value ? '「保存する」を押すと試せます' : 'このきっかけが届いたことにして、マイクラに出します';
     });
   }
 
@@ -2132,6 +2149,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const body = testBodyFor(row);
     const tryIt = Object.assign(el('button', 'try', '▶ 試す'), { type: 'button' });
     tryIt.disabled = !body || rulesDirty;
+    if (!body) tryIt.dataset.untestable = '';
     tryIt.title = !body ? 'このきっかけは試せません' : rulesDirty ? '「保存する」を押すと試せます' : 'このきっかけが届いたことにして、マイクラに出します';
     tryIt.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2366,6 +2384,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     const problem = editorProblem(row);
     if (problem) {
       $('editorError').textContent = problem;
+      $('ruleEditor').querySelector('.editor-body input:invalid')?.focus();
       return;
     }
     if (index === null) rows.push(row);
@@ -2816,7 +2835,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   $('licenseForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const data = await post('/api/license/activate', { key: $('licenseKey').value }, { button: $('licenseActivate'), done: '有料版を有効にしました' });
+    const key = $('licenseKey').value.normalize('NFKC').trim();
+    if (!key) {
+      toast('ライセンスキーを入れてください（購入したときのメールに書いてあります）', 'error');
+      $('licenseKey').focus();
+      return;
+    }
+    const data = await post('/api/license/activate', { key }, { button: $('licenseActivate'), done: '有料版を有効にしました' });
     if (data?.ok) $('licenseKey').value = '';
   });
   $('licenseDeactivate').addEventListener('click', async () => {
@@ -2874,7 +2899,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   $('presetOk').addEventListener('click', savePreset);
   $('presetName').addEventListener('keydown', (e) => {
     $('presetName').classList.remove('invalid');
-    if (e.key === 'Enter') savePreset();
+    if (e.key === 'Enter' && !e.isComposing) savePreset();
   });
   $('presetCancel').addEventListener('click', () => $('presetDialog').close());
 
@@ -3197,25 +3222,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     post('/api/test', { kind: b.dataset.test, count: Number(b.dataset.count ?? 1) }, { button: b, done: '「' + buttonText(b) + '」が届いたことにしました' })));
   document.querySelectorAll('button[data-icon]').forEach((b) => b.prepend(mcIcon(b.dataset.icon)));
 
-  // 設定の行の数の入力は、− と ＋ のボタンと単位をつける
-  document.querySelectorAll('.setting input[type=number]').forEach((input) => {
-    const box = el('div', 'stepper');
-    const step = (dir) => {
-      try {
-        if (dir > 0) input.stepUp(); else input.stepDown();
-      } catch {
-        return;
-      }
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    };
-    const minus = Object.assign(el('button', '', '−'), { type: 'button', tabIndex: -1, title: '減らす' });
-    const plus = Object.assign(el('button', '', '＋'), { type: 'button', tabIndex: -1, title: '増やす' });
-    minus.addEventListener('click', () => step(-1));
-    plus.addEventListener('click', () => step(1));
-    input.before(box);
-    box.append(minus, input, el('span', 'unit', input.dataset.unit ?? ''), plus);
-  });
+  // プルダウン・数の入力・色などを、画面のデザインに合わせた部品にする（後から足されるものも。controls.js）
+  watchControls();
 
   // 置くブロック・枠の素材は、絵のタイルで選ぶ（値は隠した select に持つ）
   document.querySelectorAll('select[data-tiles]').forEach((sel) => {
@@ -3328,6 +3336,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
   $('wizNext').addEventListener('click', async () => {
     if (wizardStep === 1) {
       const username = $('wizUsername').value.trim();
+      if (tiktokIdProblem(username)) {
+        toast(tiktokIdProblem(username), 'error');
+        $('wizUsername').focus();
+        return;
+      }
       if (username && username !== state?.tiktokUsername) {
         const data = await post('/api/tiktok', { username });
         if (!data?.ok) return;
@@ -3342,6 +3355,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
     showWizardStep(wizardStep + 1);
   });
   $('wizard').addEventListener('close', () => storage('redstone.wizardDone', '1'));
+  // TikTok ID を入れて Enter で次へ（変換を決める Enter では進まない）
+  $('wizUsername').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      $('wizNext').click();
+    }
+  });
 
   const events = new EventSource('/events');
   events.addEventListener('snapshot', (e) => {

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, dialog, screen, shell } from 'electron';
 import { startApp } from '../src/app.js';
 import { ConfigError } from '../src/config.js';
+import { ASSETS_DIR } from '../src/assets.js';
 import { restoreBounds } from '../src/windowBounds.js';
 
 // 製品名を STATIC ARC に変えても、画面の覚えている内容（最後に開いたタブなど）を引き継ぐため、前と同じ場所を使う
@@ -57,7 +58,10 @@ if (!app.requestSingleInstanceLock()) {
       ...(saved ? { x: saved.x, y: saved.y, width: saved.width, height: saved.height } : { width: fit(1280, area.width), height: fit(800, area.height), useContentSize: true, center: true }),
       ...min,
       title: 'STATIC ARC',
-      backgroundColor: '#14161a',
+      // タスクバーとウィンドウのアイコン（ロゴのマーク。exe のアイコンは package.json の build.win.icon）
+      icon: join(ASSETS_DIR, 'brand', 'icon.png'),
+      // 開いた瞬間に色がちらつかないよう、操作画面の背景と同じ色
+      backgroundColor: '#0a0a0a',
       autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, sandbox: true },
     });

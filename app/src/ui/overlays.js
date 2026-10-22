@@ -10,6 +10,7 @@ export const OVERLAY_WIDGETS = [
   { id: 'alerts', name: 'ギフト通知', description: 'ギフトが届いて妨害が出たら、ギフトの絵・送った人・出た妨害を大きく出します。', size: [1080, 560] },
   { id: 'gifts', name: 'ギフト表', description: 'どのギフトで何が起きるかを、「ギフト＋妨害」のカードにして横長の1枚に並べます（基本は横5×縦3）。「妨害の設定」のルールがそのまま出ます。増えるとカードを小さくして1枚に収めます。', size: [1080, 608] },
   { id: 'round', name: 'ゲーム状況', description: '埋め立てはラウンドと埋めた割合、採掘チャレンジは集めた数と残り時間。カウントダウンを大きく出し、クリアで演出します。ゲーム中だけ出ます。', size: [1080, 360] },
+  { id: 'goal', name: 'いいねの目標', description: '「いいね あと 320 回で TNT ×5」のように、いいねのルールの次の妨害までの残りをバーで出します。あと少しのものから3つまで。視聴者が押したくなる目安になります。いいねのルールがないときは何も出ません。', size: [1080, 420] },
   { id: 'ranking', name: 'ギフトランキング', description: 'ギフトをたくさん送ってくれた人の上位5人（コインの合計）。配信が始まってからの分を数え、次の配信で0に戻ります（アプリを起動し直しても続きから）。テスト送信は数えません。', size: [540, 600] },
 ];
 
@@ -670,6 +671,68 @@ const ROUND = page({
 `,
 });
 
+// ---- いいねの目標 ----
+const GOAL = page({
+  title: 'いいねの目標',
+  id: 'goal',
+  size: widgetSize('goal'),
+  css: String.raw`
+  #goals { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: calc(1.6 * var(--u)); padding: calc(1 * var(--u)) calc(2 * var(--u)); box-sizing: border-box; }
+  .goal { display: grid; grid-template-columns: calc(8 * var(--u)) minmax(0, 1fr); align-items: center; gap: calc(2.6 * var(--u)); padding: calc(1.6 * var(--u)) calc(3 * var(--u)) calc(1.8 * var(--u)) calc(2.2 * var(--u)); flex: none; }
+  .goal .mc { --s: calc(7.4 * var(--u)); }
+  .goal .icon { display: flex; align-items: center; justify-content: center; }
+  .goal .icon .badge { width: calc(7.4 * var(--u)); height: calc(7.4 * var(--u)); font-size: calc(4.2 * var(--u)); }
+  .line { display: flex; align-items: baseline; gap: calc(1.4 * var(--u)); font-size: calc(3.6 * var(--u)); min-width: 0; white-space: nowrap; }
+  .line .left { font-size: calc(5 * var(--u)); color: var(--ov-accent); flex: none; }
+  .line .muted { flex: none; }
+  .line .what { font-size: calc(4.6 * var(--u)); color: var(--ov-text); }
+  .line .cond { margin-left: auto; font-size: calc(3 * var(--u)); flex: none; }
+  .bar { position: relative; height: calc(1.8 * var(--u)); margin-top: calc(1 * var(--u)); border-radius: 999px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--ov-accent); transition: width .5s cubic-bezier(.2, .8, .3, 1); }
+  .goal.hit { animation: hit 1.2s ease-out; }
+  .goal.hit .left { color: var(--ov-text); }
+  @keyframes hit { 0% { transform: scale(1.04); box-shadow: 0 0 0 calc(.6 * var(--u)) var(--ov-accent); } 100% { transform: none; box-shadow: 0 0 0 0 transparent; } }
+`,
+  body: '<div id="goals"></div>',
+  script: String.raw`
+  let last = new Map();
+  let lastKey = '';
+  function render(goals) {
+    const key = JSON.stringify(goals);
+    if (key === lastKey) return;
+    lastKey = key;
+    $('goals').replaceChildren(...goals.map((g) => {
+      const id = g.likes + ':' + g.action;
+      // 数が減った = 目標に届いて妨害が出た。少しのあいだ「達成！」を出す
+      const hit = last.has(id) && g.current < last.get(id);
+      const left = g.likes - g.current;
+      const icon = g.icon === 'message' ? el('span', 'badge', '♥') : mcIcon(g.icon);
+      const line = el('div', 'line', el('span', 'left num', hit ? '達成！' : 'あと ' + left.toLocaleString('ja-JP')), el('span', 'muted', hit ? '' : 'いいねで'),
+        el('span', 'what ellipsis fit', g.action), ...(g.condition ? [el('span', 'cond muted', g.condition)] : []));
+      const bar = el('div', 'bar', el('i'));
+      bar.firstChild.style.width = (hit ? 100 : (g.current / g.likes) * 100) + '%';
+      return el('div', 'goal panel' + (hit ? ' hit' : ''), el('span', 'icon', icon), el('div', '', line, bar));
+    }));
+    fitText($('goals'));
+    last = new Map(goals.map((g) => [g.likes + ':' + g.action, g.current]));
+  }
+  if (DEMO) {
+    // 試しの表示: いいねがたまっていく様子
+    const goals = [
+      { likes: 100, current: 40, action: 'お助けブロック ×5', icon: 'fill_help', condition: '' },
+      { likes: 1000, current: 680, action: 'TNT ×10', icon: 'tnt', condition: '' },
+    ];
+    render(goals);
+    setInterval(() => {
+      goals.forEach((g) => (g.current = (g.current + Math.round(g.likes * 0.12)) % g.likes));
+      render(goals.map((g) => ({ ...g })));
+    }, 1400);
+  } else {
+    connect({ onState: (state) => render(state.likeGoals ?? []) });
+  }
+`,
+});
+
 // ---- ギフトランキング ----
 const RANKING = page({
   title: 'ギフトランキング',
@@ -733,4 +796,4 @@ const RANKING = page({
 });
 
 /** id → ページ */
-export const OVERLAY_PAGES = { alerts: ALERTS, gifts: GIFTS, round: ROUND, ranking: RANKING };
+export const OVERLAY_PAGES = { alerts: ALERTS, gifts: GIFTS, round: ROUND, goal: GOAL, ranking: RANKING };

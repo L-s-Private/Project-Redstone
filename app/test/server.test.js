@@ -364,7 +364,7 @@ test('配信前のチェック: 開いている配信画面の部品を数え（
     const live = await open('/events?overlay=alerts');
     const demo = await open('/events?overlay=gifts&demo=1');
     const panel = await open('/events');
-    assert.deepEqual((await request(port, { path: '/api/overlays' })).json().open, { alerts: 1, gifts: 0, round: 0, ranking: 0 });
+    assert.deepEqual((await request(port, { path: '/api/overlays' })).json().open, { alerts: 1, gifts: 0, round: 0, goal: 0, ranking: 0 });
     live.req.destroy();
     await new Promise((r) => setTimeout(r, 50));
     assert.equal((await request(port, { path: '/api/overlays' })).json().open.alerts, 0);

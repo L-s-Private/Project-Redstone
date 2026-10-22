@@ -54,6 +54,37 @@ export function giftTable(rules, findGift, describe) {
     .slice(0, MAX_TABLE_ROWS);
 }
 
+/** 目標のバーに出す数（近いものから） */
+export const MAX_GOALS = 3;
+
+/**
+ * いいねのルールの目標（「あと何回で何が出るか」）。配信画面の「いいねの目標」に出す。あと少しのものから
+ * @param {Map<number, number>} progress ルールの番号 → たまっている回数（dispatcher の likeProgress）
+ * @returns {Array<{likes: number, current: number, action: string, icon: string, condition: string}>}
+ */
+export function likeGoals(rules, progress, describe) {
+  const goals = [];
+  rules.forEach((rule, i) => {
+    if (rule.likes === undefined) return;
+    const choices = rule.action === RANDOM_ACTION ? rule.choices : [rule];
+    const names = choices.map((choice) => {
+      const action = { type: choice.action, count: Math.min(choice.count ?? 1, MAX_COUNT_BY_TYPE[choice.action] ?? Infinity) };
+      if (choice.mob !== undefined) action.mob = choice.mob;
+      return describe(action);
+    });
+    const first = choices[0];
+    goals.push({
+      likes: rule.likes,
+      current: Math.min(rule.likes, progress.get(i) ?? 0),
+      // メッセージだけのルールは、出す文を見せる
+      action: rule.action === 'message' ? rule.label ?? '' : rule.action === RANDOM_ACTION ? 'ランダム（' + names.map((n) => n.replace(/ ×?\d.*$/, '')).join('・') + '）' : names[0],
+      icon: rule.action === 'message' ? 'message' : first.action === 'mob' ? (first.mob ?? 'zombie') : first.action,
+      condition: conditionText(rule),
+    });
+  });
+  return goals.sort((a, b) => (a.likes - a.current) - (b.likes - b.current) || a.likes - b.likes).slice(0, MAX_GOALS);
+}
+
 /** ルールの条件を短い文にする（条件がなければ空） */
 export function conditionText(rule) {
   const parts = [];

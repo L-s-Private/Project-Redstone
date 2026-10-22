@@ -5,7 +5,7 @@ import { DEFAULT_OVERLAY_STYLE, parseFill, parseOverlayStyle, parseWorld, parseP
 import { BUILTIN_PRESETS, MAX_PRESET_NAME } from './presets.js';
 import { checkFeature, checkPresetSave, checkAdvancedRules, checkRules, CURRENT_PLAN, planOf } from './plan.js';
 import { describeEvent } from './rules.js';
-import { giftTable, Ranking } from './overlayData.js';
+import { giftTable, likeGoals, Ranking } from './overlayData.js';
 import { Analytics } from './analytics.js';
 import { actionText, RulesHistory } from './history.js';
 import { TikTokSource } from './tiktok.js';
@@ -334,6 +334,8 @@ export class Engine extends EventEmitter {
       testButtons: this.cached('testButtons', [this.config.rules], () => testButtons(this.config.rules)),
       recentGifts: this.recentGifts,
       // 配信画面（オーバーレイ）用
+      // いいねの目標（あと何回で何が出るか）。いいねのたびに変わるので毎回作る（ルールの数だけ）
+      likeGoals: likeGoals(this.config.rules, this.dispatcher.likeProgress, describeAction),
       giftTable: this.cached('giftTable', [this.config.rules, this.giftCatalog?.version], () =>
         giftTable(this.config.rules, (name) => this.giftCatalog?.find({ giftName: name }) ?? null, describeAction)),
       ranking: this.ranking.top(),

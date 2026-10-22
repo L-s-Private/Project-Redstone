@@ -227,7 +227,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     const route = `${req.method} ${url.pathname}`;
 
     if (route === 'GET /') return sendHtml(res, panelHtml);
-    // 配信画面の部品（ギフト通知・ギフト表・ラウンド・ランキング）。
+    // 配信画面の部品（ギフト通知・ギフト表・ゲーム状況・いいねの目標・ランキング）。
     // LIVE Studio のリンク欄は「.html のような、点＋英字」がない URL をはねる（127.0.0.1 だけだと通らない）ので、末尾 .html でも開ける。
     // また LIVE Studio は貼られた URL を一度読んで確かめるので、表示用のこのページだけはほかのアプリからも読めるようにする
     if (route === 'GET /overlay' || route === 'GET /overlay.html') return sendHtml(res, OVERLAY_HTML, { readable: true });

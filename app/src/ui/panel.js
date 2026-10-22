@@ -1201,7 +1201,7 @@ ${CONTROLS_CSS}
         <div class="widget-list" id="widgets"></div>
         <section class="card" id="styleCard" hidden>
           <div class="card-head"><h2>見た目</h2><button class="ghost" id="styleReset">元に戻す</button></div>
-          <p class="lead">4つの部品すべてに効きます。変えると、すぐ配信画面と下の試し表示に映ります。大きさと位置は、LIVE Studio で枠を動かして変えてください。</p>
+          <p class="lead">すべての部品に効きます。変えると、すぐ配信画面と下の試し表示に映ります。大きさと位置は、LIVE Studio で枠を動かして変えてください。</p>
           <div class="style-groups" id="styleFields">
             <div class="style-group">
               <h3>色</h3>
@@ -1397,7 +1397,7 @@ ${CONTROLS_CSS}
       <section class="card link-card">
         <div>
           <h2>配信画面に表示（オーバーレイ）</h2>
-          <p class="lead">ギフト通知・ギフト表・ラウンド・ランキングを、部品ごとに LIVE Studio に貼れます。</p>
+          <p class="lead">ギフト通知・ギフト表・ゲーム状況・いいねの目標・ランキングを、部品ごとに LIVE Studio に貼れます。</p>
         </div>
         <button data-goto="tabOverlay">配信画面の部品を見る</button>
       </section>
@@ -1488,7 +1488,7 @@ ${CONTROLS_CSS}
         <table class="compare">
           <thead><tr><th></th><th>無料版</th><th>${PLANS.plus.name}</th></tr></thead>
           <tbody>
-            <tr><th>妨害14種類・埋め立て・配信画面の部品4つ</th><td>○</td><td class="plus">○</td></tr>
+            <tr><th>妨害14種類・埋め立て・配信画面の部品5つ</th><td>○</td><td class="plus">○</td></tr>
             <tr><th>一時停止・全妨害ストップ・テスト</th><td>○</td><td class="plus">○</td></tr>
             <tr><th>ランダムの妨害・「いつ出すか」</th><td>○</td><td class="plus">○</td></tr>
             <tr><th>自分のプリセット</th><td>${PLANS.free.userPresets}個</td><td class="plus">${PLANS.plus.userPresets}個</td></tr>

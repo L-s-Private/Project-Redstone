@@ -68,3 +68,20 @@ test('ギフト表: ランダムは候補を並べ、条件は出さない', () 
   assert.equal(row.icon, 'tnt');
   assert.equal(row.when, undefined, '小さすぎて読めないので出さない');
 });
+
+test('いいねの目標: いいねのルールだけを、あと少しのものから3つまで出す', async () => {
+  const { likeGoals } = await import('../src/overlayData.js');
+  const describe = (a) => (a.type === 'tnt' ? 'TNT ×' + a.count : a.type === 'mob' ? 'ゾンビ ×' + a.count : 'お助け ×' + a.count);
+  const rules = [
+    { gift: 'バラ', action: 'tnt', count: 1 },
+    { likes: 100, action: 'fill_help', count: 5 },
+    { likes: 1000, action: 'tnt', count: 10, when: 'filling' },
+    { likes: 50, action: 'message', label: 'ありがとう！' },
+    { likes: 300, action: 'random', choices: [{ action: 'tnt', count: 2 }, { action: 'mob', mob: 'zombie', count: 3 }] },
+  ];
+  const goals = likeGoals(rules, new Map([[1, 90], [2, 990], [3, 0], [4, 299]]), describe);
+  assert.deepEqual(goals.map((g) => [g.likes, g.current]), [[300, 299], [100, 90], [1000, 990]]);
+  assert.equal(goals[0].action, 'ランダム（TNT・ゾンビ）');
+  assert.equal(goals[2].condition, '埋め立て中');
+  assert.equal(likeGoals(rules, new Map(), describe).find((g) => g.likes === 50).action, 'ありがとう！');
+});

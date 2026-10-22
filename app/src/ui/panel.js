@@ -489,6 +489,25 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .gift-field.unset .gf-text b { color: var(--muted); font-weight: 600; }
   .gift-field.unknown { border-color: var(--warn); }
   .gift-field.invalid { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+  /* ギフトをその場で探して選ぶ（別の窓を開かない） */
+  .gift-chooser { flex: 1 1 100%; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .gift-chooser.invalid .gc-search { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+  #ruleEditor .gc-search { height: 38px; font-size: 14px; padding-left: 36px; width: 100%; }
+  .gc-search-wrap { position: relative; }
+  .gc-search-wrap > svg { position: absolute; left: 12px; top: 50%; width: 15px; height: 15px; margin-top: -7.5px; pointer-events: none; color: var(--faint); }
+  .gift-chooser .gift-grid { margin: 0; max-height: 232px; padding: 2px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .gift-chooser .gift-grid button {
+    position: relative; flex-direction: row; justify-content: flex-start; align-items: center; gap: 9px; height: 46px; padding: 0 10px 0 6px;
+    text-align: left; font-size: 13px; font-weight: 600; white-space: nowrap;
+  }
+  .gift-chooser .gift-grid button .gift-img { width: 30px; height: 30px; flex: none; }
+  .gift-chooser .gift-grid .gn { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+  .gift-chooser .gift-grid .gn b { overflow: hidden; text-overflow: ellipsis; }
+  .gift-chooser .gift-grid .gn small { font-weight: 400; }
+  .gift-chooser .gift-grid em { position: absolute; top: 3px; right: 5px; font-style: normal; font-size: 10px; color: var(--muted); }
+  .gift-chooser .gift-grid button.selected { border-color: var(--text); background: var(--raised); box-shadow: inset 0 0 0 1px var(--text); }
+  .gc-foot { display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 12px; }
+  .gc-foot span { flex: 1; }
   /* 妨害のタイル */
   .action-group + .action-group { margin-top: 14px; }
   .action-group > span { display: block; font-size: 12px; color: var(--faint); margin-bottom: 6px; letter-spacing: .02em; }
@@ -555,7 +574,21 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .ed-arrow { align-self: center; color: var(--faint); line-height: 1; }
   .ed-arrow svg { width: 16px; height: 16px; display: block; }
   .ed-desc { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
-  .ed-warn { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--warn); color: var(--warn); font-size: 12px; font-weight: 600; }
+  .ed-warn { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--warn); color: var(--warn); font-size: 12px; font-weight: 600; line-height: 1.6; }
+  .ed-warn button { display: flex; margin-top: 6px; height: 26px; padding: 0 10px; font-size: 12px; }
+  /* 数のよく使う値 */
+  .quick-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .quick-counts button { height: 28px; min-width: 40px; padding: 0 10px; font-size: 12px; font-variant-numeric: tabular-nums; background: var(--surface); border-color: var(--line); color: var(--muted); }
+  .quick-counts button:hover { color: var(--text); }
+  .quick-counts button.on { background: var(--invert-bg); border-color: var(--invert-bg); color: var(--invert-text); font-weight: 700; }
+  /* 今のゲームモードでは出ない妨害（ふだんは閉じておく） */
+  .off-actions { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .off-actions > summary { color: var(--muted); font-size: 12px; }
+  .off-actions[open] > summary { margin-bottom: 10px; }
+  .off-actions .action-group + .action-group { margin-top: 10px; }
+  /* 追加・変更したルールを一覧で光らせる */
+  .rule.flash { animation: rule-flash 1.8s ease-out; }
+  @keyframes rule-flash { 0%, 35% { background: var(--hover); box-shadow: inset 0 0 0 1px var(--text); } 100% { box-shadow: inset 0 0 0 1px transparent; } }
   .ed-side-fields { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
   .ed-side-fields:empty { display: none; }
   .editor-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px 12px 26px; border-top: 1px solid var(--line-soft); background: var(--surface); }
@@ -1470,7 +1503,7 @@ ${CONTROLS_CSS}
     <button class="ghost ed-delete" id="editorDelete">このルールを削除</button>
     <p class="form-error grow" id="editorError" role="alert"></p>
     <button id="editorCancel">やめる</button>
-    <button class="next" id="editorOk">追加する</button>
+    <button class="next" id="editorOk" title="Ctrl+Enter でも決められます">追加する</button>
   </div>
 </dialog>
 
@@ -2127,7 +2160,7 @@ ${CONTROLS_JS}
   }
 
   /** ギフトを選ぶ欄（絵・名前・コイン数）。押すとギフトの一覧が開く */
-  function giftPickButton(row, onPicked) {
+  function giftPickButton(row, onClick) {
     const name = row.value.trim();
     const gift = giftFor(row.value);
     const b = el('button', 'gift-field' + (!name ? ' unset' : gift ? '' : ' unknown'));
@@ -2137,7 +2170,7 @@ ${CONTROLS_JS}
       el('span', 'gf-text', el('b', '', !name ? 'ギフトを選ぶ' : gift?.nameJa ?? row.value),
         el('small', '', !name ? '一覧から絵で選べます' : gift ? '🪙 ' + gift.diamonds + ' コイン' : 'ギフトの一覧にない名前です')),
       el('span', 'gf-change', name ? '変更' : '選ぶ'));
-    b.addEventListener('click', () => openGiftPicker(onPicked));
+    b.addEventListener('click', onClick);
     return b;
   }
 
@@ -2247,6 +2280,7 @@ ${CONTROLS_JS}
       removeRow(i);
     });
     line.append(triggerSummary(row), arrow, actionSummary(row), label, tag, tryIt, del);
+    line.dataset.index = String(i);
     line.addEventListener('click', () => openEditor(i));
     line.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -2276,9 +2310,10 @@ ${CONTROLS_JS}
   // ---- ルールを作る・変える窓 ----
   let editing = null; // { index, row }
   function openEditor(index, defaults = {}) {
-    const row = index === null ? { ...toRow({ gift: '', action: 'tnt', count: 1 }), ...defaults } : { ...rows[index] };
+    const row = index === null ? { ...toRow({ gift: '', action: 'tnt', count: 1 }), ...defaults } : structuredClone(rows[index]);
     if (index === null && row.trigger !== 'gift') row.value = row.trigger === 'likes' ? '100' : row.trigger === 'minDiamonds' ? '100' : '';
-    editing = { index, row };
+    // initial: 開いたときの中身（閉じるときに、変えたかどうかを見る）。chooser: ギフトを探す欄
+    editing = { index, row, initial: JSON.stringify(row), chooser: null, chooseGift: false, offOpen: false };
     $('editorTitle').textContent = index === null ? 'ルールを追加' : 'ルールを変える';
     $('editorOk').textContent = index === null ? '追加する' : '変更する';
     $('editorDelete').hidden = index === null;
@@ -2287,6 +2322,9 @@ ${CONTROLS_JS}
     renderEditor();
     $('ruleEditor').showModal();
     $('ruleEditor').querySelector('.editor-body').scrollTop = 0;
+    // ギフトのルールを新しく作るときは、すぐ名前を打てるように
+    if (editing.chooser && !row.value.trim()) editing.chooser.search.focus();
+    else $('editorOk').focus();
   }
 
   /** きっかけの絵（一覧と同じ） */
@@ -2299,6 +2337,85 @@ ${CONTROLS_JS}
     if (mining && FILL_ONLY.includes(type)) return '埋め立て専用（今の採掘チャレンジでは出ません）';
     if (!mining && MINING_ONLY.includes(type)) return '採掘チャレンジ専用（今の埋め立てでは出ません）';
     return '';
+  }
+
+  /** ギフトの名前をそろえる（英語名でも日本語名でも同じギフトなら同じ） */
+  const giftKey = (name) => (giftFor(name)?.nameJa ?? String(name ?? '')).trim().toLowerCase();
+  /** ほかのルールで使っているギフト（いま変えているルールは除く） */
+  function giftsInUse() {
+    return new Set(rows.filter((r, i) => i !== editing.index && r.trigger === 'gift').map((r) => giftKey(r.value)));
+  }
+  /** ギフトをその場で探して選ぶ欄。開いているあいだは作り直さない（打った文字・動かした位置を残す） */
+  function giftChooser() {
+    if (editing.chooser) return editing.chooser;
+    const search = input('', () => fill(), { placeholder: 'ギフトの名前で探す（例: バラ・Rose）', className: 'gc-search', maxLength: 40 });
+    search.setAttribute('aria-label', 'ギフトを探す');
+    const wrap = el('div', 'gc-search-wrap', search);
+    wrap.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>');
+    const grid = el('div', 'gift-grid');
+    const note = el('span');
+    const foot = el('div', 'gc-foot', note);
+    const SHOWN = 150;
+    // ひらがなで打っても、カタカナの名前が見つかるように（ばら → バラ）
+    const fold = (text) => text.normalize('NFKC').toLowerCase().replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+    function fill() {
+      const query = fold(search.value.trim());
+      const used = giftsInUse();
+      const current = giftKey(editing.row.value);
+      // 同じ日本語名のギフトは1つだけ（安いほう）
+      const seen = new Set();
+      const list = gifts
+        .filter((g) => !query || fold(g.nameJa).includes(query) || fold(g.name).includes(query))
+        .filter((g) => !seen.has(g.nameJa) && seen.add(g.nameJa));
+      // 打った文字で始まるものを先に
+      const head = (g) => Number(!fold(g.nameJa).startsWith(query) && !fold(g.name).startsWith(query));
+      if (query) list.sort((a, b) => head(a) - head(b));
+      grid.replaceChildren(...list.slice(0, SHOWN).map((g) => {
+        const b = Object.assign(el('button', g.nameJa.toLowerCase() === current ? 'selected' : '', giftIcon(g.image),
+          el('span', 'gn', el('b', '', g.nameJa), el('small', '', '🪙 ' + g.diamonds))), { type: 'button', title: g.nameJa + '（' + g.diamonds + 'コイン）' });
+        if (used.has(g.nameJa.toLowerCase())) {
+          b.append(el('em', '', 'ルールあり'));
+          b.title += '。このギフトのルールはもうあります';
+        }
+        b.addEventListener('click', () => {
+          editing.row.value = g.nameJa;
+          editing.chooseGift = false;
+          $('editorError').textContent = '';
+          renderEditor();
+        });
+        return b;
+      }));
+      note.textContent = gifts.length === 0
+        ? 'ギフトの一覧をまだ取れていません。インターネットにつながっているか確かめて、アプリを起動し直してください。'
+        : !query ? 'コインの少ない順。名前で探すと、全' + list.length + '種類から探せます'
+        : list.length === 0 ? '「' + search.value.trim() + '」のギフトは見つかりません。ひらがな・カタカナ・英語名でも探せます'
+        : list.length + '件' + (list.length > SHOWN ? '（はじめの' + SHOWN + '件）' : '') + '。Enter でいちばん上を選びます';
+    }
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault();
+        grid.querySelector('button')?.click();
+      }
+    });
+    fill();
+    editing.chooser = { el: el('div', 'gift-chooser', wrap, grid, foot), search, foot, fill };
+    return editing.chooser;
+  }
+
+  /** ルールの出す妨害を短い文に（「TNT ×1個」「ランダム（TNT・ゾンビ）」） */
+  function actionText(r) {
+    if (r.random) return 'ランダム（' + r.choices.map((c) => ACTION_INFO[c.key]?.name ?? c.key).join('・') + '）';
+    const info = ACTION_INFO[actionKey(r)];
+    return (info?.name ?? r.action) + (info?.unit ? (info.unit === '秒' ? ' ' : ' ×') + r.count + info.unit : '');
+  }
+  /** 同じきっかけ・同じ条件のほかのルール（あると、どちらか一方しか使われない） */
+  function duplicateOf(row) {
+    const same = (r) => r.trigger === row.trigger
+      && (row.trigger === 'follow' || row.trigger === 'share' || (row.trigger === 'gift' ? giftKey(r.value) === giftKey(row.value) : String(r.value).trim() === String(row.value).trim()))
+      && (r.when || '') === (row.when || '') && String(r.minRound || '') === String(row.minRound || '');
+    if (row.trigger === 'gift' && !row.value.trim()) return null;
+    const i = rows.findIndex((r, j) => j !== editing.index && same(r));
+    return i === -1 ? null : { index: i, row: rows[i], wins: editing.index === null || i < editing.index };
   }
 
   function renderEditor() {
@@ -2324,11 +2441,28 @@ ${CONTROLS_JS}
       renderSummary();
     };
     if (row.trigger === 'gift') {
-      value.replaceChildren(giftPickButton(row, (name) => {
-        row.value = name;
-        $('editorError').textContent = '';
-        renderEditor();
-      }), 'が届いたら');
+      if (!row.value.trim() || editing.chooseGift) {
+        // ギフトを選ぶ（選んだら閉じる）。選び直しのときは「やめる」で元のギフトに戻れる
+        const chooser = giftChooser();
+        chooser.foot.querySelector('.gc-cancel')?.remove();
+        if (row.value.trim()) {
+          const keep = Object.assign(el('button', 'ghost gc-cancel', (giftFor(row.value)?.nameJa ?? row.value) + ' のままにする'), { type: 'button' });
+          keep.addEventListener('click', () => {
+            editing.chooseGift = false;
+            renderEditor();
+          });
+          chooser.foot.append(keep);
+        }
+        value.replaceChildren(chooser.el);
+      } else {
+        value.replaceChildren(giftPickButton(row, () => {
+          editing.chooseGift = true;
+          renderEditor();
+          editing.chooser.fill();
+          editing.chooser.search.focus();
+          editing.chooser.search.select();
+        }), 'が届いたら');
+      }
     } else if (row.trigger === 'minDiamonds') {
       value.replaceChildren(numberField(row.value, live('value'), { min: 1, before: '🪙', after: 'コイン以上のギフトが届いたら', width: 80, label: 'コイン数' }));
     } else if (row.trigger === 'likes') {
@@ -2361,8 +2495,7 @@ ${CONTROLS_JS}
       return b;
     }));
     const chosen = (key) => (row.random ? row.choices.some((c) => c.key === key) : key === selected);
-    $('editorActions').replaceChildren(...ACTION_GROUPS.map(([title, list]) => el('div', 'action-group', el('span', '', title),
-      el('div', 'action-tiles', ...list.map(([key, name, , def]) => {
+    const tile = ([key, name, , def]) => {
         const off = offModeNote(key);
         const b = Object.assign(el('button', (chosen(key) ? 'selected' : '') + (off ? ' off-mode' : ''), mcIcon(iconOf(key), 22), el('span', '', name)), { type: 'button' });
         b.setAttribute('aria-pressed', String(chosen(key)));
@@ -2393,7 +2526,20 @@ ${CONTROLS_JS}
           renderEditor();
         });
         return b;
-      })))));
+      };
+    const groups = (pick) => ACTION_GROUPS.map(([title, list]) => [title, list.filter(pick)]).filter(([, list]) => list.length)
+      .map(([title, list]) => el('div', 'action-group', el('span', '', title), el('div', 'action-tiles', ...list.map(tile))));
+    const shown = ([key]) => !offModeNote(key) || chosen(key);
+    const hidden = ACTION_GROUPS.flatMap(([, list]) => list).filter((item) => !shown(item));
+    const blocks = groups(shown);
+    if (hidden.length) {
+      const mode = state?.gameMode === 'mining_challenge' ? '採掘チャレンジ' : '埋め立て';
+      const off = el('details', 'off-actions', el('summary', '', '今のゲームモード（' + mode + '）では出ない妨害（' + hidden.length + '個）'), ...groups((item) => !shown(item)));
+      off.open = !!editing.offOpen;
+      off.addEventListener('toggle', () => (editing.offOpen = off.open));
+      blocks.push(off);
+    }
+    $('editorActions').replaceChildren(...blocks);
 
     // ランダムの候補（選んだものを上に並べる）
     const advanced = !!state.plan?.advancedRules;
@@ -2447,8 +2593,27 @@ ${CONTROLS_JS}
     const side = [];
     if (info?.unit) {
       const max = MAX_COUNT[row.action];
-      side.push(el('label', 'ed-field', '数', el('small', '', '1回あたり・最大 ' + max + info.unit),
-        numberField(row.count, live('count'), { min: 1, max, before: info.unit === '秒' ? '' : '×', after: info.unit, width: 64, label: '数' })));
+      const presets = [...new Set([...(info.unit === '秒' ? [5, 10, 30, 60] : [1, 3, 5, 10]).filter((n) => n < max), max])];
+      const quick = el('div', 'quick-counts');
+      const markQuick = () => quick.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === Number(row.count)));
+      const field = numberField(row.count, (v) => {
+        row.count = v;
+        markQuick();
+        renderSummary();
+      }, { min: 1, max, before: info.unit === '秒' ? '' : '×', after: info.unit, width: 64, label: '数' });
+      quick.append(...presets.map((n) => {
+        const b = Object.assign(el('button', '', (n === max ? '最大 ' : '') + n), { type: 'button', title: n + info.unit + 'にする' });
+        b.dataset.n = n;
+        b.addEventListener('click', () => {
+          row.count = n;
+          field.querySelector('input').value = String(n);
+          markQuick();
+          renderSummary();
+        });
+        return b;
+      }));
+      markQuick();
+      side.push(el('div', 'ed-field', el('span', '', '数'), el('small', '', '1回あたり・最大 ' + max + info.unit), field, quick));
     }
     const needsLabel = !row.random && row.action === 'message';
     const label = input(row.label, live('label'), { placeholder: needsLabel ? '例: ありがとう！' : '空なら妨害の名前', maxLength: 100 });
@@ -2509,6 +2674,16 @@ ${CONTROLS_JS}
       desc = info?.desc ?? '枠の中の地上に出る（埋め立て中でなければ、プレイヤーのまわり）';
       warn = offModeNote(key);
     }
+    const dup = duplicateOf(row);
+    let dupNote = null;
+    if (dup) {
+      const open = Object.assign(el('button', '', 'そのルールを開く'), { type: 'button' });
+      open.addEventListener('click', async () => {
+        if (await leaveEditor()) openEditor(dup.index);
+      });
+      dupNote = el('p', 'ed-warn', '同じきっかけ・条件のルールがもうあります（→ ' + actionText(dup.row) + '）。'
+        + (dup.wins ? '先にあるそちらだけが使われ、このルールは出ません。' : 'このルールが先なので、そちらは出なくなります。'), open);
+    }
     const arrow = el('span', 'ed-arrow');
     arrow.innerHTML = ARROW_DOWN;
     const conditions = [
@@ -2520,7 +2695,8 @@ ${CONTROLS_JS}
       el('div', 'ed-flow', trigger, arrow, action),
       ...(conditions.length ? [el('p', 'ed-desc', '条件: ' + conditions.join('・'))] : []),
       el('p', 'ed-desc', desc),
-      ...(warn ? [el('p', 'ed-warn', warn)] : [])));
+      ...(warn ? [el('p', 'ed-warn', warn)] : []),
+      ...(dupNote ? [dupNote] : [])));
     $('editorMoreNote').textContent = conditions.length ? conditions.join('・') : 'そのままでも使えます（待ち時間・いつ出すか）';
   }
 
@@ -2556,7 +2732,7 @@ ${CONTROLS_JS}
     return '';
   }
 
-  $('editorOk').addEventListener('click', () => {
+  $('editorOk').addEventListener('click', async () => {
     const { index, row } = editing;
     const problem = editorProblem(row);
     if (problem) {
@@ -2568,21 +2744,53 @@ ${CONTROLS_JS}
         if (more) more.open = true;
         bad.focus();
       } else if (row.trigger === 'gift' && !row.value.trim()) {
-        const field = $('ruleEditor').querySelector('.gift-field');
-        field?.classList.add('invalid');
-        field?.focus();
+        $('ruleEditor').querySelector('.gift-chooser')?.classList.add('invalid');
+        editing.chooser?.search.focus();
       }
       return;
+    }
+    // 同じきっかけのルールが先にあると、このルールは出ない。気づかずに作らないように確かめる
+    const dup = duplicateOf(row);
+    if (dup?.wins) {
+      const ok = await askConfirm({ title: 'このルールは出ません', text: '同じきっかけ・条件のルール（→ ' + actionText(dup.row) + '）が先にあるため、そちらだけが使われます。それでも' + (index === null ? '追加' : '変更') + 'しますか？', ok: index === null ? '追加する' : '変更する', cancel: '戻って直す' });
+      if (!ok) return;
     }
     if (index === null) rows.push(row);
     else rows[index] = row;
     setDirty(true);
     renderRows();
     $('ruleEditor').close();
+    // 一覧のどこに入ったか、光らせて見せる
+    const line = document.querySelector('.rule[data-index="' + (index === null ? rows.length - 1 : index) + '"]');
+    if (line) {
+      line.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      line.classList.add('flash');
+    }
     toast(index === null ? 'ルールを追加しました。「保存する」で使われます' : 'ルールを変えました。「保存する」で使われます');
   });
-  $('editorCancel').addEventListener('click', () => $('ruleEditor').close());
-  $('editorClose').addEventListener('click', () => $('ruleEditor').close());
+  /** 窓を閉じる。変えたところがあれば、捨ててよいか確かめる。@returns 閉じたか */
+  async function leaveEditor() {
+    if (editing && JSON.stringify(editing.row) !== editing.initial) {
+      const ok = await askConfirm({ title: '入力した内容を捨てますか？', text: 'このルールの変更は残りません。', ok: '捨てる', cancel: '編集に戻る' });
+      if (!ok) return false;
+    }
+    $('ruleEditor').close();
+    return true;
+  }
+  $('editorCancel').addEventListener('click', leaveEditor);
+  $('editorClose').addEventListener('click', leaveEditor);
+  // Esc でも同じ（いきなり消えないように）
+  $('ruleEditor').addEventListener('cancel', (e) => {
+    e.preventDefault();
+    leaveEditor();
+  });
+  // Ctrl+Enter で決める
+  $('ruleEditor').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {
+      e.preventDefault();
+      $('editorOk').click();
+    }
+  });
   $('editorDelete').addEventListener('click', () => {
     $('ruleEditor').close();
     removeRow(editing.index);

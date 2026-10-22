@@ -33,7 +33,9 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
   const onLog = (entry) => broadcast('log', entry);
   const onState = (state) => broadcast('state', state);
   const onAlert = (alert) => broadcast('alert', alert);
+  const onActivity = (entry) => broadcast('activity', entry);
   engine.on('log', onLog);
+  engine.on('activity', onActivity);
   engine.on('state', onState);
   engine.on('alert', onAlert);
 
@@ -237,7 +239,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     }
     if (route === 'GET /events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
-      res.write(`event: snapshot\ndata: ${JSON.stringify({ state: engine.state, logs: engine.logs })}\n\n`);
+      res.write(`event: snapshot\ndata: ${JSON.stringify({ state: engine.state, logs: engine.logs, activity: engine.activity })}\n\n`);
       clients.add(res);
       req.on('close', () => clients.delete(res));
       return;
@@ -274,6 +276,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
     engine.off('log', onLog);
     engine.off('state', onState);
     engine.off('alert', onAlert);
+    engine.off('activity', onActivity);
   });
 
   return {

@@ -18,6 +18,9 @@ const ANALYTICS_SAVE_DELAY_MS = 5000;
 /** 無料版で見られる、妨害の設定の履歴の数 */
 const FREE_HISTORY_ENTRIES = 3;
 
+/** 配信の画面に出す「届いたものと出した妨害」の数 */
+const MAX_ACTIVITY = 100;
+
 const SKIP_MESSAGES = {
   no_rule: '対応する妨害がないので無視しました',
   paused: '一時停止中なので出しませんでした',
@@ -136,6 +139,8 @@ export class Engine extends EventEmitter {
     this.tiktok = tiktok ?? new TikTokSource();
     this.dispatcher = new Dispatcher({ rules: config.rules, client: this.client, now, game: () => this.client.status?.fill ?? null });
     this.logs = [];
+    this.activity = [];
+    this.activitySeq = 0;
     this.mock = false;
     // 実際に届いたギフト（設定画面で「最近届いたギフト」として出す）
     this.recentGifts = [];
@@ -551,8 +556,10 @@ export class Engine extends EventEmitter {
       // テスト送信のギフトにも日本語名と絵を足す
       const event = this.withGiftInfo(raw);
       this.log('gift', testMark(event) + describeEvent(event), event.image ? { giftImage: event.image } : {});
+      // マイクラを待つあいだも「届いた」は先に見せる
+      const entry = this.startActivity(event);
       const result = await this.dispatcher.handle(event);
-      this.logResult(event, result);
+      this.logResult(event, result, entry);
       this.emitState();
       return result;
     } catch (e) {
@@ -562,7 +569,8 @@ export class Engine extends EventEmitter {
     }
   }
 
-  logResult(event, result) {
+  logResult(event, result, entry) {
+    this.finishActivity(entry ?? this.startActivity(event, result), result);
     if (result.status === 'sent') {
       const icon = result.action.type === 'mob' ? (result.action.mob ?? 'zombie') : result.action.type;
       this.log('ok', `  → ${result.random ? 'ランダムで ' : ''}${describeAction(result.action)} を出しました`, { icon });
@@ -633,6 +641,47 @@ export class Engine extends EventEmitter {
   async shutdown() {
     this.client.stop();
     await Promise.all([this.tiktok.stop(), this.flushRanking(), this.flushAnalytics(), this.historyWrite]);
+  }
+
+  /**
+   * 配信の画面の「届いたものと出した妨害」に1件足す（誰が・何を）。結果が出るまでは status が pending。
+   * 同じ id で finishActivity が結果を知らせる
+   */
+  startActivity(event, result = {}) {
+    const gift = event.kind === 'gift';
+    const entry = {
+      id: ++this.activitySeq,
+      time: this.now(),
+      kind: event.kind,
+      test: event.test === true,
+      who: event.from ?? '',
+      gift: gift ? event.giftNameJa || event.giftName || `ギフト#${event.giftId}` : '',
+      giftImage: gift ? event.image ?? '' : '',
+      count: gift ? event.count : 1,
+      likes: event.kind === 'like' ? result.likes ?? 0 : 0,
+      status: 'pending',
+      action: '',
+      icon: '',
+      random: false,
+      reason: '',
+    };
+    this.activity.push(entry);
+    if (this.activity.length > MAX_ACTIVITY) this.activity.shift();
+    this.emit('activity', { ...entry });
+    return entry;
+  }
+
+  /** どうなったか（出した・出さなかった・失敗）を書き足して知らせる */
+  finishActivity(entry, result) {
+    const sent = result.status === 'sent';
+    Object.assign(entry, {
+      status: result.status,
+      action: sent ? describeAction(result.action) : '',
+      icon: sent ? (result.action.type === 'mob' ? (result.action.mob ?? 'zombie') : result.action.type) : '',
+      random: sent && result.random === true,
+      reason: result.status === 'failed' ? result.error ?? '' : SKIP_MESSAGES[result.status] ?? '',
+    });
+    this.emit('activity', { ...entry });
   }
 
   /** extra は画面で絵を出すための giftName・icon */

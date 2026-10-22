@@ -171,9 +171,44 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .stat + .stat { border-left: 1px solid var(--line); }
   .stat small { display: block; color: var(--muted); font-size: 13px; }
   .stat b { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.3; }
-  .log-card { display: flex; flex-direction: column; flex: 1; min-height: 280px; }
-  #log { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto; font-variant-numeric: tabular-nums; }
-  #log li { padding: 5px 0; border-bottom: 1px solid var(--line-soft); display: flex; gap: 14px; }
+  .log-card { display: flex; flex-direction: column; }
+  #log { list-style: none; margin: 0; padding: 0; max-height: 36vh; min-height: 120px; overflow-y: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+  #log li { padding: 5px 0; border-bottom: 1px solid var(--line-soft); display: flex; gap: 10px; }
+  #log li > span { min-width: 0; overflow-wrap: anywhere; }
+  /* 配信の上の段: 3つの状態と4つの数 */
+  .live-top { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 2.4fr); padding: 14px 6px; }
+  .live-top > * { padding: 0 16px; min-width: 0; }
+  .live-top > * + * { border-left: 1px solid var(--line-soft); }
+  .status-tile { display: flex; align-items: center; gap: 12px; }
+  .status-tile .dot { width: 10px; height: 10px; flex: none; }
+  .status-tile small, .counts small { display: block; color: var(--muted); font-size: 12px; }
+  .status-tile b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .counts b { display: block; font-size: 22px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  @media (max-width: 1100px) {
+    .live-top { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; }
+    .live-top .counts { grid-column: 1 / -1; border-left: 0; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+  }
+  /* 届いたものと出した妨害（新しい順） */
+  .feed-card { display: flex; flex-direction: column; min-height: calc(100vh - 260px); }
+  .feed { list-style: none; margin: 0; padding: 0; }
+  .feed li {
+    display: grid; grid-template-columns: 62px minmax(0, 1.1fr) 18px minmax(0, 1fr); gap: 10px; align-items: center;
+    padding: 8px 4px; border-bottom: 1px solid var(--line-soft);
+  }
+  .feed li.fresh { animation: feed-in 1.4s ease-out; }
+  @keyframes feed-in { from { background: var(--hover); } }
+  .feed time { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .feed-src, .feed-res { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .feed-src b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 11em; flex: none; }
+  .feed-src span, .feed-res span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .feed-src .muted { color: var(--muted); }
+  .feed-src .rule-tag, .feed-res .rule-tag { flex: none; }
+  .feed-arrow { color: var(--faint); text-align: center; }
+  .feed-res.sent { font-weight: 700; }
+  .feed-res.skip { color: var(--muted); }
+  .feed-res.failed { color: var(--bad); }
+  .feed-empty { color: var(--muted); padding: 24px 4px; max-width: 46em; }
   #log time { color: var(--faint); flex: none; }
   #log span { display: inline-flex; align-items: center; flex-wrap: wrap; }
   #log .ok { color: var(--text); }
@@ -183,6 +218,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   /* 埋め立ての状況（配信中にいちばん見るところなので大きく） */
   .fill-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  #fillCard .empty { flex-direction: column; align-items: flex-start; gap: 10px; }
   .fill-round small, .fill-pct small { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
   .fill-round b, .fill-pct b {
     display: block; font-family: "Segoe UI Variable Display", "Segoe UI", "Yu Gothic UI", sans-serif;
@@ -285,7 +321,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .rule-none { color: var(--faint); font-size: 13px; padding: 10px 14px; border: 1px dashed var(--line-soft); border-radius: var(--radius); }
   .rule {
     display: grid; align-items: center; column-gap: 12px; width: 100%; text-align: left;
-    grid-template-columns: minmax(170px, 1.1fr) 14px minmax(170px, 1.1fr) minmax(0, 1fr) auto 30px;
+    grid-template-columns: minmax(0, 230px) 18px minmax(0, 300px) minmax(0, 1fr) auto auto 30px;
     background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 8px 6px 8px 12px;
     font-weight: 400; min-height: 46px; cursor: pointer;
   }
@@ -301,10 +337,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .rule-label.empty { color: var(--faint); }
   .rule-tag { font-size: 12px; color: var(--faint); border: 1px solid var(--line-soft); border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
   .rule .del { padding: 4px 6px; }
+  .rule .try { padding: 3px 10px; font-size: 12px; color: var(--muted); background: transparent; border-color: var(--line); }
+  .rule .try:hover { color: var(--text); background: var(--hover); }
   .rule .del:hover { color: var(--bad); }
   .trigger-icon { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 6px; background: var(--raised); font-size: 13px; }
   @container rules (max-width: 820px) {
-    .rule { grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) auto 30px; }
+    .rule { grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) auto auto 30px; }
     .rule-label { display: none; }
   }
   .rule-list { container: rules / inline-size; }
@@ -594,41 +632,50 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <button class="lg danger" id="stop">全妨害ストップ</button>
   </div>
   <div class="page">
-
-    <section class="card">
-      <div id="fillRunning" hidden>
-        <div class="fill-hero">
-          <div class="fill-round"><small>ラウンド（クリアした数）</small><b id="fillRound"></b></div>
-          <div class="fill-pct"><small>埋まった割合</small><b id="fillPercent"></b></div>
-        </div>
-        <div class="fill-progress" id="fillBar"><div></div></div>
-        <div class="fill-meta"><span class="fill-phase" id="fillPhase"></span><span class="fill-detail" id="fillDetail"></span></div>
-        <div class="fill-buttons">
-          <button data-action="fill_expand" data-icon="fill_expand">枠 +1</button>
-          <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
-          <button data-action="fill_help" data-count="10" data-icon="fill_help">お助け +10</button>
-          <button data-action="tnt" data-icon="tnt">TNT</button>
-        </div>
-      </div>
-      <div class="empty" id="fillEmpty">
-        <span>埋め立ては始まっていません。</span>
-        <button data-goto="tabFill">埋め立ての設定へ</button>
+    <section class="card live-top">
+      <div class="status-tile" id="tileTiktok"><span class="dot"></span><div><small>TikTok</small><b>—</b></div></div>
+      <div class="status-tile" id="tileMod"><span class="dot"></span><div><small>マイクラ</small><b>—</b></div></div>
+      <div class="status-tile" id="tilePause"><span class="dot"></span><div><small>妨害</small><b>—</b></div></div>
+      <div class="counts">
+        <div title="届いたギフト・フォロー・シェアと、決めた回数に届いたいいねの数"><small>届いた</small><b id="received">0</b></div>
+        <div title="マイクラに妨害を出した数"><small>妨害を出した</small><b id="sent">0</b></div>
+        <div title="ルールがない・一時停止中・待ち時間中で、出さなかった数"><small>出さなかった</small><b id="skipped">0</b></div>
+        <div title="マイクラに届かなかった数"><small>失敗</small><b id="failed">0</b></div>
       </div>
     </section>
-
-    <section class="card">
-      <div class="stats">
-        <div class="stat"><small>届いた</small><b id="received">0</b></div>
-        <div class="stat"><small>妨害を出した</small><b id="sent">0</b></div>
-        <div class="stat"><small>見送り</small><b id="skipped">0</b></div>
-        <div class="stat"><small>失敗</small><b id="failed">0</b></div>
-      </div>
-    </section>
-
-    <section class="card log-card">
-      <div class="card-head"><h2>ログ</h2><button class="ghost" id="logLatest" hidden>最新のログへ ↓</button></div>
-      <ul id="log"></ul>
-    </section>
+    <div class="split">
+      <section class="card feed-card">
+        <div class="card-head"><h2>届いたものと出した妨害</h2><span class="hint" style="margin: 0;">新しい順</span></div>
+        <ol class="feed" id="feed"></ol>
+        <div class="feed-empty" id="feedEmpty">まだ何も届いていません。TikTok LIVE で届いたギフトと、それで出した妨害がここに並びます。「テスト」の画面で試しに送ることもできます。</div>
+      </section>
+      <aside class="split-side">
+        <section class="card" id="fillCard">
+          <div id="fillRunning" hidden>
+            <div class="fill-hero">
+              <div class="fill-round"><small>ラウンド（クリアした数）</small><b id="fillRound"></b></div>
+              <div class="fill-pct"><small>埋まった割合</small><b id="fillPercent"></b></div>
+            </div>
+            <div class="fill-progress" id="fillBar"><div></div></div>
+            <div class="fill-meta"><span class="fill-phase" id="fillPhase"></span><span class="fill-detail" id="fillDetail"></span></div>
+            <div class="fill-buttons">
+              <button data-action="fill_expand" data-icon="fill_expand">枠 +1</button>
+              <button data-action="fill_shrink" data-icon="fill_shrink">枠 −1</button>
+              <button data-action="fill_help" data-count="10" data-icon="fill_help">お助け +10</button>
+              <button data-action="tnt" data-icon="tnt">TNT</button>
+            </div>
+          </div>
+          <div class="empty" id="fillEmpty">
+            <span>埋め立ては始まっていません。</span>
+            <button data-goto="tabFill">埋め立ての設定へ</button>
+          </div>
+        </section>
+        <section class="card log-card">
+          <div class="card-head"><h2>アプリの記録</h2><button class="ghost" id="logLatest" hidden>最新へ ↓</button></div>
+          <ul id="log"></ul>
+        </section>
+      </aside>
+    </div>
   </div>
 </main>
 
@@ -728,7 +775,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <h1>妨害の設定</h1>
     <span class="dirty" id="dirty" hidden>保存していない変更があります</span>
     <button class="lg ghost" id="openHistory" title="保存するたびに残している、前の設定を見て戻せます">変更の履歴</button>
-    <button class="lg ghost" id="revertRules">元に戻す</button>
+    <button class="lg ghost" id="revertRules" title="最後に保存したときの設定に戻します">保存前に戻す</button>
     <button class="lg next" id="saveRules">保存する</button>
   </div>
   <div class="page">
@@ -740,7 +787,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <input type="file" id="importFile" accept=".json,application/json" hidden>
         </span>
       </div>
-      <p class="lead">自分で保存したルールの組です。押すと、ルールがまとめて入れ替わります（「保存する」を押すまで確定しません）。</p>
+      <p class="lead">押すと、ルールがまとめて入れ替わります（「保存する」で確定）。</p>
       <div class="presets" id="presets"></div>
     </section>
     <div class="recent-strip" title="押すと、そのギフトのルールを作ります">
@@ -752,7 +799,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
         <h2>ルール <span class="count" id="ruleCount"></span></h2>
         <button class="lg next" id="addRule">＋ ルールを追加</button>
       </div>
-      <p class="hint" style="margin-top: 0;">行を押すと変えられます。ギフトを連打すると、出る数も増えます。</p>
+      <p class="hint" style="margin-top: 0;">行を押すと変えられます。「▶ 試す」で、そのきっかけが届いたことにしてマイクラで試せます。ギフトを連打すると、出る数も増えます。</p>
       <div class="rule-list" id="ruleGroups"></div>
     </section>
   </div>
@@ -1120,7 +1167,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <dialog id="ruleEditor">
   <div class="editor-body">
     <h2 id="editorTitle">ルールを追加</h2>
-    <p class="hint" style="margin: 0 0 18px;">①きっかけ → ②出す妨害 → ③細かい設定 の順に決めます。</p>
+    <p class="hint" style="margin: 0 0 18px;">①きっかけ → ②出す妨害 → ③数と見せ方 → ④出す条件 の順に決めます。③④はそのままでも使えます。</p>
     <div class="editor-step">
       <h3><b>①</b>きっかけ（何が起きたら）</h3>
       <div class="segmented" id="editorTriggers"></div>
@@ -1132,8 +1179,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
       <p class="action-desc" id="editorActionDesc"></p>
     </div>
     <div class="editor-step">
-      <h3><b>③</b>細かい設定</h3>
+      <h3><b>③</b>数と見せ方</h3>
       <div class="editor-details" id="editorDetails"></div>
+    </div>
+    <div class="editor-step">
+      <h3><b>④</b>出す条件（埋め立て中に使う）</h3>
+      <div class="editor-details" id="editorConditions"></div>
     </div>
   </div>
   <div class="editor-foot">
@@ -1255,6 +1306,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('toggle').classList.toggle('paused', state.paused);
     $('pauseDot').className = 'dot ' + (state.paused ? 'warn' : 'ok');
     $('pauseText').textContent = state.paused ? '一時停止中' : '受け付け中';
+    const tile = (id, level, text) => {
+      $(id).querySelector('.dot').className = 'dot ' + level;
+      $(id).querySelector('b').textContent = text;
+    };
+    tile('tileTiktok', tiktok[0], $('tiktokText').textContent);
+    tile('tileMod', mod[0], mod[1]);
+    tile('tilePause', state.paused ? 'warn' : 'ok', state.paused ? '一時停止中' : '受け付け中');
     for (const key of ['received', 'sent', 'skipped', 'failed']) $(key).textContent = state.stats[key];
 
     if (document.activeElement !== $('username')) $('username').value = state.tiktokUsername;
@@ -1346,6 +1404,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   new ResizeObserver(keepLogAtEnd).observe($('log'));
 
   function addLog(entry) {
+    if (entry.level === 'gift' || entry.text.startsWith('  →')) return;
     const log = $('log');
     const li = document.createElement('li');
     const time = document.createElement('time');
@@ -1359,6 +1418,48 @@ export const PANEL_HTML = String.raw`<!doctype html>
     log.append(li);
     while (log.children.length > 300) log.firstChild.remove();
     if (followLog) log.scrollTop = log.scrollHeight;
+  }
+
+  // ---- 届いたものと出した妨害（新しい順） ----
+  const SKIP_SHORT = { no_rule: 'ルールがないので出さず', paused: '一時停止中なので出さず', cooldown: '待ち時間中なので出さず' };
+  function activityResult(a) {
+    if (a.status === 'pending') return 'マイクラを待っています…';
+    if (a.status === 'sent') return a.action;
+    if (a.status === 'failed') return '出せませんでした: ' + a.reason;
+    return SKIP_SHORT[a.status] ?? a.reason;
+  }
+  function feedItem(a, fresh) {
+    const time = el('time', '', new Date(a.time).toLocaleTimeString('ja-JP', { hour12: false }));
+    const who = a.who ? a.who + 'さん' : '誰か';
+    const src = el('div', 'feed-src');
+    if (a.kind === 'gift') src.append(giftIcon(a.giftImage || a.gift), el('b', '', who), el('span', 'muted', a.gift + ' ×' + a.count));
+    else if (a.kind === 'like') src.append(el('span', 'trigger-icon', '❤'), el('span', '', 'いいね ' + a.likes + '回'));
+    else if (a.kind === 'follow') src.append(el('span', 'trigger-icon', '＋'), el('b', '', who), el('span', 'muted', 'がフォロー'));
+    else if (a.kind === 'share') src.append(el('span', 'trigger-icon', '↗'), el('b', '', who), el('span', 'muted', 'がシェア'));
+    else src.append(el('span', 'trigger-icon', '●'), el('span', '', '配信者のボタン'));
+    if (a.test) src.append(el('span', 'rule-tag', 'テスト'));
+    const kind = a.status === 'sent' ? 'sent' : a.status === 'failed' ? 'failed' : 'skip';
+    // 結果が出たら、同じ行を書き換える
+    const res = el('div', 'feed-res ' + kind);
+    if (a.status === 'sent') res.append(mcIcon(a.icon, 20));
+    res.append(el('span', '', activityResult(a)));
+    if (a.random) res.append(el('span', 'rule-tag', 'ランダム'));
+    res.title = a.reason || '';
+    const li = el('li', fresh ? 'fresh' : '', time, src, el('span', 'feed-arrow', '→'), res);
+    li.dataset.id = a.id;
+    return li;
+  }
+  function addActivity(a, fresh) {
+    const old = $('feed').querySelector('li[data-id="' + a.id + '"]');
+    if (old) old.replaceWith(feedItem(a, false));
+    else $('feed').prepend(feedItem(a, fresh));
+    while ($('feed').children.length > 100) $('feed').lastChild.remove();
+    $('feedEmpty').hidden = true;
+    // ほかの画面からテストしたときは、どうなったかをお知らせで出す
+    if (fresh && a.test && a.status !== 'pending' && $('tabLive').hidden) {
+      const what = a.kind === 'gift' ? a.gift : a.kind === 'like' ? 'いいね ' + a.likes + '回' : a.kind === 'follow' ? 'フォロー' : 'シェア';
+      toast('テスト: ' + what + ' → ' + activityResult(a), a.status === 'failed' ? 'error' : 'ok');
+    }
   }
 
   // ---- お知らせ（右下に少しだけ出る。作業を止めない） ----
@@ -1657,6 +1758,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('rulesBadge').hidden = !value;
     $('saveRules').disabled = !value;
     $('revertRules').disabled = !value;
+    // 試すは保存したルールで動くので、変更があるあいだは押せなくする
+    document.querySelectorAll('.rule .try').forEach((b) => {
+      if (b.title !== 'このきっかけは試せません') b.disabled = value;
+      if (b.title !== 'このきっかけは試せません') b.title = value ? '「保存する」を押すと試せます' : 'このきっかけが届いたことにして、マイクラに出します';
+    });
   }
 
   function input(value, onInput, { list, ...attrs } = {}) {
@@ -1767,12 +1873,22 @@ export const PANEL_HTML = String.raw`<!doctype html>
       Number(row.cooldownSec) > 0 ? '待ち ' + row.cooldownSec + '秒' : '',
     ].filter(Boolean);
     const tag = tags.length ? el('span', 'rule-tag', tags.join('・')) : el('span');
+    // 試す: このルールのきっかけが届いたことにする（保存したルールで動くので、保存していない変更があるときは押せない）
+    const body = testBodyFor(row);
+    const tryIt = Object.assign(el('button', 'try', '▶ 試す'), { type: 'button' });
+    tryIt.disabled = !body || rulesDirty;
+    tryIt.title = !body ? 'このきっかけは試せません' : rulesDirty ? '「保存する」を押すと試せます' : 'このきっかけが届いたことにして、マイクラに出します';
+    tryIt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      post('/api/test', body, { button: tryIt });
+    });
+    tryIt.addEventListener('keydown', (e) => e.stopPropagation());
     const del = Object.assign(el('button', 'icon-only del', '✕'), { type: 'button', title: 'このルールを削除' });
     del.addEventListener('click', (e) => {
       e.stopPropagation();
       removeRow(i);
     });
-    line.append(triggerSummary(row), arrow, actionSummary(row), label, tag, del);
+    line.append(triggerSummary(row), arrow, actionSummary(row), label, tag, tryIt, del);
     line.addEventListener('click', () => openEditor(i));
     line.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -1783,11 +1899,20 @@ export const PANEL_HTML = String.raw`<!doctype html>
     return line;
   }
 
+  /** ルールのきっかけを、テスト送信の中身にする（ギフトIDのルールは試せない） */
+  function testBodyFor(row) {
+    if (row.trigger === 'gift' && row.value) return { kind: 'gift', giftName: row.value, count: 1 };
+    if (row.trigger === 'minDiamonds') return { kind: 'gift', giftName: row.value + 'コインのギフト', diamonds: Number(row.value), count: 1 };
+    if (row.trigger === 'likes') return { kind: 'like', count: Number(row.value) };
+    if (row.trigger === 'follow' || row.trigger === 'share') return { kind: row.trigger };
+    return null;
+  }
+
   function removeRow(i) {
     rows.splice(i, 1);
     setDirty(true);
     renderRows();
-    toast('ルールを削除しました。「元に戻す」で取り消せます');
+    toast('ルールを削除しました。「保存前に戻す」で取り消せます');
   }
 
   // ---- ルールを作る・変える窓 ----
@@ -1931,16 +2056,20 @@ export const PANEL_HTML = String.raw`<!doctype html>
     details.push(el('label', '', needsLabel ? '配信画面に出す文（必須）' : '配信画面に出す文', label));
     details.push(el('label', '', '待ち時間（続けて出さない）',
       numberField(row.cooldownSec, (v) => (row.cooldownSec = v), { min: 0, after: '秒', width: 60, label: '待ち時間（秒）' })));
+    $('editorDetails').replaceChildren(...details);
+    const conditions = [];
     // いつ出すか（埋め立ての状況で切り替える）
     const when = document.createElement('select');
     for (const [value, text] of WHEN_OPTIONS) when.append(Object.assign(document.createElement('option'), { value, textContent: text, selected: row.when === value }));
     when.addEventListener('change', () => (row.when = when.value));
-    details.push(el('label', '', 'いつ出すか', when));
+    conditions.push(el('label', '', 'いつ出すか', when));
     const round = numberField(row.minRound, (v) => (row.minRound = v), { min: 1, max: 99, after: 'ラウンド目から', width: 60, label: '何ラウンド目から' });
     Object.assign(round.querySelector('input'), { placeholder: '最初', disabled: !advanced });
-    details.push(el('label', '', '何ラウンド目から（空なら最初から）', round, ...plusNote()));
-    details.push(el('p', 'hint wide', '「いつ出すか」や「何ラウンド目から」を決めたルールは、それに合うときだけ使われ、同じきっかけの「いつでも」のルールより先になります（例: バラは普段ゾンビ、カウントダウン中だけ TNT）。埋め立てをしていないときは使われません。'));
-    $('editorDetails').replaceChildren(...details);
+    conditions.push(el('label', '', '何ラウンド目から（空なら最初から）', round, ...plusNote()));
+    const more = el('details', 'more-info wide', el('summary', '', '条件を決めたルールの使われ方'),
+      el('p', 'hint', '条件を決めたルールは、それに合うときだけ使われ、同じきっかけの「いつでも」のルールより先になります（例: バラは普段ゾンビ、カウントダウン中だけ TNT）。埋め立てをしていないときは使われません。'));
+    conditions.push(more);
+    $('editorConditions').replaceChildren(...conditions);
   }
 
   /** 決定する前に確かめる。@returns 問題があれば理由 */
@@ -2737,14 +2866,18 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   const events = new EventSource('/events');
   events.addEventListener('snapshot', (e) => {
-    const { state, logs } = JSON.parse(e.data);
+    const { state, logs, activity } = JSON.parse(e.data);
     $('log').replaceChildren();
     logs.forEach(addLog);
+    $('feed').replaceChildren();
+    (activity ?? []).forEach((a) => addActivity(a, false));
+    $('feedEmpty').hidden = $('feed').children.length > 0;
     renderState(state);
     $('offline').style.display = 'none';
   });
   events.addEventListener('state', (e) => renderState(JSON.parse(e.data)));
   events.addEventListener('log', (e) => addLog(JSON.parse(e.data)));
+  events.addEventListener('activity', (e) => addActivity(JSON.parse(e.data), true));
   events.addEventListener('error', () => ($('offline').style.display = 'block'));
 </script>
 </body>

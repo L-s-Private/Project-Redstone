@@ -445,3 +445,33 @@ test('販売を始めたら（組織 ID あり）、キーがなければ無料�
   assert.equal(engine.analyticsList().full, false);
   assert.equal(engine.historyList().full, false);
 });
+
+test('配信の画面用に、誰が何を送ってどうなったかを1件ずつ残す', async () => {
+  const { engine, client } = setup();
+  const seen = [];
+  engine.on('activity', (a) => seen.push(a));
+  await engine.handleEvent(rose);
+  await engine.handleEvent({ kind: 'gift', giftId: '9', giftName: 'Unknown', diamonds: 5, count: 1, from: 'はなこ', test: true });
+  client.status.connected = false;
+  client.send = async () => ({ ok: false, error: 'つながっていません' });
+  await engine.handleEvent(rose);
+  // 届いたとき（pending）と、結果が出たときの2回知らせる
+  assert.equal(seen.length, 6);
+  assert.equal(seen[0].status, 'pending');
+  assert.equal(seen[0].id, seen[1].id);
+  const finals = seen.filter((x) => x.status !== 'pending');
+  assert.deepEqual(engine.activity, finals);
+  seen.splice(0, seen.length, ...finals);
+  assert.equal(seen[0].who, 'たろう');
+  assert.equal(seen[0].gift, 'Rose');
+  assert.equal(seen[0].count, 3);
+  assert.equal(seen[0].status, 'sent');
+  assert.equal(seen[0].action, 'TNT ×6');
+  assert.equal(seen[0].icon, 'tnt');
+  assert.equal(seen[0].test, false);
+  assert.equal(seen[1].status, 'no_rule', 'ルールがないギフトは見送り');
+  assert.equal(seen[1].test, true, 'テスト送信には印');
+  assert.ok(seen[1].reason);
+  assert.equal(seen[2].status, 'failed');
+  assert.equal(seen[2].action, '');
+});

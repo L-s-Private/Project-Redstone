@@ -65,6 +65,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .brand-mark::after { content: ""; position: absolute; inset: 6px; border-radius: 2px; background: var(--bg); }
   .brand b { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
   nav { display: flex; flex-direction: column; gap: 2px; }
+  /* 使う場面ごとの小さな見出し */
+  .nav-group { padding: 12px 10px 4px; font-size: 12px; color: var(--faint); letter-spacing: .04em; }
+  .nav-group:first-child { padding-top: 0; }
+  .nav-gap { height: 12px; }
   nav button {
     justify-content: flex-start; gap: 10px; width: 100%; padding: 8px 10px;
     background: transparent; border-color: transparent; color: var(--muted); font-weight: 600;
@@ -485,6 +489,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     nav { flex-direction: row; flex-wrap: wrap; }
     nav button { width: auto; }
     nav button svg { display: none; }
+    .nav-group, .nav-gap { display: none; }
     .status { margin: 0; padding: 0; border: 0; flex-direction: row; gap: 14px; }
     .page-head, .page { padding-left: 16px; padding-right: 16px; }
   }
@@ -623,20 +628,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
 <aside>
   <div class="brand"><span class="brand-mark"></span><b>STATIC ARC</b></div>
   <nav>
+    <span class="nav-group">配信中</span>
     <button class="active" data-tab="tabLive">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M4.5 4.5a5 5 0 0 0 0 7M11.5 4.5a5 5 0 0 1 0 7M2.4 2.4a8 8 0 0 0 0 11.2M13.6 2.4a8 8 0 0 1 0 11.2"/></svg>配信</button>
     <button data-tab="tabFill">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 14 5v6l-6 3.2L2 11V5z"/><path d="M2 5l6 3.2L14 5M8 8.2v6"/></svg>埋め立て</button>
+    <span class="nav-group">準備</span>
     <button data-tab="tabRules">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>妨害の設定<span class="badge" id="rulesBadge" title="保存していない変更があります" hidden></span></button>
     <button data-tab="tabOverlay">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="4" y="1.5" width="8" height="13" rx="1.5"/><path d="M6 5h4M6 7.5h2.5"/></svg>配信画面</button>
-    <button data-tab="tabStats">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 14h12M4 11V8M8 11V3M12 11V6"/></svg>分析</button>
     <button data-tab="tabDebug">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 1.8h4M6.8 1.8v4.4L2.6 13a.8.8 0 0 0 .7 1.2h9.4a.8.8 0 0 0 .7-1.2L9.2 6.2V1.8"/><path d="M4.4 10h7.2"/></svg>テスト</button>
     <button data-tab="tabSetup">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 1.5v3M10 1.5v3M4 4.5h8v3a4 4 0 0 1-8 0zM8 11.5v3"/></svg>接続と準備</button>
+    <span class="nav-group">ふり返り</span>
+    <button data-tab="tabStats">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 14h12M4 11V8M8 11V3M12 11V6"/></svg>分析</button>
+    <span class="nav-gap"></span>
     <button data-tab="tabPlan">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4.5 2h7L14.5 6 8 14 1.5 6z"/><path d="M1.5 6h13M6 2 5.5 6 8 14l2.5-8L10 2"/></svg>有料版</button>
   </nav>

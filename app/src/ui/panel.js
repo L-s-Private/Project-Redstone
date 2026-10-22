@@ -57,7 +57,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   /* ---- 左のメニュー ---- */
   body > aside {
     grid-row: 1; grid-column: 1;
-    display: flex; flex-direction: column; min-height: 0;
+    display: flex; flex-direction: column; min-height: 0; overflow-y: auto;
     background: var(--sidebar); border-right: 1px solid var(--line-soft); padding: 16px 10px 12px;
   }
   .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 18px; }
@@ -77,6 +77,14 @@ export const PANEL_HTML = String.raw`<!doctype html>
   nav button:hover { background: var(--surface); color: var(--text); }
   nav button.active { background: var(--raised); color: var(--text); }
   .status { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px; }
+  /* 低いウィンドウ（ノートの拡大150%など）でも、左下の接続状態まで見えるように詰める */
+  @media (max-height: 720px) {
+    .brand { padding-bottom: 10px; }
+    .nav-group { padding: 6px 10px 2px; }
+    .nav-gap { height: 6px; }
+    nav button { padding: 5px 10px; }
+    .status { padding-top: 8px; gap: 4px; }
+  }
   /* 接続状態: 1行目に名前、2行目にいまの状態 */
   .chip { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; column-gap: 9px; font-size: 13px; color: var(--muted); }
   .chip span:last-child { grid-column: 2; color: var(--text); line-height: 1.5; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -98,6 +106,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .page-head h1 { font-size: 17px; font-weight: 700; margin: 0 auto 0 0; }
   .page { display: flex; flex-direction: column; gap: 16px; padding: 24px 28px 28px; flex: 1; min-height: 0; width: 100%; }
+  /* 広い画面でも中身は 1600px まで（目が左右に行き来しすぎないように）。見出しと中身は同じ幅で真ん中に */
+  .page-head, .page { padding-left: max(28px, calc((100% - 1600px) / 2)); padding-right: max(28px, calc((100% - 1600px) / 2)); }
   .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: stretch; }
   /*
    * 画面の並べ方の決まり
@@ -432,7 +442,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
   /* ---- 配信画面（オーバーレイ） ---- */
   /* 部品の一覧（押すと右の試し表示が切り替わる） */
   .widget-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
-  @media (max-width: 1200px) { .widget-list { grid-template-columns: minmax(0, 1fr); } }
+  /* 2列だとリンクの最後（どの部品か）が切れるので、広い画面だけ2列 */
+  @media (max-width: 1440px) { .widget-list { grid-template-columns: minmax(0, 1fr); } }
   .widget { display: flex; flex-direction: column; gap: 10px; cursor: pointer; }
   .widget:hover { border-color: var(--line); }
   .widget.selected { border-color: var(--text); }
@@ -602,6 +613,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .stream-detail { display: flex; flex-direction: column; gap: 16px; }
   .detail-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
   .key-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* 幅が狭いと大きな数どうしがくっつくので 2×2 にする */
+  .stream-detail > .card:first-child { container-type: inline-size; }
+  @container (max-width: 620px) {
+    .key-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+    .key-stats .stat:nth-child(3) { border-left: 0; }
+  }
   .key-stats .stat b.warn { color: var(--warn); }
   .key-stats .stat b.bad { color: var(--bad); }
   .sub-stats { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -1573,6 +1590,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   $('toggle').addEventListener('click', () => post(state?.paused ? '/api/resume' : '/api/pause', {}, { button: $('toggle') }));
   $('stop').addEventListener('click', () => post('/api/stop', {}, { button: $('stop'), done: '妨害を止めて、一時停止しました' }));
+  // TikTok ID は24文字まで。先頭の @ は外してから数える（貼り付けた「@id」の最後が切れないように）
+  for (const id of ['username', 'wizUsername']) {
+    $(id).addEventListener('input', () => {
+      const value = $(id).value.replace(/^@+/, '').slice(0, 24);
+      if (value !== $(id).value) $(id).value = value;
+    });
+  }
   $('tiktokForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const button = e.submitter ?? $('tiktokForm').querySelector('button');

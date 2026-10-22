@@ -62,9 +62,9 @@ test('ランキングは配信ごと: 違う配信につながったら0から�
   assert.deepEqual(new Ranking({ roomId: 3, coins: [['', 5], ['b', 'x'], ['c', 2]] }).toJSON(), { roomId: '', coins: [['c', 2]] });
 });
 
-test('ギフト表: ランダムは候補を並べ、条件は短い文で出す', () => {
+test('ギフト表: ランダムは候補を並べ、条件は出さない', () => {
   const [row] = giftTable([{ gift: 'バラ', action: 'random', choices: [{ action: 'tnt', count: 2 }, { action: 'mob', mob: 'pig' }], when: 'countdown', minRound: 2 }], find, describeAction);
   assert.equal(row.action, 'TNT・ブタ', 'カードに収まるよう名前だけ');
   assert.equal(row.icon, 'tnt');
-  assert.equal(row.when, '2ラウンド目から・カウントダウン中・ランダム');
+  assert.equal(row.when, undefined, '小さすぎて読めないので出さない');
 });

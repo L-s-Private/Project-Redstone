@@ -2,7 +2,7 @@
 // オーバーレイ（LIVE Studio に貼る URL）は同じサーバーから出す。
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, screen, shell } from 'electron';
 import { startApp } from '../src/app.js';
 import { ConfigError } from '../src/config.js';
 
@@ -38,11 +38,17 @@ if (!app.requestSingleInstanceLock()) {
       return;
     }
 
+    // いちばん多い画面（1920×1080。ノートの拡大125%なら 1536×864 相当）に合わせて、1280×800 で開く。
+    // 小さい画面では、はみ出さないように縮める。いちばん小さくて 960×600（1920 の画面の半分に置ける大きさ）
+    const area = screen.getPrimaryDisplay().workAreaSize;
+    const fit = (size, room) => Math.min(size, Math.round(room * 0.92));
     window = new BrowserWindow({
-      width: 1280,
-      height: 880,
-      minWidth: 720,
-      minHeight: 560,
+      width: fit(1280, area.width),
+      height: fit(800, area.height),
+      minWidth: fit(960, area.width),
+      minHeight: fit(600, area.height),
+      useContentSize: true,
+      center: true,
       title: 'STATIC ARC',
       backgroundColor: '#14161a',
       autoHideMenuBar: true,

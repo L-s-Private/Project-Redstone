@@ -285,7 +285,6 @@ const GIFTS = page({
   .tile .mc { --s: calc(var(--t) * .24); }
   .tile .action { width: 100%; font-size: calc(var(--t) * .115); line-height: 1.15; color: var(--ov-text); margin-top: calc(var(--t) * .02); }
   /* 条件のあるルール（カウントダウン中だけ など） */
-  .tile .when { width: 100%; font-size: calc(var(--t) * .08); line-height: 1.2; color: var(--ov-accent); font-weight: 700; }
   #dots { display: flex; justify-content: center; gap: calc(.8 * var(--u)); margin-top: calc(1 * var(--u)); }
   #dots:empty { display: none; }
   #dots i { width: calc(.9 * var(--u)); height: calc(.9 * var(--u)); border-radius: 50%; background: rgba(255, 255, 255, .25); }
@@ -309,7 +308,6 @@ const GIFTS = page({
   let current = 0;
   function tile(r) {
     const action = el('div', '', mcIcon(r.icon), el('div', 'action clamp2 fit', r.action));
-    if (r.when) action.prepend(el('div', 'when ellipsis fit', r.when));
     // ギフトは絵だけ（絵がないギフトだけ名前を出す）。コイン数・いいね・フォローは印＋文字
     if (r.trigger === 'gift' && r.image) return el('div', 'tile gift', el('div', '', giftPicture(r.image, '🎁')), el('span', 'arrow', '▼'), action);
     const label = el('div', 'label ellipsis fit', r.label);

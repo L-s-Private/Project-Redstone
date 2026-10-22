@@ -27,13 +27,11 @@ export function giftTable(rules, findGift, describe) {
     });
     const first = choices[0];
     const random = rule.action === RANDOM_ACTION;
-    // ランダムはカードに収まるよう、数を外して名前だけ並べる（「ランダム」は条件と同じ小さい行に出す）
+    // ランダムはカードに収まるよう、数を外して名前だけ並べる。条件（何ラウンド目から など）は小さすぎて読めないので出さない
     const row = {
       action: random ? names.map((name) => name.replace(/ ×?\d.*$/, '')).join('・') : names[0],
       icon: first.action === 'mob' ? (first.mob ?? 'zombie') : first.action,
     };
-    const when = [conditionText(rule), random ? 'ランダム' : ''].filter(Boolean).join('・');
-    if (when) row.when = when;
     if (rule.gift !== undefined) {
       const gift = findGift(rule.gift);
       Object.assign(row, { trigger: 'gift', label: gift?.nameJa ?? rule.gift, coins: gift?.diamonds ?? null, image: gift?.image ?? '' });

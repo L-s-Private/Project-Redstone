@@ -83,11 +83,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .version { color: var(--faint); font-size: 12px; }
 
   /* ---- 右の画面 ---- */
-  main { grid-row: 1; grid-column: 2; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+  /* スクロールバーの場所はいつも空けておく（画面によってヘッダーの幅が変わらないように） */
+  main { grid-row: 1; grid-column: 2; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
   .page-head {
     position: sticky; top: 0; z-index: 5;
     display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-    padding: 14px 28px; min-height: 64px; background: rgba(10, 10, 10, .9); backdrop-filter: blur(8px);
+    /* 大きいボタンがあってもなくても同じ高さ（画面を移ったときに見出しが上下しないように） */
+    padding: 14px 28px; min-height: 70px; background: rgba(10, 10, 10, .9); backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line-soft);
   }
   .page-head h1 { font-size: 17px; font-weight: 700; margin: 0 auto 0 0; }

@@ -24,8 +24,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     --line: #262626;
     --line-soft: #1b1b1b;
     --text: #ededed;
-    --muted: #8a8a8a;
-    --faint: #565656;
+    --muted: #a6a6a6;
+    /* 補足の文字。背景との差が足りるよう、前より明るくした */
+    --faint: #808080;
     --invert-bg: #ededed;
     --invert-text: #0a0a0a;
     --ok: #5fb97f;
@@ -45,7 +46,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     margin: 0; overflow: hidden;
     display: grid; grid-template-columns: 216px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
     background: var(--bg); color: var(--text);
-    font: 13px/1.6 "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    font: 14px/1.65 "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
     font-feature-settings: "palt";
     -webkit-font-smoothing: antialiased;
   }
@@ -73,13 +74,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   nav button.active { background: var(--raised); color: var(--text); }
   .status { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px; }
   /* 接続状態: 1行目に名前、2行目にいまの状態 */
-  .chip { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; column-gap: 9px; font-size: 12px; color: var(--muted); }
+  .chip { display: grid; grid-template-columns: 7px minmax(0, 1fr); align-items: center; column-gap: 9px; font-size: 13px; color: var(--muted); }
   .chip span:last-child { grid-column: 2; color: var(--text); line-height: 1.5; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
   .dot.ok { background: var(--ok); }
   .dot.warn { background: var(--warn); }
   .dot.bad { background: var(--bad); }
-  .version { color: var(--faint); font-size: 11px; }
+  .version { color: var(--faint); font-size: 12px; }
 
   /* ---- 右の画面 ---- */
   main { grid-row: 1; grid-column: 2; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
@@ -92,12 +93,38 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .page-head h1 { font-size: 17px; font-weight: 700; margin: 0 auto 0 0; }
   .page { display: flex; flex-direction: column; gap: 16px; padding: 24px 28px 28px; flex: 1; min-height: 0; width: 100%; }
   .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: stretch; }
-  /* 設定の画面は横に広げすぎない（名前と入力欄が離れないように） */
-  .page.narrow { max-width: 960px; }
-  .stack { display: flex; flex-direction: column; gap: 16px; }
+  /*
+   * 画面の並べ方の決まり
+   * - 一覧や状況を見る画面: 全幅
+   * - 設定する画面: .split（左に設定、右に図や補足。右は画面を動かしてもついてくる）
+   */
+  .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: 16px; align-items: start; }
+  .split-side { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  @media (max-width: 980px) {
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .split-side { position: static; }
+  }
+  /* くわしい説明は、開いたときだけ */
+  details.more-info { border-top: 1px solid var(--line-soft); margin-top: 14px; padding-top: 10px; }
+  details.more-info summary { color: var(--muted); font-size: 13px; }
+  details.more-info summary:hover { color: var(--text); }
+  details.more-info > :not(summary) { margin-top: 8px; }
+  details.more-info ul { margin: 8px 0 0; padding-left: 20px; color: var(--muted); font-size: 13px; line-height: 1.8; }
+  /* どの画面でも上に出す注意（マイクラにつながっていない、など） */
+  .alert-bar { display: flex; flex-direction: column; gap: 8px; }
+  .alert { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid; font-weight: 600; }
+  .alert span { flex: 1; min-width: 0; }
+  .alert.warn { border-color: var(--warn); color: var(--warn); }
+  .alert.bad { border-color: var(--bad); color: var(--bad); background: rgba(216, 92, 85, .08); }
+  .alert button { flex: none; }
+  /* 埋め立ての枠の図 */
+  .frame-figure svg { display: block; width: 100%; height: auto; }
+  .frame-size { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+  .frame-size b { color: var(--text); font-variant-numeric: tabular-nums; }
   .card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 18px 20px; }
   .card h2 { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
-  .card .lead { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+  .card .lead { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
   .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
   .card-head h2 { margin: 0 auto 0 0; }
 
@@ -117,7 +144,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .danger { background: var(--stop); border-color: var(--stop); color: #fff; font-weight: 700; }
   .danger:hover { background: #962e28; }
   .lg { padding: 9px 18px; font-size: 13px; }
-  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   input, select {
     font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
     border-radius: var(--radius-sm); padding: 6px 10px; max-width: 100%; height: 32px;
@@ -130,11 +157,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .row { display: flex; gap: 8px; }
   .row > * { min-width: 0; }
   .row > button { flex: none; }
-  .hint { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 10px 0 0; max-width: 72ch; }
+  .hint { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 10px 0 0; max-width: 72ch; }
   .quick { display: flex; flex-wrap: wrap; gap: 6px; }
   .quick + .quick { margin-top: 6px; }
-  code { flex: 1; background: var(--bg); border: 1px solid var(--line); padding: 6px 10px; border-radius: var(--radius-sm); font-size: 12px; color: var(--muted); word-break: break-all; }
-  .group-label { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+  code { flex: 1; background: var(--bg); border: 1px solid var(--line); padding: 6px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--muted); word-break: break-all; }
+  .group-label { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
 
   /* ---- 配信 ---- */
   #toggle.paused { background: var(--invert-bg); color: var(--invert-text); border-color: var(--invert-bg); }
@@ -142,7 +169,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); }
   .stat { padding: 2px 16px; }
   .stat + .stat { border-left: 1px solid var(--line); }
-  .stat small { display: block; color: var(--muted); font-size: 12px; }
+  .stat small { display: block; color: var(--muted); font-size: 13px; }
   .stat b { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.3; }
   .log-card { display: flex; flex-direction: column; flex: 1; min-height: 280px; }
   #log { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto; font-variant-numeric: tabular-nums; }
@@ -156,7 +183,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   /* 埋め立ての状況（配信中にいちばん見るところなので大きく） */
   .fill-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
-  .fill-round small, .fill-pct small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .fill-round small, .fill-pct small { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
   .fill-round b, .fill-pct b {
     display: block; font-family: "Segoe UI Variable Display", "Segoe UI", "Yu Gothic UI", sans-serif;
     font-weight: 600; font-size: 52px; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums;
@@ -169,7 +196,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .fill-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
   .fill-phase { font-weight: 700; }
   .fill-phase.countdown, .fill-phase.cleared { color: var(--ok); }
-  .fill-detail { color: var(--muted); font-size: 12px; }
+  .fill-detail { color: var(--muted); font-size: 13px; }
   .fill-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
   .empty { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--muted); }
 
@@ -178,7 +205,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .fields select { width: 100%; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; }
   .tiles button {
-    flex-direction: column; gap: 8px; padding: 12px 4px 9px; font-size: 11px;
+    flex-direction: column; gap: 8px; padding: 12px 4px 9px; font-size: 12px;
     color: var(--muted); background: var(--bg); border-color: var(--line-soft);
   }
   .tiles button:hover { background: var(--raised); color: var(--text); }
@@ -191,7 +218,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .setting.tall { align-items: start; }
   .setting-text label { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
-  .setting-text small { display: block; margin-top: 2px; font-size: 12px; color: var(--faint); }
+  .setting-text small { display: block; margin-top: 2px; font-size: 13px; color: var(--faint); }
   .setting-control { display: flex; justify-content: flex-end; min-width: 0; }
   .setting-control select { width: 100%; }
   .setting-control .tiles { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -206,7 +233,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .stepper button:hover { background: var(--raised); color: var(--text); }
   .stepper input { width: 64px; height: 100%; padding: 0 4px; border: 0; border-radius: 0; background: transparent; text-align: right; -moz-appearance: textfield; }
   .stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  .stepper .unit { min-width: 2.6em; padding: 0 8px 0 3px; color: var(--muted); font-size: 12px; }
+  .stepper .unit { min-width: 2.6em; padding: 0 8px 0 3px; color: var(--muted); font-size: 13px; }
   @media (max-width: 720px) {
     .setting { grid-template-columns: minmax(0, 1fr); }
     .setting-control { justify-content: flex-start; }
@@ -222,12 +249,12 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .checks .mark { width: 14px; flex: none; text-align: center; font-weight: 700; }
   .checks .yes .mark { color: var(--muted); }
   .checks .no .mark { color: var(--bad); }
-  .checks small { color: var(--faint); display: block; font-size: 11px; word-break: break-all; }
-  .ready { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); font-size: 12px; }
+  .checks small { color: var(--faint); display: block; font-size: 12px; word-break: break-all; }
+  .ready { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); font-size: 13px; }
 
   /* ---- 妨害の設定 ---- */
   .count { color: var(--faint); font-weight: 600; margin-left: 4px; }
-  .icon-only { padding: 4px 8px; background: transparent; border-color: transparent; color: var(--muted); font-size: 12px; }
+  .icon-only { padding: 4px 8px; background: transparent; border-color: transparent; color: var(--muted); font-size: 13px; }
   .icon-only:hover { background: var(--raised); color: var(--text); }
   .icon-only:disabled { opacity: .2; }
   /* プリセット */
@@ -238,9 +265,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .preset:hover { background: var(--raised); border-color: var(--line); }
   .preset b { font-size: 13px; }
-  .preset small { color: var(--faint); font-size: 11px; font-weight: 400; }
+  .preset small { color: var(--faint); font-size: 12px; font-weight: 400; }
   .preset.current { border-color: var(--text); background: var(--raised); }
-  .preset .in-use { position: absolute; top: 8px; right: 10px; font-size: 10px; color: var(--ok); font-weight: 700; }
+  .preset .in-use { position: absolute; top: 8px; right: 10px; font-size: 11px; color: var(--ok); font-weight: 700; }
   .preset-mine { display: inline-flex; align-items: stretch; }
   .preset-mine .preset { border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .preset-mine .del { border: 1px solid var(--line-soft); border-left: 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 0 9px; }
@@ -252,10 +279,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .rule-group { margin-top: 18px; }
   .rule-group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
   .rule-group-head h3 { font-size: 13px; margin: 0; }
-  .rule-group-head p { margin: 0 auto 0 0; color: var(--faint); font-size: 11px; }
-  .rule-group-head button { padding: 3px 10px; font-size: 12px; }
+  .rule-group-head p { margin: 0 auto 0 0; color: var(--faint); font-size: 12px; }
+  .rule-group-head button { padding: 3px 10px; font-size: 13px; }
   .rule-rows { display: flex; flex-direction: column; gap: 6px; }
-  .rule-none { color: var(--faint); font-size: 12px; padding: 10px 14px; border: 1px dashed var(--line-soft); border-radius: var(--radius); }
+  .rule-none { color: var(--faint); font-size: 13px; padding: 10px 14px; border: 1px dashed var(--line-soft); border-radius: var(--radius); }
   .rule {
     display: grid; align-items: center; column-gap: 12px; width: 100%; text-align: left;
     grid-template-columns: minmax(170px, 1.1fr) 14px minmax(170px, 1.1fr) minmax(0, 1fr) auto 30px;
@@ -270,9 +297,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .rule-when .unknown { color: var(--warn); }
   .rule-arrow { color: var(--faint); display: flex; justify-content: center; }
   .rule-arrow svg { width: 14px; height: 14px; }
-  .rule-label { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .rule-label { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .rule-label.empty { color: var(--faint); }
-  .rule-tag { font-size: 11px; color: var(--faint); border: 1px solid var(--line-soft); border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
+  .rule-tag { font-size: 12px; color: var(--faint); border: 1px solid var(--line-soft); border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
   .rule .del { padding: 4px 6px; }
   .rule .del:hover { color: var(--bad); }
   .trigger-icon { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 6px; background: var(--raised); font-size: 13px; }
@@ -282,26 +309,26 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .rule-list { container: rules / inline-size; }
   input.invalid { border-color: var(--warn); }
-  .num-field { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .num-field { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; white-space: nowrap; }
   .num-field .affix { color: var(--muted); }
   /* ギフトを選ぶボタン */
   .gift-pick { gap: 8px; height: 32px; padding: 3px 10px 3px 6px; background: var(--bg); max-width: 100%; min-width: 0; }
   .gift-pick .gift-img { width: 22px; height: 22px; }
   .gift-pick-name { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
   .gift-pick small { color: var(--faint); font-variant-numeric: tabular-nums; }
-  .gift-pick .caret { color: var(--faint); font-size: 10px; }
+  .gift-pick .caret { color: var(--faint); font-size: 11px; }
   .gift-pick.unknown { border-color: var(--warn); }
   .gift-pick.unset { border-style: dashed; color: var(--warn); border-color: var(--warn); padding-left: 10px; }
-  .dirty { color: var(--warn); font-size: 12px; }
+  .dirty { color: var(--warn); font-size: 13px; }
   /* 最近届いたギフト（横1列。押すとルールを作る） */
   .recent-strip {
     display: flex; align-items: center; gap: 14px; min-width: 0;
     padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--surface);
   }
-  .recent-title { font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .recent-title { font-size: 13px; font-weight: 700; white-space: nowrap; }
   .recent { display: flex; gap: 6px; overflow-x: auto; min-width: 0; padding: 2px 0; }
-  .recent button { flex: none; padding: 3px 10px 3px 6px; font-size: 12px; }
-  .recent-empty { color: var(--faint); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent button { flex: none; padding: 3px 10px 3px 6px; font-size: 13px; }
+  .recent-empty { color: var(--faint); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* ルールを作る・変える窓 */
   #ruleEditor { width: min(780px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; }
   #ruleEditor[open] { display: flex; flex-direction: column; }
@@ -309,38 +336,38 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .editor-foot { display: flex; align-items: center; gap: 8px; padding: 14px 26px; border-top: 1px solid var(--line-soft); }
   .editor-foot .grow { flex: 1; }
   .editor-step { margin-bottom: 18px; }
-  .editor-step > h3 { font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
+  .editor-step > h3 { font-size: 13px; font-weight: 700; color: var(--muted); margin: 0 0 8px; }
   .editor-step > h3 b { color: var(--text); margin-right: 6px; }
   .segmented { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 10px; }
   .segmented button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 6px 14px; }
   .segmented button + button { border-left: 1px solid var(--line); }
   .segmented button.selected { background: var(--invert-bg); color: var(--invert-text); font-weight: 700; }
-  .trigger-value { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--muted); font-size: 12px; }
+  .trigger-value { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--muted); font-size: 13px; }
   .action-group { margin-bottom: 10px; }
-  .action-group > span { display: block; font-size: 11px; color: var(--faint); margin-bottom: 5px; }
+  .action-group > span { display: block; font-size: 12px; color: var(--faint); margin-bottom: 5px; }
   .action-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 5px; }
   .action-tiles button {
-    justify-content: flex-start; gap: 8px; padding: 5px 8px; font-size: 12px; font-weight: 600;
+    justify-content: flex-start; gap: 8px; padding: 5px 8px; font-size: 13px; font-weight: 600;
     background: var(--bg); border-color: var(--line-soft); color: var(--muted); height: 36px;
   }
   .action-tiles button:hover { background: var(--raised); color: var(--text); }
   .action-tiles button.selected { border-color: var(--text); color: var(--text); background: var(--raised); }
   .action-tiles .mc { --s: 20px; }
-  .action-desc { margin: 4px 0 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 12px; }
+  .action-desc { margin: 4px 0 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg); color: var(--muted); font-size: 13px; }
   .editor-details { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: end; }
-  .editor-details label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--faint); min-width: 0; }
+  .editor-details label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--faint); min-width: 0; }
   .editor-details label input:not([type=number]) { width: 100%; }
   .editor-details .wide { grid-column: 1 / -1; }
   .choices { display: flex; flex-direction: column; gap: 6px; }
   .choice { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); }
-  .choice .name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12px; color: var(--text); min-width: 120px; }
+  .choice .name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--text); min-width: 120px; }
   .choice .mc { --s: 20px; }
-  .choice .odds { margin-left: auto; color: var(--faint); font-size: 11px; white-space: nowrap; }
-  .editor-details .check-line { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; font-size: 12px; color: var(--muted); }
+  .choice .odds { margin-left: auto; color: var(--faint); font-size: 12px; white-space: nowrap; }
+  .editor-details .check-line { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; font-size: 13px; color: var(--muted); }
   .editor-details label.check-line input[type=checkbox] { width: 16px; height: 16px; flex: none; margin: 0; }
   .action-tiles button:disabled { opacity: .35; cursor: not-allowed; }
-  .plus-note { font-size: 11px; color: var(--faint); }
-  .form-error { color: var(--warn); font-size: 12px; margin: 0; }
+  .plus-note { font-size: 12px; color: var(--faint); }
+  .form-error { color: var(--warn); font-size: 13px; margin: 0; }
 
   /* ---- 配信画面（オーバーレイ） ---- */
   .widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: stretch; }
@@ -355,11 +382,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .widget .preview { position: relative; width: min(100%, calc(198px * var(--ratio))); aspect-ratio: var(--ratio); }
   .widget .card-head { margin: 0; }
   .widget .card-head h2 { margin-right: auto; }
-  .widget .card-head button { padding: 3px 10px; font-size: 12px; }
+  .widget .card-head button { padding: 3px 10px; font-size: 13px; }
   .widget .url { margin-top: auto; }
   /* 見た目の設定（色・面と文字・ギフト通知の3つに分ける） */
   .style-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; }
-  .style-group h3 { margin: 0 0 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .style-group h3 { margin: 0 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
   .style-group .setting { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 0; }
   @media (max-width: 1100px) { .style-groups { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
   .swatch { display: inline-flex; align-items: center; gap: 8px; }
@@ -367,18 +394,18 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .swatch code { flex: none; width: 6.5em; padding: 5px 0; text-align: center; font-variant-numeric: tabular-nums; }
   .range { display: inline-flex; align-items: center; gap: 10px; }
   .range input[type="range"] { width: 150px; height: auto; padding: 0; border: 0; background: none; accent-color: var(--text); }
-  .range output { width: 3.4em; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .range output { width: 3.4em; text-align: right; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
   /* 部品は明るい配色の前提のページなので、枠も同じにしないと白い背景が塗られる（本番の LIVE Studio では透明） */
   .widget .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; color-scheme: normal; }
   .widget h2 { margin: 0; }
   .widget .lead { margin: 0; }
   .widget .url { display: flex; gap: 8px; align-items: center; min-width: 0; }
   .widget .url code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .widget .size { color: var(--faint); font-size: 12px; }
+  .widget .size { color: var(--faint); font-size: 13px; }
 
   /* ---- テスト ---- */
-  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-  details pre { margin: 10px 0 0; font-size: 11px; white-space: pre-wrap; color: var(--muted); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details pre { margin: 10px 0 0; font-size: 12px; white-space: pre-wrap; color: var(--muted); }
 
   /* ---- ダイアログ ---- */
   dialog {
@@ -387,7 +414,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   dialog::backdrop { background: rgba(0, 0, 0, .75); }
   dialog h2 { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
-  .steps { color: var(--faint); font-size: 12px; margin-bottom: 18px; }
+  .steps { color: var(--faint); font-size: 13px; margin-bottom: 18px; }
   .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 24px; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
@@ -431,7 +458,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   #giftPicker { width: min(780px, calc(100vw - 32px)); }
   .gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; max-height: 60vh; overflow-y: auto; margin-top: 14px; padding-right: 4px; }
   .gift-grid button {
-    flex-direction: column; gap: 2px; padding: 10px 4px; white-space: normal; font-size: 12px; line-height: 1.35;
+    flex-direction: column; gap: 2px; padding: 10px 4px; white-space: normal; font-size: 13px; line-height: 1.35;
     background: var(--bg); border-color: var(--line-soft);
   }
   .gift-grid button:hover { background: var(--raised); border-color: var(--line); }
@@ -446,7 +473,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .plan-hero .lead { margin-bottom: 14px; }
   .plan-terms {
     margin: 0; padding-left: 24px; border-left: 1px solid var(--line-soft); align-content: start;
-    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; font-size: 12px; color: var(--muted);
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; font-size: 13px; color: var(--muted);
   }
   .plan-terms dt { color: var(--text); white-space: nowrap; }
   .plan-terms dd { margin: 0; }
@@ -454,19 +481,19 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .plan-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .feature { display: flex; flex-direction: column; gap: 8px; }
   .feature h3 { margin: 0; font-size: 14px; }
-  .feature p { margin: 0; color: var(--muted); font-size: 12px; }
-  .feature .free-note { color: var(--faint); font-size: 11px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 13px; }
+  .feature .free-note { color: var(--faint); font-size: 12px; }
   .feature button { margin-top: auto; align-self: flex-start; }
   .plan-numbers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .plan-numbers .card { display: flex; flex-direction: column; gap: 2px; }
   .plan-numbers b { font-size: 22px; font-weight: 600; line-height: 1.3; }
-  .plan-numbers span { color: var(--muted); font-size: 12px; }
+  .plan-numbers span { color: var(--muted); font-size: 13px; }
   .compare { width: 100%; border-collapse: collapse; }
   .compare th, .compare td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
   .compare tr:last-child th, .compare tr:last-child td { border-bottom: 0; }
-  .compare thead th { font-size: 11px; font-weight: 400; color: var(--faint); border-bottom-color: var(--line); }
+  .compare thead th { font-size: 12px; font-weight: 400; color: var(--faint); border-bottom-color: var(--line); }
   .compare tbody th { font-weight: 400; color: var(--muted); }
-  .compare td { white-space: nowrap; }
+  .compare td { white-space: nowrap; width: 22%; }
   .compare td.plus { color: var(--text); font-weight: 600; }
   .compare td.none { color: var(--faint); }
   @media (max-width: 1000px) {
@@ -476,9 +503,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
 
   /* ---- プラン（販売を始めるまでは出さない） ---- */
-  .plan-badge { font-size: 11px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 10px; color: var(--muted); }
+  .plan-badge { font-size: 12px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 10px; color: var(--muted); }
   .plan-badge.plus { color: var(--text); border-color: var(--text); }
-  .plan-chip { margin-top: 6px; align-self: flex-start; font-size: 11px; padding: 2px 10px; height: auto; color: var(--muted); background: transparent; border-color: var(--line); }
+  .plan-chip { margin-top: 6px; align-self: flex-start; font-size: 12px; padding: 2px 10px; height: auto; color: var(--muted); background: transparent; border-color: var(--line); }
   .plan-chip.plus { color: var(--text); }
   .plus-link { margin-left: 6px; padding: 0; height: auto; border: 0; background: none; color: var(--text); text-decoration: underline; font-size: inherit; }
 
@@ -488,15 +515,15 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .history-list > li:last-child { border-bottom: 0; }
   .history-head { display: flex; align-items: center; gap: 10px; }
   .history-head b { font-variant-numeric: tabular-nums; }
-  .history-head .grow { flex: 1; color: var(--muted); font-size: 12px; }
-  .history-head .now { font-size: 11px; color: var(--faint); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
-  .history-diff { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--muted); }
+  .history-head .grow { flex: 1; color: var(--muted); font-size: 13px; }
+  .history-head .now { font-size: 12px; color: var(--faint); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
+  .history-diff { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; color: var(--muted); }
   .history-diff li { padding: 1px 0; overflow-wrap: anywhere; }
   .history-diff .mark { display: inline-block; width: 3.4em; color: var(--faint); }
 
   /* ---- 分析 ---- */
   .stream-list { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  .stream-list th { text-align: right; font-weight: 400; font-size: 11px; color: var(--faint); padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .stream-list th { text-align: right; font-weight: 400; font-size: 12px; color: var(--faint); padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   .stream-list td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
   .stream-list th:first-child, .stream-list td:first-child { text-align: left; }
   .stream-list tbody tr { cursor: pointer; }
@@ -507,9 +534,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
   @media (max-width: 900px) { .detail-lists { grid-template-columns: minmax(0, 1fr); } }
   .stats.wide { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); row-gap: 12px; }
   .chart { position: relative; margin-bottom: 14px; }
-  .chart-title { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .chart-title { margin: 10px 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
   .chart svg { display: block; width: 100%; height: 140px; overflow: visible; }
-  .chart .axis { fill: var(--faint); font-size: 10px; }
+  .chart .axis { fill: var(--faint); font-size: 11px; }
   .chart .grid { stroke: var(--line-soft); stroke-width: 1; }
   .chart .base { stroke: var(--line); stroke-width: 1; }
   .chart .bar { fill: var(--data); }
@@ -517,7 +544,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .chart .cursor { stroke: var(--muted); stroke-width: 1; }
   .chart .tip {
     position: absolute; top: 0; pointer-events: none; transform: translateX(-50%);
-    background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; white-space: nowrap;
+    background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 13px; white-space: nowrap;
   }
   .chart .tip small { color: var(--muted); margin-right: 6px; }
   .rank-list { list-style: none; margin: 0; padding: 0; font-variant-numeric: tabular-nums; }
@@ -550,6 +577,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <button data-tab="tabPlan">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4.5 2h7L14.5 6 8 14 1.5 6z"/><path d="M1.5 6h13M6 2 5.5 6 8 14l2.5-8L10 2"/></svg>有料版</button>
   </nav>
+  <div class="alert-bar" id="alertBar" hidden></div>
   <div class="status">
     <span class="chip"><span class="dot" id="pauseDot"></span>妨害<span id="pauseText">—</span></span>
     <span class="chip"><span class="dot" id="tiktokDot"></span>TikTok<span id="tiktokText">—</span></span>
@@ -566,7 +594,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <button class="lg danger" id="stop">全妨害ストップ</button>
   </div>
   <div class="page">
-    <div class="banner" id="pausedBanner" hidden>一時停止中です。ギフトが来ても妨害は出ません。</div>
 
     <section class="card">
       <div id="fillRunning" hidden>
@@ -611,8 +638,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <button class="lg primary" id="fillStart">埋め立てを始める</button>
     <button class="lg" id="fillStop" hidden>埋め立てを終える</button>
   </div>
-  <div class="page narrow">
+  <div class="page">
     <div class="banner" id="fillBusy" hidden>埋め立て中です。設定を変えるときは、いったん終えてから始め直してください。</div>
+    <div class="split">
+    <div class="stack">
     <div id="fillIdle" class="stack">
       <section class="card">
         <h2>ゲームの決まり</h2>
@@ -661,10 +690,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
             <option value="light_blue_stained_glass">空色のガラス</option><option value="bedrock">岩盤</option>
           </select></div></div>
       </section>
-      <section class="card">
-        <h2>始めるとどうなるか</h2>
-        <p class="hint" style="margin: 6px 0 0;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
-      </section>
     </div>
     <section class="card">
       <h2>ワールド</h2>
@@ -682,6 +707,19 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <option value="false">落とす（ふつう）</option><option value="true">残る</option>
         </select></div></div>
     </section>
+    </div>
+    <aside class="split-side" id="fillSide">
+      <section class="card">
+        <h2>枠の大きさ</h2>
+        <div class="frame-figure" id="frameFigure"></div>
+        <p class="frame-size" id="frameSize"></p>
+        <details class="more-info">
+          <summary>始めるとどうなるか</summary>
+          <p class="hint" style="margin-top: 8px;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
+        </details>
+      </section>
+    </aside>
+    </div>
   </div>
 </main>
 
@@ -725,7 +763,11 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <div class="page">
     <section class="card">
       <h2>配信画面に出す部品</h2>
-      <p class="lead" style="margin-bottom: 0;">TikTok LIVE Studio で「ソースを追加」→「リンク」を選び、下の URL を貼ります。部品ごとに別々に貼れるので、好きな位置・大きさに置いてください（大きさは縦画面 1080×1920 のときのおすすめです。枠を大きくすると、文字や絵も大きくなります）。下の絵は試しの表示です。</p>
+      <p class="lead" style="margin-bottom: 0;">部品の「コピー」を押し、TikTok LIVE Studio の「ソースを追加」→「リンク」に貼ります。部品ごとに好きな位置・大きさに置けます。</p>
+      <details class="more-info">
+        <summary>大きさについて</summary>
+        <p class="hint">おすすめの大きさは、縦画面（1080×1920）のときのものです。枠を大きくすると、文字や絵も大きくなります。下の絵は試しの表示です。</p>
+      </details>
     </section>
     <section class="card" id="styleCard" hidden>
       <div class="card-head"><h2>見た目</h2><button class="ghost" id="styleReset">元に戻す</button></div>
@@ -760,7 +802,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   <div class="page">
     <section class="card">
       <h2>配信ごとの記録</h2>
-      <p class="lead" id="statsLead">TikTok LIVE につないだ配信ごとに、届いたギフトや出した妨害を数えています（テスト送信は数えません）。直近30日分を残します。行を押すと、くわしく見られます。この画面を開いているあいだは、15秒ごとに自動で新しくなります。</p>
+      <p class="lead" id="statsLead">TikTok LIVE の配信ごとの記録です（直近30日分・テスト送信は数えません）。行を押すと、くわしく見られます。開いているあいだは15秒ごとに新しくなります。</p>
       <p class="hint" id="statsPlusNote" hidden></p>
       <div style="overflow-x: auto;"><table class="stream-list" id="streamList"></table></div>
       <div class="empty" id="streamEmpty" hidden><span>まだ記録がありません。TikTok LIVE につないで配信すると、ここに出ます。</span></div>
@@ -882,7 +924,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
     <h1>接続と準備</h1>
     <button class="lg" id="openWizard">はじめの設定をやり直す</button>
   </div>
-  <div class="page narrow">
+  <div class="page">
+    <div class="split">
+    <div class="stack">
       <section class="card">
         <h2>マイクラ（Java版 <span id="mcVersion">26.3</span>）</h2>
         <p class="lead">MOD を動かすのに必要なものです。</p>
@@ -911,19 +955,24 @@ export const PANEL_HTML = String.raw`<!doctype html>
         </div>
         <button data-goto="tabOverlay">配信画面の部品を見る</button>
       </section>
+    </div>
+    <aside class="split-side">
       <section class="card">
-        <h2>対応している環境</h2>
-        <ul class="hint" style="margin: 6px 0 0; padding-left: 20px; line-height: 1.8;">
+        <h2>このアプリについて</h2>
+        <p class="lead" style="margin: 0;">Windows 10 / 11 と Minecraft Java版 26.3 で動きます。TikTok のパスワードは使いません。</p>
+        <details class="more-info">
+          <summary>対応している環境</summary>
+          <ul>
           <li>Windows 10 / 11</li>
           <li>Minecraft Java版 26.3（統合版は使えません）</li>
           <li>Fabric Loader 0.19.5 以上と Fabric API（「まとめて導入する」で入ります）</li>
           <li>シングルプレイのワールド（最初に入ったプレイヤーを配信者として扱います）</li>
           <li>配信画面の部品は、同じ PC の TikTok LIVE Studio で使います（127.0.0.1 の URL はほかの PC からは開けません）</li>
         </ul>
-      </section>
-      <section class="card">
-        <h2>データの扱い</h2>
-        <ul class="hint" style="margin: 6px 0 0; padding-left: 20px; line-height: 1.8;">
+        </details>
+        <details class="more-info">
+          <summary>データの扱い</summary>
+          <ul>
           <li>TikTok のパスワードやログインは使いません。入れるのは TikTok ID だけです</li>
           <li>TikTok LIVE には、非公式のしくみ（tiktok-live-connector）でつなぎます。つなぐとき、TikTok ID が外部のサービス Euler Stream（eulerstream.com）に送られます</li>
           <li>ギフトの一覧は TikTok から、マイクラの準備に使うものは Fabric と Modrinth から取ってきます</li>
@@ -931,13 +980,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
           <li>これらを作者などに送ることはありません</li>
           <li>消したいときは、アプリを閉じてから、フォルダ <code>%APPDATA%\ProjectRedstone</code> を消してください。設定・ログ・ランキング・分析がすべて消えます</li>
         </ul>
+        </details>
       </section>
+    </aside>
+    </div>
   </div>
 </main>
 
 <main id="tabPlan" hidden>
   <div class="page-head"><h1>有料版</h1><span class="plan-badge" id="planBadge"></span></div>
-  <div class="page narrow">
+  <div class="page">
     <section class="card plan-hero" id="licenseCard">
       <div>
         <p class="plan-name">${PLANS.plus.name}</p>
@@ -1201,7 +1253,6 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
     $('toggle').textContent = state.paused ? '再開する' : '一時停止';
     $('toggle').classList.toggle('paused', state.paused);
-    $('pausedBanner').hidden = !state.paused;
     $('pauseDot').className = 'dot ' + (state.paused ? 'warn' : 'ok');
     $('pauseText').textContent = state.paused ? '一時停止中' : '受け付け中';
     for (const key of ['received', 'sent', 'skipped', 'failed']) $(key).textContent = state.stats[key];
@@ -1221,6 +1272,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     }
     if (state.giftCatalogVersion !== giftsVersion) loadGifts(state.giftCatalogVersion);
 
+    renderAlerts(mod, tiktok);
     renderFill(state.fill);
     $('debugState').textContent = JSON.stringify({ mod: { connected: state.mod.connected, players: state.mod.players }, fill: state.fill, paused: state.paused, stats: state.stats }, null, 2);
     renderFillSettings(state.fillSettings);
@@ -1234,6 +1286,41 @@ export const PANEL_HTML = String.raw`<!doctype html>
       wizardChecked = true;
       if (!state.tiktokUsername && !storage('redstone.wizardDone')) openWizard();
     }
+  }
+
+  /** 配信の前に直すべきことを、どの画面でも上に出す */
+  function renderAlerts(mod, tiktok) {
+    const items = [];
+    if (state.paused) items.push(['warn', '一時停止中です。ギフトが来ても妨害は出ません。', '再開する', () => $('toggle').click()]);
+    if (!state.mod.connected) items.push(['bad', 'マイクラにつながっていません。ランチャーで「fabric-loader」を選んで起動し、ワールドを開いてください。', '接続と準備へ', 'tabSetup']);
+    if (!state.mock && !state.tiktokUsername) items.push(['bad', 'TikTok ID が入っていません。', '接続と準備へ', 'tabSetup']);
+    else if (!state.mock && state.tiktok.state === 'retrying') items.push(['bad', 'TikTok LIVE との接続が切れました。つなぎ直しています。', null, null]);
+    const key = JSON.stringify(items.map((i) => i[1]));
+    if ($('alertBar').dataset.key === key) return;
+    $('alertBar').dataset.key = key;
+    $('alertBar').hidden = items.length === 0;
+    $('alertBar').replaceChildren(...items.map(([level, text, label, action]) => {
+      const row = el('div', 'alert ' + level, el('span', '', text));
+      if (label) {
+        const b = Object.assign(el('button', '', label), { type: 'button' });
+        // 文字なら、その画面へ移る（その画面を開いているときはボタンを出さない）
+        if (typeof action === 'string') {
+          b.dataset.to = action;
+          b.addEventListener('click', () => showTab(action));
+        } else {
+          b.addEventListener('click', action);
+        }
+        row.append(b);
+      }
+      return row;
+    }));
+    placeAlerts(document.querySelector('body > main:not([hidden])')?.id);
+  }
+  /** 注意の帯は、開いている画面のいちばん上に置く */
+  function placeAlerts(id) {
+    const page = $(id)?.querySelector('.page');
+    if (page) page.prepend($('alertBar'));
+    $('alertBar').querySelectorAll('[data-to]').forEach((b) => (b.hidden = b.dataset.to === id));
   }
 
   // ログはいつも最新（いちばん下）を見せる。上に戻して読んでいる間だけ追いかけるのを止め、「最新のログへ」で戻る。
@@ -1433,6 +1520,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   function showTab(id) {
     document.querySelectorAll('nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     document.querySelectorAll('body > main').forEach((page) => (page.hidden = page.id !== id));
+    placeAlerts(id);
     // 分析は開いたときに読み直す
     if (id === 'tabStats') loadStreams();
     // 配信の画面に戻ったら、ログは最新を見せる
@@ -1444,6 +1532,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   // 前に開いていた画面を開く
   const lastTab = storage('redstone.tab');
   if (lastTab && $(lastTab)?.tagName === 'MAIN') showTab(lastTab);
+  else placeAlerts('tabLive');
 
   // ---- 妨害の設定 ----
   /** 出す妨害。グループごとに絵つきで並べる。unit は数の単位（なければ数を決めない）、def は選んだときの数 */
@@ -2371,6 +2460,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
     $('fillRunning').hidden = !fill;
     $('fillEmpty').hidden = !!fill;
     $('fillIdle').hidden = !!fill;
+    $('fillSide').hidden = !!fill;
     $('fillBusy').hidden = !fill;
     $('fillStart').hidden = !!fill;
     $('fillStop').hidden = !fill;
@@ -2399,6 +2489,46 @@ export const PANEL_HTML = String.raw`<!doctype html>
   let fillFormDirty = false;
   Object.keys(FILL_FIELDS).forEach((id) => $(id).addEventListener('input', () => (fillFormDirty = true)));
   let fillSettingsKey = '';
+  /** 右の枠の図（幅×幅×高さの箱。置かれるブロックの色で下から3分の1を塗る） */
+  const BLOCK_COLORS = {
+    amethyst_block: '#9a6fd6', diamond_block: '#5fd6d0', emerald_block: '#3fbf5f', gold_block: '#e8c23a',
+    iron_block: '#d8d8d8', lapis_block: '#2f5bb7', redstone_block: '#c8302a', quartz_block: '#ece6dc',
+  };
+  const WALL_COLORS = { glass: '#cfe3ea', white_stained_glass: '#f0f0f0', light_blue_stained_glass: '#7fbfe6', bedrock: '#7a7a7a' };
+  function renderFrameFigure() {
+    const w = Math.max(1, Number($('fillWidth').value) || 1);
+    const h = Math.max(1, Number($('fillHeight').value) || 1);
+    // 斜め上から見た箱。いちばん大きい辺が図に収まるように縮める
+    const unit = 120 / Math.max(w, h * 0.9);
+    const dx = w * unit * 0.87, dy = w * unit * 0.5, hh = h * unit;
+    const W = 2 * dx + 20, H = 2 * dy + hh + 20;
+    const cx = W / 2, top = 10;
+    const pt = (x, y) => x.toFixed(1) + ',' + y.toFixed(1);
+    // 上の面の4つの角（奥・右・手前・左）
+    const back = [cx, top], right = [cx + dx, top + dy], front = [cx, top + 2 * dy], left = [cx - dx, top + dy];
+    const down = (p, k) => [p[0], p[1] + k];
+    const fillH = hh / 3;
+    const block = BLOCK_COLORS[$('fillBlock').value] ?? '#9a6fd6';
+    const wall = WALL_COLORS[$('fillWall').value] ?? '#cfe3ea';
+    const poly = (pts, attrs) => '<polygon points="' + pts.map((q) => pt(...q)).join(' ') + '" ' + attrs + '/>';
+    const filledTop = [down(back, hh - fillH), down(right, hh - fillH), down(front, hh - fillH), down(left, hh - fillH)];
+    $('frameFigure').innerHTML = '<svg viewBox="0 0 ' + W.toFixed(0) + ' ' + H.toFixed(0) + '" role="img" aria-label="枠の図">'
+      // 埋まった部分（下から3分の1）
+      + poly([down(left, hh - fillH), down(front, hh - fillH), down(front, hh), down(left, hh)], 'fill="' + block + '" opacity=".75"')
+      + poly([down(front, hh - fillH), down(right, hh - fillH), down(right, hh), down(front, hh)], 'fill="' + block + '" opacity=".55"')
+      + poly(filledTop, 'fill="' + block + '" opacity=".9"')
+      // 枠（ガラスなど）
+      + poly([left, front, down(front, hh), down(left, hh)], 'fill="' + wall + '" fill-opacity=".08" stroke="' + wall + '" stroke-opacity=".7"')
+      + poly([front, right, down(right, hh), down(front, hh)], 'fill="' + wall + '" fill-opacity=".05" stroke="' + wall + '" stroke-opacity=".7"')
+      + poly([back, right, front, left], 'fill="none" stroke="' + wall + '" stroke-opacity=".7" stroke-dasharray="3 3"')
+      + '</svg>';
+    const rounds = Number($('fillRounds').value) || 1;
+    $('frameSize').innerHTML = '';
+    $('frameSize').append('幅 ', el('b', '', String(w)), ' × 奥行き ', el('b', '', String(w)), ' × 高さ ', el('b', '', String(h)),
+      ' ＝ ', el('b', '', (w * w * h).toLocaleString('ja-JP')), ' マス。全 ', el('b', '', String(rounds)), ' ラウンド');
+  }
+  ['fillWidth', 'fillHeight', 'fillRounds', 'fillBlock', 'fillWall'].forEach((id) => $(id).addEventListener('input', renderFrameFigure));
+
   function renderFillSettings(settings) {
     if (fillFormDirty || !settings) return;
     const key = JSON.stringify(settings);
@@ -2408,6 +2538,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
       $(id).value = String(settings[key]);
       $(id).dispatchEvent(new Event('sync'));
     }
+    renderFrameFigure();
   }
 
   // ---- ワールドの設定（変えたらすぐ入れる） ----

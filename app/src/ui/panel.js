@@ -185,6 +185,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .row > * { min-width: 0; }
   .row > button { flex: none; }
   .hint { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 10px 0 0; max-width: 72ch; }
+  /* 公式ではないことの注意書き（Minecraft の利用ガイドラインで、商品の上に目立つように出すことになっている） */
+  .notice { margin: 14px 0 0; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; line-height: 1.7; }
+  .notice p { margin: 0; }
+  .notice p + p { margin-top: 4px; }
   .quick { display: flex; flex-wrap: wrap; gap: 6px; }
   .quick + .quick { margin-top: 6px; }
   code { flex: 1; background: var(--bg); border: 1px solid var(--line); padding: 6px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--muted); word-break: break-all; }
@@ -1445,6 +1449,11 @@ ${CONTROLS_CSS}
       <section class="card">
         <h2>このアプリについて</h2>
         <p class="lead" style="margin: 0;">Windows 10 / 11 と Minecraft Java版 26.3 で動きます。TikTok のパスワードは使いません。</p>
+        <div class="notice">
+          <p lang="en">NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
+          <p>STATIC ARC は Minecraft の公式製品ではなく、Mojang・Microsoft が認めたり関わったりしているものではありません。TikTok（ByteDance）の公式ツールでもなく、TikTok とは関係ありません。</p>
+          <p>提供：STATIC ARC</p>
+        </div>
         <details class="more-info">
           <summary>対応している環境</summary>
           <ul>
@@ -1570,6 +1579,7 @@ ${CONTROLS_CSS}
     <ul class="checks setup-checks"></ul>
     <div class="ready setup-ready" hidden>準備できています。</div>
     <div class="setup-todo" hidden><button class="primary install-btn">まとめて導入する</button></div>
+    <p class="notice">STATIC ARC は、Minecraft・TikTok の公式ツールではありません（Mojang・Microsoft・TikTok とは関係ありません）。</p>
   </div>
   <div data-step="1" hidden>
     <h2>TikTok ID</h2>

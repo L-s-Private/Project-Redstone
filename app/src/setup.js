@@ -10,11 +10,12 @@ export const PROFILE_KEY = `fabric-loader-${MINECRAFT_VERSION}`;
 
 const FABRIC_META = 'https://meta.fabricmc.net/v2';
 const MODRINTH_API = 'https://api.modrinth.com/v2';
-const USER_AGENT = 'ProjectRedstone/0.2 (github.com/L-s-Private/Project-Redstone)';
+const USER_AGENT = 'StaticArc (TikTok LIVE tool for Minecraft)';
 const PROFILE_FILES = ['launcher_profiles.json', 'launcher_profiles_microsoft_store.json'];
 
 const FABRIC_API_FILE = /^fabric-api-.*\.jar$/i;
-const OUR_MOD_FILE = /^project-redstone-.*\.jar$/i;
+// 0.17 までの MOD は開発中の名前（project-redstone-○○.jar）。入れ替えるときに消せるよう、両方を自分の MOD とみなす
+const OUR_MOD_FILE = /^(static-arc|project-redstone)-.*\.jar$/i;
 
 export class SetupError extends Error {}
 

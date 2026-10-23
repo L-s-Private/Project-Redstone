@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "project_redstone",
+  "id": "static_arc",
   "version": "${version}",
   "name": "STATIC ARC",
   "description": "TikTok LIVE のギフトでマイクラに妨害を出すMOD。PCアプリと組み合わせて使う。",
@@ -8,10 +8,10 @@
   "license": "All-Rights-Reserved",
   "environment": "*",
   "entrypoints": {
-    "main": ["com.projectredstone.RedstoneMod"],
-    "client": ["com.projectredstone.RedstoneClient"]
+    "main": ["com.staticarc.StaticArcMod"],
+    "client": ["com.staticarc.StaticArcClient"]
   },
-  "mixins": ["project_redstone.mixins.json"],
+  "mixins": ["static_arc.mixins.json"],
   "depends": {
     "fabricloader": ">=0.19.5",
     "minecraft": "~26.3",

@@ -27,7 +27,7 @@ cd app; npm run app:mock                # TikTok なし。テスト送信だけ
 
 - MOD を直したら、マイクラを閉じて `.\gradlew runClient` をやり直す
 - アプリの画面（`app/src/ui/*.js`）やサーバー側を直したら、アプリを起動し直す
-- ログ: マイクラ `mod/run/logs/latest.log`、アプリ `%APPDATA%\ProjectRedstone\app.log`（どちらも Claude が直接読んでよい）
+- ログ: マイクラ `mod/run/logs/latest.log`、アプリ `%APPDATA%\StaticArc\app.log`（どちらも Claude が直接読んでよい）
 
 ## テスト
 

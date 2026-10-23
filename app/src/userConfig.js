@@ -1,13 +1,35 @@
-// 画面版の設定ファイル。exe の横ではなく、ユーザーごとのフォルダ（Windows なら %APPDATA%\ProjectRedstone）に置く。
+// 画面版の設定ファイル。exe の横ではなく、ユーザーごとのフォルダ（Windows なら %APPDATA%\StaticArc）に置く。
+import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import example from '../config.example.json' with { type: 'json' };
 import { ConfigError, parseConfig } from './config.js';
 import { writeFileSafely } from './files.js';
 
 export function configDir(env = process.env, home = homedir()) {
-  return env.APPDATA ? join(env.APPDATA, 'ProjectRedstone') : join(home, '.config', 'project-redstone');
+  return env.APPDATA ? join(env.APPDATA, 'StaticArc') : join(home, '.config', 'static-arc');
+}
+
+/** 画面（Electron）の一時ファイル・ウィンドウの位置などを置く場所。設定と同じフォルダの中にまとめる（消すときに1つで済むように） */
+export function browserDir(env = process.env, home = homedir()) {
+  return join(configDir(env, home), 'browser');
+}
+
+/**
+ * 0.45 までのフォルダ（開発中の名前）を、今の名前に移す。中身はそのまま。
+ * 新しい方がもうあるとき・移せないとき（ほかのソフトが開いているなど）は何もしない
+ */
+export function moveOldFolders(env = process.env, home = homedir()) {
+  const moves = [[env.APPDATA ? join(env.APPDATA, 'ProjectRedstone') : join(home, '.config', 'project-redstone'), configDir(env, home)]];
+  if (env.APPDATA) moves.push([join(env.APPDATA, 'Project Redstone'), browserDir(env, home)]);
+  for (const [from, to] of moves) {
+    if (!existsSync(from) || existsSync(to)) continue;
+    try {
+      mkdirSync(dirname(to), { recursive: true });
+      renameSync(from, to);
+    } catch {}
+  }
 }
 
 /** 設定を読む。初めてなら設定例を元に作る（TikTok ID は空）。 */

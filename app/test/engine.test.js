@@ -329,7 +329,7 @@ test('無料版の上限: プリセットとルールを増やすときだけ断
 test('設定ファイル: 書き出したものを読み込むと、すべて自分のプリセットとして足される（同じ名前には (2)）', () => {
   const a = setup({ presets: [{ name: 'お祭り', rules: [{ gift: 'GG', action: 'tnt' }] }] });
   const file = JSON.parse(JSON.stringify(a.engine.exportSettings()));
-  assert.equal(file.format, 'project-redstone-settings');
+  assert.equal(file.format, 'static-arc-settings');
   assert.equal(file.version, 1);
 
   const b = setup({ presets: [{ name: 'お祭り', rules: [{ gift: 'Rose', action: 'mob' }] }] });
@@ -342,14 +342,17 @@ test('設定ファイル: 書き出したものを読み込むと、すべて自
 test('設定ファイル: 違うファイル・壊れたプリセット・入りきらないときは、何も足さずに断る', () => {
   const { engine } = setup();
   assert.throws(() => engine.importSettings({ hello: 1 }), /設定ファイルではありません/);
-  assert.throws(() => engine.importSettings({ format: 'project-redstone-settings', version: 99, presets: [] }), /新しい版/);
+  assert.throws(() => engine.importSettings({ format: 'static-arc-settings', version: 99, presets: [] }), /新しい版/);
+  // 0.45 までに書き出したファイル（開発中の名前の印）も読める
+  assert.deepEqual(engine.importSettings({ format: 'project-redstone-settings', version: 1, presets: [{ name: '前の版', rules: [{ gift: 'GG', action: 'tnt' }] }] }), ['前の版']);
+  engine.config.presets = [];
   assert.throws(
-    () => engine.importSettings({ format: 'project-redstone-settings', version: 1, presets: [{ name: 'よい', rules: [{ gift: 'GG', action: 'tnt' }] }, { name: 'こわれ', rules: [{ gift: 'GG', action: 'explode' }] }] }),
+    () => engine.importSettings({ format: 'static-arc-settings', version: 1, presets: [{ name: 'よい', rules: [{ gift: 'GG', action: 'tnt' }] }, { name: 'こわれ', rules: [{ gift: 'GG', action: 'explode' }] }] }),
     /2番目のプリセット「こわれ」/,
   );
   assert.equal((engine.config.presets ?? []).length, 0);
   const many = Array.from({ length: 21 }, (_, i) => ({ name: `p${i}`, rules: [{ gift: 'GG', action: 'tnt' }] }));
-  assert.throws(() => engine.importSettings({ format: 'project-redstone-settings', version: 1, presets: many }), /入りきりません/);
+  assert.throws(() => engine.importSettings({ format: 'static-arc-settings', version: 1, presets: many }), /入りきりません/);
 });
 
 test('設定ファイルは有料版の機能（無料版では断る）', () => {

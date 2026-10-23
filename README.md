@@ -44,18 +44,18 @@ cd mod
 ./gradlew build        # Windows は gradlew.bat build
 ```
 
-`mod/build/libs/project-redstone-0.1.0.jar` を `.minecraft/mods` に入れる（Fabric API も同じ場所に必要）。
-GitHub Actions の `project-redstone-mod` からも jar をダウンロードできる。
+`mod/build/libs/static-arc-<版>.jar` を `.minecraft/mods` に入れる（Fabric API も同じ場所に必要）。
+GitHub Actions の `static-arc-mod` からも jar をダウンロードできる。
 
 ### 2. アプリを動かす
 
 #### デスクトップ版（おすすめ）
 
-GitHub Actions の `project-redstone-app-windows` から `StaticArc-<版>.exe` をダウンロードして、ダブルクリックする。
+GitHub Actions の `static-arc-app-windows` から `StaticArc-<版>.exe` をダウンロードして、ダブルクリックする。
 インストールは不要。専用のウィンドウで操作画面が開く。
 
 - 初回は「WindowsによってPCが保護されました」と出ることがある（署名なしのため）。「詳細情報」→「実行」で起動できる。
-- 設定は `%APPDATA%\ProjectRedstone\config.json`、ログは同じフォルダの `app.log` に保存される。
+- 設定は `%APPDATA%\StaticArc\config.json`、ログは同じフォルダの `app.log` に保存される。
 - 「マイクラの準備」の「まとめて導入する」で、Fabric Loader・Fabric API・MOD（同梱）がまとめて入る。
 
 操作画面でできること:

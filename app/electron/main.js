@@ -8,9 +8,11 @@ import { startApp } from '../src/app.js';
 import { ConfigError } from '../src/config.js';
 import { ASSETS_DIR } from '../src/assets.js';
 import { restoreBounds } from '../src/windowBounds.js';
+import { browserDir, moveOldFolders } from '../src/userConfig.js';
 
-// 製品名を STATIC ARC に変えても、画面の覚えている内容（最後に開いたタブなど）を引き継ぐため、前と同じ場所を使う
-app.setPath('userData', join(app.getPath('appData'), 'Project Redstone'));
+// 画面の一時ファイルは設定と同じフォルダの中に置く。0.45 までのフォルダ（開発中の名前）があれば、先に移して中身を引き継ぐ
+moveOldFolders();
+app.setPath('userData', browserDir());
 
 // 2つ目を起動したら、1つ目のウィンドウを前に出すだけにする
 if (!app.requestSingleInstanceLock()) {

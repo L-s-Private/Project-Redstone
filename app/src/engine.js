@@ -75,7 +75,9 @@ export function testButtons(rules) {
 }
 
 /** 設定ファイル（書き出し・読み込み）の形。中身を変えたら SETTINGS_VERSION を上げる */
-export const SETTINGS_FORMAT = 'project-redstone-settings';
+export const SETTINGS_FORMAT = 'static-arc-settings';
+/** 0.45 までに書き出したファイルの印（開発中の名前）。読み込みだけ受け付ける */
+const OLD_SETTINGS_FORMAT = 'project-redstone-settings';
 export const SETTINGS_VERSION = 1;
 
 /** 同じ名前があれば「名前 (2)」のようにする（名前の長さの上限に収める） */
@@ -410,7 +412,7 @@ export class Engine extends EventEmitter {
   importSettings(data) {
     const problem = checkFeature(this.plan, 'importExport', '設定の読み込み');
     if (problem) throw new Error(problem);
-    if (data?.format !== SETTINGS_FORMAT || !Number.isInteger(data.version)) {
+    if ((data?.format !== SETTINGS_FORMAT && data?.format !== OLD_SETTINGS_FORMAT) || !Number.isInteger(data.version)) {
       throw new Error('STATIC ARC の設定ファイルではありません');
     }
     if (data.version > SETTINGS_VERSION) {

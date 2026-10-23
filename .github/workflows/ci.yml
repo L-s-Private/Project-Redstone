@@ -35,7 +35,7 @@ jobs:
           mkdir -p ../mod/build/libs "$RUNNER_TEMP/mc"
           npx electron-builder --linux dir --publish never
           REDSTONE_MINECRAFT_DIR="$RUNNER_TEMP/mc" REDSTONE_SMOKE_RESULT="$GITHUB_WORKSPACE/app/electron-window" \
-            timeout 60 xvfb-run --auto-servernum dist/linux-unpacked/project-redstone --mock --no-sandbox --disable-gpu
+            timeout 60 xvfb-run --auto-servernum dist/linux-unpacked/static-arc --mock --no-sandbox --disable-gpu
           cat electron-window.json
           grep -q '"hasControls":true' electron-window.json
       - uses: actions/upload-artifact@v7
@@ -60,7 +60,7 @@ jobs:
       - run: ./gradlew build --no-daemon
       - uses: actions/upload-artifact@v7
         with:
-          name: project-redstone-mod
+          name: static-arc-mod
           path: mod/build/libs/*.jar
 
   exe:
@@ -84,7 +84,7 @@ jobs:
           key: electron-windows-${{ hashFiles('app/package-lock.json') }}
       - uses: actions/download-artifact@v8
         with:
-          name: project-redstone-mod
+          name: static-arc-mod
           path: mod/build/libs
       - run: npm ci
       - name: 本物の Fabric・Modrinth から導入できるか確認
@@ -92,7 +92,7 @@ jobs:
       - run: npm run dist
       - uses: actions/upload-artifact@v7
         with:
-          name: project-redstone-app-windows
+          name: static-arc-app-windows
           path: app/dist/*.exe
           # exe は作るときに圧縮済みなので、zip 化の時間を省く
           compression-level: 0

@@ -346,14 +346,14 @@ test('配信画面の部品だけ、同じアプリの中でなら枠に入れ�
 
 test('設定ファイルの書き出しはダウンロードとして返し、読み込みはエンジンに渡す', async () => {
   await withServer(async ({ engine, port }) => {
-    engine.exportSettings = () => ({ format: 'project-redstone-settings', version: 1, exportedAt: '2026-10-21T00:00:00.000Z', rules: [], presets: [] });
+    engine.exportSettings = () => ({ format: 'static-arc-settings', version: 1, exportedAt: '2026-10-21T00:00:00.000Z', rules: [], presets: [] });
     engine.importSettings = (data) => {
       if (!data) throw new Error('読めません');
       return ['A'];
     };
     const res = await request(port, { method: 'GET', path: '/api/settings/export' });
     assert.equal(res.status, 200);
-    assert.match(res.headers['content-disposition'], /project-redstone-2026-10-21\.json/);
+    assert.match(res.headers['content-disposition'], /static-arc-2026-10-21\.json/);
     const ok = await json(port, '/api/settings/import', { data: { x: 1 } });
     assert.equal(ok.status, 200);
     assert.deepEqual(ok.json().imported, ['A']);

@@ -12,7 +12,7 @@ import { createMediaStore } from './media.js';
 import { createUiServer, DEFAULT_UI_PORT } from './server.js';
 import { getSetupStatus, installAll, minecraftDir, updateModIfOutdated } from './setup.js';
 import pkg from '../package.json' with { type: 'json' };
-import { loadUserConfig, saveUserConfig } from './userConfig.js';
+import { loadUserConfig, moveOldFolders, saveUserConfig } from './userConfig.js';
 
 /**
  * @param {object} [options]
@@ -23,6 +23,7 @@ import { loadUserConfig, saveUserConfig } from './userConfig.js';
  *   ポートが使えないときは code = 'EADDRINUSE' の Error を投げる
  */
 export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = () => {}, debug = true } = {}) {
+  moveOldFolders();
   const { config, path: configPath, created, removed } = await loadUserConfig();
   const logFile = join(dirname(configPath), 'app.log');
 
@@ -44,7 +45,7 @@ export async function startApp({ mock = false, port = DEFAULT_UI_PORT, onLog = (
   const engine = new Engine({
     license,
     config, version: pkg.version, giftCatalog, ranking,
-    modVersion: bundledMod?.fileName.match(/^project-redstone-(.+)\.jar$/)?.[1] ?? '',
+    modVersion: bundledMod?.fileName.match(/^static-arc-(.+)\.jar$/)?.[1] ?? '',
     saveRanking: (data) => writeFileSafely(rankingFile, `${JSON.stringify(data)}\n`),
     analytics,
     saveAnalytics: (data) => writeFileSafely(analyticsFile, `${JSON.stringify(data)}\n`),

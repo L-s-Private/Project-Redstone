@@ -14,7 +14,7 @@ function fakeFetch({ sha512 = createHash('sha512').update(FABRIC_API_JAR).digest
   const calls = [];
   const fetch = async (url, options) => {
     calls.push(url);
-    assert.match(options.headers['User-Agent'], /ProjectRedstone/);
+    assert.match(options.headers['User-Agent'], /StaticArc/);
     if (offline) throw new TypeError('fetch failed');
     const json = (body) => ({ ok: true, status: 200, json: async () => body });
     if (url === 'https://meta.fabricmc.net/v2/versions/loader/26.3') {
@@ -38,7 +38,7 @@ function fakeFetch({ sha512 = createHash('sha512').update(FABRIC_API_JAR).digest
   return { fetch, calls };
 }
 
-const bundledMod = (fileName = 'project-redstone-0.2.0.jar') => ({ fileName, read: async () => Buffer.from(`mod:${fileName}`) });
+const bundledMod = (fileName = 'static-arc-0.2.0.jar') => ({ fileName, read: async () => Buffer.from(`mod:${fileName}`) });
 
 async function minecraftFolder({ launcher = true, store = false } = {}) {
   const dir = join(await mkdtemp(join(tmpdir(), 'mc-')), '.minecraft');
@@ -77,7 +77,7 @@ test('何も入っていない状態から、3つとも入れる', async () => {
   assert.equal((await stat(join(dir, 'versions', LOADER_ID, `${LOADER_ID}.jar`))).size, 0);
 
   // mods: 正式版の Fabric API と、同梱の MOD
-  assert.deepEqual((await readdir(join(dir, 'mods'))).sort(), ['fabric-api-0.163.0+26.3.jar', 'project-redstone-0.2.0.jar']);
+  assert.deepEqual((await readdir(join(dir, 'mods'))).sort(), ['fabric-api-0.163.0+26.3.jar', 'static-arc-0.2.0.jar']);
   assert.ok(logs.some((l) => l.includes('Fabric API を入れました')));
 });
 
@@ -102,7 +102,7 @@ test('古い MOD と別バージョンの Fabric API を入れ替え、ほかの
   assert.equal(before.fabricApi.installed, false);
 
   await installAll({ dir, bundledMod: bundledMod(), fetch: fakeFetch().fetch });
-  assert.deepEqual((await readdir(join(dir, 'mods'))).sort(), ['fabric-api-0.163.0+26.3.jar', 'project-redstone-0.2.0.jar', 'sodium.jar']);
+  assert.deepEqual((await readdir(join(dir, 'mods'))).sort(), ['fabric-api-0.163.0+26.3.jar', 'sodium.jar', 'static-arc-0.2.0.jar']);
 });
 
 test('ランチャーがない・ネットにつながらない・ダウンロードが壊れているときは理由を返す', async () => {
@@ -133,16 +133,16 @@ test('起動時に、古い MOD だけを新しいものへ入れ替える（入
   const dir = await minecraftFolder();
   const logs = [];
   const log = (level, text) => logs.push(text);
-  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('project-redstone-0.4.0.jar'), log }), 'not_installed');
+  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('static-arc-0.4.0.jar'), log }), 'not_installed');
 
   await mkdir(join(dir, 'mods'));
   await writeFile(join(dir, 'mods', 'project-redstone-0.3.0.jar'), 'old');
   await writeFile(join(dir, 'mods', 'sodium.jar'), 'other');
-  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('project-redstone-0.4.0.jar'), log }), 'updated');
-  assert.deepEqual((await readdir(join(dir, 'mods'))).sort(), ['project-redstone-0.4.0.jar', 'sodium.jar']);
-  assert.equal(await readFile(join(dir, 'mods', 'project-redstone-0.4.0.jar'), 'utf8'), 'mod:project-redstone-0.4.0.jar');
-  assert.ok(logs.some((l) => l.includes('0.3.0.jar → project-redstone-0.4.0.jar')));
+  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('static-arc-0.4.0.jar'), log }), 'updated');
+  assert.deepEqual((await readdir(join(dir, 'mods'))).sort(), ['sodium.jar', 'static-arc-0.4.0.jar']);
+  assert.equal(await readFile(join(dir, 'mods', 'static-arc-0.4.0.jar'), 'utf8'), 'mod:static-arc-0.4.0.jar');
+  assert.ok(logs.some((l) => l.includes('0.3.0.jar → static-arc-0.4.0.jar')));
 
-  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('project-redstone-0.4.0.jar'), log }), 'up_to_date');
+  assert.equal(await updateModIfOutdated({ dir, bundledMod: bundledMod('static-arc-0.4.0.jar'), log }), 'up_to_date');
   assert.equal(await updateModIfOutdated({ dir, bundledMod: null, log }), 'not_installed');
 });

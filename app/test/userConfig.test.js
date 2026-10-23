@@ -1,18 +1,35 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { ConfigError } from '../src/config.js';
-import { configDir, loadUserConfig, saveUserConfig } from '../src/userConfig.js';
+import { browserDir, configDir, loadUserConfig, moveOldFolders, saveUserConfig } from '../src/userConfig.js';
 
 test('Windows では APPDATA の下に置く', () => {
-  assert.equal(configDir({ APPDATA: 'C:\\Users\\me\\AppData\\Roaming' }, '/home/me'), join('C:\\Users\\me\\AppData\\Roaming', 'ProjectRedstone'));
-  assert.equal(configDir({}, '/home/me'), join('/home/me', '.config', 'project-redstone'));
+  assert.equal(configDir({ APPDATA: 'C:\\Users\\me\\AppData\\Roaming' }, '/home/me'), join('C:\\Users\\me\\AppData\\Roaming', 'StaticArc'));
+  assert.equal(configDir({}, '/home/me'), join('/home/me', '.config', 'static-arc'));
+});
+
+test('0.45 までのフォルダ（開発中の名前）は、中身ごと今の名前に移す。今のフォルダがもうあれば触らない', async () => {
+  const appData = await mkdtemp(join(tmpdir(), 'staticarc-'));
+  const env = { APPDATA: appData };
+  await mkdir(join(appData, 'ProjectRedstone'));
+  await writeFile(join(appData, 'ProjectRedstone', 'config.json'), '{}');
+  await mkdir(join(appData, 'Project Redstone'));
+  await writeFile(join(appData, 'Project Redstone', 'window.json'), '{}');
+  moveOldFolders(env);
+  assert.deepEqual((await readdir(appData)).sort(), ['StaticArc']);
+  assert.deepEqual((await readdir(configDir(env))).sort(), ['browser', 'config.json']);
+  assert.deepEqual(await readdir(browserDir(env)), ['window.json']);
+
+  await mkdir(join(appData, 'ProjectRedstone'));
+  moveOldFolders(env);
+  assert.deepEqual((await readdir(appData)).sort(), ['ProjectRedstone', 'StaticArc']);
 });
 
 test('初回は設定例から作り、保存した内容を次回読める', async () => {
-  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'ProjectRedstone');
+  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'StaticArc');
   const first = await loadUserConfig(dir);
   assert.equal(first.created, true);
   assert.equal(first.config.tiktokUsername, '');
@@ -27,7 +44,7 @@ test('初回は設定例から作り、保存した内容を次回読める', as
 });
 
 test('ワールドの設定と自分のプリセットも保存して、次回読める', async () => {
-  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'ProjectRedstone');
+  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'StaticArc');
   const first = await loadUserConfig(dir);
   first.config.world = { ...first.config.world, time: 'day' };
   first.config.presets = [{ name: 'いつもの', rules: [{ gift: 'バラ', action: 'jail', count: 10 }] }];
@@ -38,7 +55,7 @@ test('ワールドの設定と自分のプリセットも保存して、次回�
 });
 
 test('ゲームモードと採掘チャレンジの設定も保存して、次回読める（埋め立ての設定はそのまま）', async () => {
-  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'ProjectRedstone');
+  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'StaticArc');
   const first = await loadUserConfig(dir);
   // 前の版の設定ファイルには無いので、埋め立て・採掘チャレンジの既定値になる
   assert.equal(first.config.gameMode, 'fill');

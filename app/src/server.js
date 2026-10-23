@@ -298,7 +298,7 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       const day = data.exportedAt.slice(0, 10);
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
-        'Content-Disposition': `attachment; filename="project-redstone-${day}.json"`,
+        'Content-Disposition': `attachment; filename="static-arc-${day}.json"`,
         'Cache-Control': 'no-store',
       });
       return res.end(`${JSON.stringify(data, null, 2)}

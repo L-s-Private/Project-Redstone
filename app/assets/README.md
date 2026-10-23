@@ -7,3 +7,4 @@ exe に入り、操作画面・配信画面から `/assets/<この中の場所>`
 - 配れる種類: jpg / png / webp / gif / svg
 - どの絵をどこで使うかは `src/assets.js` にまとめる（例: `KEY_ART`・`BRAND`）
 - `brand/` はロゴ。操作画面の左上・はじめの案内・アプリのアイコン（`icon.png`。exe・タスクバー・ウィンドウ）に使う
+- `guide/` は操作のしかたのスクショ。配信画面の「LIVE Studio での貼り方」・はじめの準備（TikTok ID・ランチャー）に使う

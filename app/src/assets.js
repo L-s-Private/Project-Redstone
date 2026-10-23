@@ -22,6 +22,20 @@ export const KEY_ART = {
 };
 
 /**
+ * 操作のしかたを見せるスクショ（app/assets/guide/）。
+ * liveStudio: 配信画面の部品を LIVE Studio に貼る手順（順番どおり）/ tiktokId: はじめの準備の TikTok ID / minecraft: はじめの準備の最後（ランチャーで選ぶもの）
+ */
+export const GUIDE = {
+  liveStudio: [
+    { src: '/assets/guide/live-studio-1.webp', alt: '「ソースを追加」をクリック' },
+    { src: '/assets/guide/live-studio-2.webp', alt: '「リンク」を選んで「追加」をクリック' },
+    { src: '/assets/guide/live-studio-3.webp', alt: 'リンクを入れて「ソースを追加」をクリック' },
+  ],
+  tiktokId: { src: '/assets/guide/tiktok-id.webp', alt: 'TikTok のプロフィールの URL の @ のあとが ID' },
+  minecraft: { src: '/assets/guide/minecraft-ready.webp', alt: 'ランチャーで fabric-loader を選ぶ' },
+};
+
+/**
  * ロゴ（app/assets/brand/）。色は文字の色（currentColor）なので、置く場所の CSS の color で白にも黒にもなる。
  * 画面に直接埋め込む（読み込みを待たずに出るように）
  */

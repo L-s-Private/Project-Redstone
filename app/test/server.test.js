@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
 import { test } from 'node:test';
-import { KEY_ART } from '../src/assets.js';
+import { GUIDE, KEY_ART } from '../src/assets.js';
 import { createUiServer } from '../src/server.js';
 
 class FakeEngine extends EventEmitter {
@@ -97,12 +97,17 @@ test('マイクラのアイコンとギフトの一覧を返す', async () => {
   }, { icons });
 });
 
-test('外部のグラフィック（app/assets/）を返す。キーアートは全部ある。おかしな場所は断る', async () => {
+test('外部のグラフィック（app/assets/）を返す。キーアートと操作のスクショは全部ある。おかしな場所は断る', async () => {
   await withServer(async ({ port }) => {
     for (const { src } of Object.values(KEY_ART)) {
       const art = await request(port, { path: src });
       assert.equal(art.status, 200, src);
       assert.equal(art.headers['content-type'], 'image/jpeg');
+    }
+    for (const { src } of [...GUIDE.liveStudio, GUIDE.tiktokId, GUIDE.minecraft]) {
+      const shot = await request(port, { path: src });
+      assert.equal(shot.status, 200, src);
+      assert.equal(shot.headers['content-type'], 'image/webp');
     }
     for (const path of ['/assets/art/nothing.jpg', '/assets/..%2Fpackage.json', '/assets/../package.json', '/assets/art/.hidden.png', '/assets/art/x.json']) {
       assert.equal((await request(port, { path })).status, 404, path);

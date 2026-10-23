@@ -9,6 +9,7 @@
 | --- | --- | --- |
 | `key-art/` | ゲームモードのキーアート。ファイル名はゲームモードの id（`fill` / `mining_challenge`） | `art/<id>.jpg`（長い辺 1600px・JPEG 品質84） |
 | `logo/` | ロゴ。`mark-*`（マークだけ）・`logotype-*`（マーク＋STATIC ARC）の黒と白 | `brand/mark.svg`・`brand/logotype.svg`（余計な情報を消し、色を文字の色にしたもの）、`brand/icon.svg`・`brand/icon.png`（アプリのアイコン。黒の角丸にマーク） |
+| `guide/` | 操作のしかたのスクショ。`live-studio-1〜3`（1280×720、LIVE Studio に貼る手順）・`tiktok-id`・`minecraft-ready`（1000×625、はじめの準備）。押すところに印を付け、個人情報は隠す | `guide/<同じ名前>.webp`（WebP 品質90。`magick 原本.png -quality 90 先.webp`。はじめの準備の2枚は、スクロールしなくて済むように大事な所だけ 1000×320 に切り抜く: `-crop 1000x320+0+<上からの位置> +repage`） |
 
 種類が増えたら、ここにフォルダを足して、この表に1行足す（例: `logo/`・`overlay/`・`thumbnail/`）。
 

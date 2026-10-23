@@ -4,7 +4,7 @@ import { CONTROLS_CSS, CONTROLS_JS } from './controls.js';
 import { COMMENT_VIEWER_COOLDOWN_SEC, MAX_CHOICES, MAX_COMMENT_WORD, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
 import { PLANS } from '../plan.js';
 import { OVERLAY_WIDGETS } from './overlays.js';
-import { BRAND, KEY_ART } from '../assets.js';
+import { BRAND, GUIDE, KEY_ART } from '../assets.js';
 import { FILL_ONLY_ACTIONS, MINING_LIMITS, MINING_ONLY_ACTIONS, MINING_PRESETS, MINING_REASONS, MINING_TARGETS } from '../mining.js';
 
 export const PANEL_HTML = String.raw`<!doctype html>
@@ -225,6 +225,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
   /* 届いたものと出した妨害（新しい順） */
   .feed-card { display: flex; flex-direction: column; min-height: calc(100vh - 260px); }
   .feed { list-style: none; margin: 0; padding: 0; }
+  /* 広い画面では、配信の画面を窓にぴったり収める（画面はスクロールせず、届いたもの・アプリの記録は枠の中だけで動く） */
+  @media (min-width: 981px) {
+    #tabLive .split { flex: 1; min-height: 320px; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+    #tabLive .split-side { position: static; min-height: 0; }
+    .feed-card { min-height: 0; }
+    .feed { flex: 1; min-height: 0; overflow-y: auto; }
+    .feed:empty { flex: none; }
+    .log-card { flex: 1; min-height: 0; }
+    #log { flex: 1; max-height: none; }
+  }
   .feed li {
     display: grid; grid-template-columns: 62px minmax(0, 1.1fr) 18px minmax(0, 1fr); gap: 10px; align-items: center;
     padding: 8px 4px; border-bottom: 1px solid var(--line-soft);
@@ -347,6 +357,16 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .setting-control { display: flex; justify-content: flex-end; min-width: 0; }
   .setting-control select { width: 100%; }
   .setting-control .tiles { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* 埋め立ての見た目: ブロックは横長の小さいタイルにして、横いっぱいに並べる（縦に長くならないように） */
+  #fillLook .setting { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  #fillLook .setting-control .tiles { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+  #fillLook .tiles button { flex-direction: row; justify-content: flex-start; gap: 8px; padding: 6px 10px; }
+  #fillLook .tiles .mc { --s: 24px !important; }
+  /* 右側に「ワールド」も置くので、ついてこさせない（下が見切れないように） */
+  #fillSide { position: static; }
+  #fillSide .setting { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 0; }
+  /* 埋め立て中は左の設定が消えるので、残る「ワールド」を横いっぱいに */
+  #modeFill .split:has(#fillIdle[hidden]) { grid-template-columns: minmax(0, 1fr); }
   @media (max-width: 720px) {
     .setting { grid-template-columns: minmax(0, 1fr); }
     .setting-control { justify-content: flex-start; }
@@ -750,6 +770,13 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .wiz-brand { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: -2px 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--line-soft); color: var(--text); }
   .wiz-brand svg { display: block; height: 34px; width: auto; }
   .wiz-brand span { color: var(--faint); font-size: 12px; letter-spacing: .08em; }
+  /* 操作のしかたのスクショ（GUIDE。src/assets.js） */
+  .guide-img { display: block; width: 100%; height: auto; margin: 10px 0; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); }
+  .guide-steps { display: grid; gap: 10px; }
+  .guide-steps .guide-img { margin: 0; }
+  /* LIVE Studio の貼り方は、3枚を横に並べる（縦に長くならないように） */
+  #liveStudioGuide .guide-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 760px) { #liveStudioGuide .guide-steps { grid-template-columns: minmax(0, 1fr); } }
   .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 24px; }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
@@ -1099,7 +1126,7 @@ ${CONTROLS_CSS}
         </select></div></div>
         <div class="setting"><div class="setting-text"><label for="fillReach">届く距離</label></div><div class="setting-control"><input id="fillReach" type="number" min="1" max="64" data-unit="マス"></div></div>
       </details>
-      <section class="card">
+      <section class="card" id="fillLook">
         <h2>見た目</h2>
         <p class="lead">配信に映るブロックと枠です。</p>
         <div class="setting tall"><div class="setting-text"><label for="fillHandBlock">手に持つブロック</label></div><div class="setting-control">
@@ -1123,25 +1150,9 @@ ${CONTROLS_CSS}
           </select></div></div>
       </section>
     </div>
-    <section class="card">
-      <h2>ワールド</h2>
-      <p class="lead">コマンドの代わりです。変えるとすぐマイクラに入り、ワールドに入るたびにも入れ直します。埋め立て中でも変えられます。</p>
-        <div class="setting"><div class="setting-text"><label for="worldTime">時間</label></div><div class="setting-control"><select id="worldTime">
-          <option value="normal">進む（ふつう）</option><option value="day">昼で止める</option><option value="night">夜で止める</option>
-        </select></div></div>
-        <div class="setting"><div class="setting-text"><label for="worldWeather">天気</label></div><div class="setting-control"><select id="worldWeather">
-          <option value="normal">変わる（ふつう）</option><option value="clear">晴れで止める</option><option value="rain">雨で止める</option>
-        </select></div></div>
-        <div class="setting"><div class="setting-text"><label for="worldMobSpawning">モブが自然に湧く</label></div><div class="setting-control"><select id="worldMobSpawning">
-          <option value="true">湧く（ふつう）</option><option value="false">湧かない（妨害のモブだけ）</option>
-        </select></div></div>
-        <div class="setting"><div class="setting-text"><label for="worldKeepInventory">やられたときの持ち物</label></div><div class="setting-control"><select id="worldKeepInventory">
-          <option value="false">落とす（ふつう）</option><option value="true">残る</option>
-        </select></div></div>
-    </section>
     </div>
     <aside class="split-side" id="fillSide">
-      <section class="card">
+      <section class="card" id="frameCard">
         <h2>枠の大きさ</h2>
         <div class="frame-figure" id="frameFigure"></div>
         <p class="frame-size" id="frameSize"></p>
@@ -1149,6 +1160,22 @@ ${CONTROLS_CSS}
           <summary>始めるとどうなるか</summary>
           <p class="hint" style="margin-top: 8px;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
         </details>
+      </section>
+      <section class="card">
+        <h2>ワールド</h2>
+        <p class="lead">コマンドの代わりです。変えるとすぐマイクラに入り、ワールドに入るたびにも入れ直します。埋め立て中でも変えられます。</p>
+          <div class="setting"><div class="setting-text"><label for="worldTime">時間</label></div><div class="setting-control"><select id="worldTime">
+            <option value="normal">進む（ふつう）</option><option value="day">昼で止める</option><option value="night">夜で止める</option>
+          </select></div></div>
+          <div class="setting"><div class="setting-text"><label for="worldWeather">天気</label></div><div class="setting-control"><select id="worldWeather">
+            <option value="normal">変わる（ふつう）</option><option value="clear">晴れで止める</option><option value="rain">雨で止める</option>
+          </select></div></div>
+          <div class="setting"><div class="setting-text"><label for="worldMobSpawning">モブが自然に湧く</label></div><div class="setting-control"><select id="worldMobSpawning">
+            <option value="true">湧く（ふつう）</option><option value="false">湧かない（妨害のモブだけ）</option>
+          </select></div></div>
+          <div class="setting"><div class="setting-text"><label for="worldKeepInventory">やられたときの持ち物</label></div><div class="setting-control"><select id="worldKeepInventory">
+            <option value="false">落とす（ふつう）</option><option value="true">残る</option>
+          </select></div></div>
       </section>
     </aside>
     </div>
@@ -1196,6 +1223,10 @@ ${CONTROLS_CSS}
 <main id="tabOverlay" hidden>
   <div class="page-head"><h1>配信画面</h1></div>
   <div class="page">
+    <details class="card fold-card" id="liveStudioGuide">
+      <summary><h2>LIVE Studio での貼り方</h2><span class="fold-note">下の部品の「コピー」を押して、この手順で貼ります</span></summary>
+      <div class="guide-steps">${GUIDE.liveStudio.map((g, i) => `<img class="guide-img" src="${g.src}" alt="${i + 1}. ${g.alt}" width="1280" height="720">`).join('')}</div>
+    </details>
     <div class="split">
       <div class="stack">
         <section class="card">
@@ -1542,13 +1573,14 @@ ${CONTROLS_CSS}
   </div>
   <div data-step="1" hidden>
     <h2>TikTok ID</h2>
-    <p class="hint">配信するアカウントのIDを入れてください（@なし）。配信が始まると自動でつながります。</p>
+    <p class="hint">配信するアカウントのIDを入れてください（@なし）。配信が始まると自動でつながります。プロフィールの URL の「@」のあとの部分が ID です（表示名ではありません）。</p>
+    <img class="guide-img" src="${GUIDE.tiktokId.src}" alt="${GUIDE.tiktokId.alt}" width="1000" height="320">
     <input id="wizUsername" autocomplete="off" spellcheck="false" placeholder="例: my_tiktok_id">
   </div>
   <div data-step="2" hidden>
     <h2>準備ができました</h2>
     <ol class="hint" style="font-size: 15px; line-height: 1.9; color: var(--text);">
-      <li>ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動</li>
+      <li>ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動<img class="guide-img" src="${GUIDE.minecraft.src}" alt="${GUIDE.minecraft.alt}" width="1000" height="320"></li>
       <li>ワールドを開く（左下の「マイクラ」が緑になります）</li>
       <li>枠を作りたい場所に立って、「配信」の画面の「埋め立てを始める」</li>
       <li>「配信」の画面の「配信前のチェック」で、全部 ✓ になっているか確かめる</li>
@@ -2271,7 +2303,8 @@ ${CONTROLS_JS}
       copy.textContent = 'コピーしました';
       setTimeout(() => (copy.textContent = 'コピー'), 1500);
     });
-    const head = el('div', 'card-head', el('h2', '', w.name), el('span', 'showing', '試し表示中'));
+    const head = el('div', 'card-head', el('h2', '', w.name), el('span', 'showing', '試し表示中'),
+      Object.assign(el('span', 'size', 'おすすめ ' + w.size[0] + '×' + w.size[1]), { title: 'おすすめの大きさ（幅×高さ）' }));
     if (w.id === 'ranking') {
       const reset = Object.assign(el('button', 'ghost', 'リセット'), { type: 'button', title: 'この配信のギフトの合計を0に戻します' });
       reset.addEventListener('click', async () => {
@@ -2280,8 +2313,7 @@ ${CONTROLS_JS}
       });
       head.append(reset);
     }
-    const card = el('section', 'card widget', head, el('p', 'lead', w.description),
-      el('div', 'url', el('code', '', url), copy), el('span', 'size', 'おすすめの大きさ: 幅' + w.size[0] + '×高さ' + w.size[1]));
+    const card = el('section', 'card widget', head, el('p', 'lead', w.description), el('div', 'url', el('code', '', url), copy));
     card.dataset.id = w.id;
     card.tabIndex = 0;
     card.addEventListener('click', (e) => {
@@ -2309,9 +2341,20 @@ ${CONTROLS_JS}
     placeAlerts(id);
     // 分析は開いたときに読み直す
     if (id === 'tabStats') loadStreams();
+    if (id === 'tabOverlay') openGuideUntilPasted();
     // 配信の画面に戻ったら、ログは最新を見せる
     if (id === 'tabLive' && followLog) $('log').scrollTop = $('log').scrollHeight;
     storage('redstone.tab', id);
+  }
+  /** LIVE Studio の貼り方は、部品が一度も LIVE Studio で開かれていないうちは開いておく（貼れたら畳む） */
+  async function openGuideUntilPasted() {
+    if (!storage('redstone.overlayPasted')) {
+      try {
+        const { open } = await (await fetch('/api/overlays')).json();
+        if (Object.values(open).some((n) => n > 0)) storage('redstone.overlayPasted', '1');
+      } catch {}
+    }
+    $('liveStudioGuide').open = !storage('redstone.overlayPasted');
   }
   document.querySelectorAll('nav [data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
   document.querySelectorAll('[data-goto]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.goto)));
@@ -3778,7 +3821,7 @@ ${CONTROLS_JS}
     $('fillRunning').hidden = !fill;
     $('fillEmpty').hidden = !!fill;
     $('fillIdle').hidden = !!fill;
-    $('fillSide').hidden = !!fill;
+    $('frameCard').hidden = !!fill;
     $('fillBusy').hidden = !fill;
     $('fillStart').hidden = !!fill;
     $('fillStop').hidden = !fill;

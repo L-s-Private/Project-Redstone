@@ -1,3 +1,4 @@
+import { ExternalLink } from '../../components/ExternalLink.js';
 import { Contact } from '../../components/Contact.js';
 import { DocPage } from '../../components/DocPage.js';
 import { Todo } from '../../components/Todo.js';
@@ -37,7 +38,7 @@ export default function Privacy() {
       <h2 id="stored">1. PC の中に保存するもの</h2>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>保存するもの</th><th>中身</th><th>保存する期間</th></tr></thead>
+          <thead><tr><th scope="col">保存するもの</th><th scope="col">中身</th><th scope="col">保存する期間</th></tr></thead>
           <tbody>
             {STORED.map(([name, what, period]) => <tr key={name}><th scope="row">{name}</th><td>{what}</td><td>{period}</td></tr>)}
           </tbody>
@@ -48,11 +49,11 @@ export default function Privacy() {
       <h2 id="sent">2. 外に送るもの・外から取るもの</h2>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>相手</th><th>いつ</th><th>送るもの・取るもの</th></tr></thead>
+          <thead><tr><th scope="col">相手</th><th scope="col">いつ</th><th scope="col">送るもの・取るもの</th></tr></thead>
           <tbody>
-            <tr><th scope="row"><a href="https://www.eulerstream.com/" target="_blank" rel="noreferrer">Euler Stream</a></th><td>TikTok LIVE につなぐとき</td><td>利用者の TikTok ID を送ります（つなぐための署名をもらうため）</td></tr>
+            <tr><th scope="row"><ExternalLink href="https://www.eulerstream.com/">Euler Stream</ExternalLink></th><td>TikTok LIVE につなぐとき</td><td>利用者の TikTok ID を送ります（つなぐための署名をもらうため）</td></tr>
             <tr><th scope="row">TikTok</th><td>配信中</td><td>LIVE のギフト・いいね・コメント・フォローなどと、ギフトの一覧を受け取ります</td></tr>
-            <tr><th scope="row"><a href="https://fabricmc.net/" target="_blank" rel="noreferrer">Fabric</a>・<a href="https://modrinth.com/" target="_blank" rel="noreferrer">Modrinth</a></th><td>「まとめて導入する」を押したとき</td><td>Minecraft の準備に使うファイルを取得します</td></tr>
+            <tr><th scope="row"><ExternalLink href="https://fabricmc.net/">Fabric</ExternalLink>・<ExternalLink href="https://modrinth.com/">Modrinth</ExternalLink></th><td>「まとめて導入する」を押したとき</td><td>Minecraft の準備に使うファイルを取得します</td></tr>
           </tbody>
         </table>
       </div>
@@ -76,7 +77,7 @@ export default function Privacy() {
       </ul>
 
       <h2 id="delete">5. 消し方</h2>
-      <p>アプリを閉じてから、フォルダ <code>%APPDATA%\StaticArc</code>（設定・ログ・ランキング・分析・演出のファイル・ウィンドウの位置など）を消すと、1の情報はすべて消えます。</p>
+      <p>アプリを閉じてから、フォルダ<code>%APPDATA%\StaticArc</code>（設定・ログ・ランキング・分析・演出のファイル・ウィンドウの位置など）を消すと、1の情報はすべて消えます。</p>
       <p>Euler Stream など外部のサービスに渡った情報については、それぞれのサービスに問い合わせてください。</p>
 
       <h2 id="changes">6. 変更と問い合わせ</h2>

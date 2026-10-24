@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ActionIcon } from '../../components/ActionIcon.js';
 import { DocPage } from '../../components/DocPage.js';
 import { Media } from '../../components/Media.js';
+import { shotItem } from '../../media.js';
 import { pageMeta } from '../../seo.js';
 
 export const metadata = pageMeta({ title: 'できること', description: 'STATIC ARC で出せる妨害（TNT・モブ・雷・逮捕・操作禁止など）と、ギフト・いいね・コメントなどのきっかけ、ゲームモード、配信画面の部品の一覧です。', path: '/features/' });
@@ -16,45 +17,45 @@ const TOC = [
 ];
 
 // アプリの「妨害の設定」と同じ並び・説明（app/src/ui/panel.js の ACTION_GROUPS）。アプリで妨害を足したら、ここにも足す。
-// 先頭はアイコンの名前（components/ActionIcon.js・src/media.js の ICONS）
+// 先頭はアイコンと写真の名前（components/ActionIcon.js・src/media.js の ICONS・shotItem）
 const ACTION_GROUPS = [
   ['敵・爆発', [
-    ['tnt', 'TNT', '枠の中に TNT が落ちて、埋めたブロックを壊す（採掘チャレンジでは地形を壊さない）'],
-    ['mob', 'モブ', 'ゾンビ・スケルトン・クリーパー・クモ・ウィッチ・シルバーフィッシュ・ブタが出てくる'],
-    ['lightning', '雷', '枠の中に雷が落ちて、まわりのブロックを少し壊す（火事にはならない）'],
+    ['tnt', 'TNT', '枠の中に TNT が落ちて、埋めたブロックを壊します（採掘チャレンジでは地形を壊しません）'],
+    ['mob', 'モブ', 'ゾンビ・スケルトン・クリーパー・クモ・ウィッチ・シルバーフィッシュ・ブタが出てきます'],
+    ['lightning', '雷', '枠の中に雷が落ちて、まわりのブロックを少し壊します（火事にはなりません）'],
   ]],
   ['動きをじゃまする', [
-    ['jail', '逮捕', '枠の横の牢屋に入れられて、決めた秒数のあいだ埋められない。終わると枠に戻る'],
-    ['freeze', '操作禁止', 'その場から動けず、ブロックも置けない'],
-    ['levitate', '浮遊', '体がふわふわ浮き上がる'],
-    ['night', '夜にする', '決めた秒数のあいだ夜になる。終わると元の時刻に戻る'],
+    ['jail', '逮捕', '枠の横の牢屋に入れられ、決めた秒数のあいだ埋められません。時間が来ると枠に戻ります'],
+    ['freeze', '操作禁止', 'その場から動けなくなり、ブロックも置けません'],
+    ['levitate', '浮遊', '体がふわふわと浮き上がります'],
+    ['night', '夜にする', '決めた秒数のあいだ夜になります。時間が来ると元の時刻に戻ります'],
   ]],
   ['埋め立てをじゃまする', [
-    ['fill_expand', '枠を広げる', '枠が広がって、埋める所が増える'],
-    ['fill_raise', '枠を高くする', '枠が高くなって、埋める段が増える（次のラウンドで元に戻る）'],
-    ['fill_clear', '全消し', '埋めたブロックが全部消える'],
+    ['fill_expand', '枠を広げる', '枠が広がり、埋める所が増えます'],
+    ['fill_raise', '枠を高くする', '枠が高くなり、埋める段が増えます（次のラウンドで元に戻ります）'],
+    ['fill_clear', '全消し', '埋めたブロックが全部消えます'],
   ]],
   ['お助け', [
-    ['fill_help', 'お助けブロック', '空いている所が下から埋まる'],
-    ['fill_layer', '一段埋め', 'いちばん下の空いている段が、まるごと埋まる'],
-    ['fill_shrink', '枠を縮める', '枠が小さくなって、埋める所が減る'],
-    ['message', 'メッセージだけ', '配信画面とマイクラに文を出すだけ（感謝などに）'],
+    ['fill_help', 'お助けブロック', '空いている所が下から埋まります'],
+    ['fill_layer', '一段埋め', 'いちばん下の空いている段が、まるごと埋まります'],
+    ['fill_shrink', '枠を縮める', '枠が小さくなり、埋める所が減ります'],
+    ['message', 'メッセージだけ', '配信画面とマイクラにメッセージを出すだけの妨害です。お礼などに使えます'],
   ]],
   ['採掘チャレンジのお助け', [
-    ['mining_bonus_drop', '収集支援', '対象アイテムがプレイヤーの近くに落ちる。拾うと数える（1回の挑戦で目標数の4分の1まで）'],
+    ['mining_bonus_drop', '収集支援', '集めるアイテムがプレイヤーの近くに落ちます。拾うと数に入ります（1回の挑戦で目標数の4分の1まで）'],
   ]],
 ];
 
 const TRIGGERS = [
-  ['ギフト', 'ギフトの種類ごとに決める'],
-  ['コイン数で', '種類で決めていないギフトは、コイン数で決める（「100コイン以上なら TNT」など）'],
-  ['いいね', 'いいねが決めた回数たまるたびに'],
-  ['コメント', '決めた言葉だけをコメントしたら（同じ人は少し待たないと出せない）'],
-  ['フォロー・シェア', '配信をフォロー・シェアしてもらったら'],
+  ['ギフト', 'ギフトの種類ごとに決めます'],
+  ['コイン数', '種類で決めていないギフトは、コイン数で決めます（「100コイン以上なら TNT」など）'],
+  ['いいね', 'いいねが決めた回数たまるたび'],
+  ['コメント', '決めた言葉がコメントされたとき（同じ人が続けて出すには、少し間をあける必要があります）'],
+  ['フォロー・シェア', '配信がフォロー・シェアされたとき'],
 ];
 
 const PRESETS = [
-  ['定番', 'モブと TNT が中心。最初はこれ'],
+  ['定番', 'モブと TNT が中心。はじめての方におすすめ'],
   ['やさしめ', 'お助けが多く、クリアしやすい'],
   ['激辛', '逮捕・全消しなど、きつい妨害が多い'],
 ];
@@ -67,18 +68,20 @@ const OVERLAYS = [
   ['ギフトランキング', 'ギフトを多く送った上位5人'],
 ];
 
-function ActionTable({ actions }) {
+// 妨害ごとのカード。上にゲーム画面の写真（起きた瞬間）、下にアイコン・名前・説明
+function ActionCards({ actions }) {
   return (
-    <div className="table-wrap">
-      <table>
-        <thead><tr><th colSpan={2}>妨害</th><th>起きること</th></tr></thead>
-        <tbody>
-          {actions.map(([icon, name, text]) => (
-            <tr key={name}><td className="icon-cell"><ActionIcon name={icon} size={30} /></td><th scope="row">{name}</th><td>{text}</td></tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="shot-grid">
+      {actions.map(([key, name, text]) => (
+        <li key={key} className="card">
+          <Media item={shotItem(key)} alt={`${name}が起きた瞬間のゲーム画面`} />
+          <div className="card-body">
+            <b className="with-icon"><ActionIcon name={key} size={24} />{name}</b>
+            <span>{text}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -86,7 +89,7 @@ function Table({ head, rows }) {
   return (
     <div className="table-wrap">
       <table>
-        <thead><tr>{head.map((h) => <th key={h}>{h}</th>)}</tr></thead>
+        <thead><tr>{head.map((h) => <th key={h} scope="col">{h}</th>)}</tr></thead>
         <tbody>
           {rows.map(([name, text]) => <tr key={name}><th scope="row">{name}</th><td>{text}</td></tr>)}
         </tbody>
@@ -101,7 +104,7 @@ export default function Features() {
       title="できること"
       path="/features/" cta
       toc={TOC}
-      lead={<p className="lead">STATIC ARC で出せる妨害と、使える機能の一覧です。どれも無料で使えます。設定のしかたは <Link href="/guide/">使い方ガイド</Link> にあります。</p>}
+      lead={<p className="lead">STATIC ARC で出せる妨害と、使える機能の一覧です。どれも無料で使えます。設定のしかたは<Link href="/guide/">使い方ガイド</Link>にあります。</p>}
     >
       <h2 id="modes">ゲームモード</h2>
       <p>遊び方を1つ選びます。ゲームを始めなくても、妨害は出せます。</p>
@@ -131,13 +134,13 @@ export default function Features() {
       {ACTION_GROUPS.map(([group, actions]) => (
         <section key={group}>
           <h3>{group}</h3>
-          <ActionTable actions={actions} />
+          <ActionCards actions={actions} />
         </section>
       ))}
       <p>ギフトごとに、配信画面で鳴らす音や、出す画像・動画も付けられます。</p>
 
       <h2 id="presets">プリセット</h2>
-      <p>はじめから、ルールの組み合わせが3つ入っています。選ぶだけで使えます。自分で作った組み合わせも、名前を付けて取っておけます。</p>
+      <p>はじめから、ルールの組み合わせが3つ入っています。選ぶだけで使えます。自分で作った組み合わせも、名前を付けて保存できます。</p>
       <Table head={['プリセット', '中身']} rows={PRESETS} />
 
       <h2 id="overlays">配信画面の部品</h2>

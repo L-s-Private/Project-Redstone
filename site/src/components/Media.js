@@ -2,9 +2,10 @@ import { MEDIA } from '../media.js';
 import { hasPublicFile } from '../publicFile.js';
 import { LoopVideo } from './LoopVideo.js';
 
-// 画像・動画の枠。ファイルがあればそれを出し、無ければ「何を入れるか」を書いた PH の枠を出す
-export function Media({ id, alt = '', className = '' }) {
-  const item = MEDIA[id];
+// 画像・動画の枠。ファイルがあればそれを出し、無ければ「何を入れるか」を書いた PH の枠を出す。
+// id は src/media.js の MEDIA の名前。一覧に無いもの（妨害の写真など）は item で直接渡す
+export function Media({ id, item: given, alt = '', className = '' }) {
+  const item = given ?? MEDIA[id];
   const style = { aspectRatio: item.ratio };
   if (hasPublicFile(item.file)) {
     if (item.file.endsWith('.mp4')) {

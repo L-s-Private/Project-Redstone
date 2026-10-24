@@ -20,7 +20,8 @@ export const MEDIA = {
   },
   step1: { file: '/media/step-1.webp', ratio: '16 / 10', label: 'アプリ画面', spec: '「まとめて導入する」に印' },
   step2: { file: '/media/step-2.webp', ratio: '16 / 10', label: 'アプリ画面', spec: 'TikTok ID の欄に印' },
-  step3: { file: '/media/step-3.webp', ratio: '16 / 10', label: 'ランチャーの画面', spec: '起動する構成に印' },
+  smartscreen: { file: '/media/smartscreen.webp', ratio: '16 / 10', label: 'Windows の警告画面', spec: '青い画面。「詳細情報」と、そのあと出る「実行」に印' },
+  step3: { file: '/media/step-3.webp', ratio: '16 / 10', label: 'ランチャーの画面', spec: '起動構成に印' },
 };
 
 // 妨害のアイコン。public/icons/<名前>.svg を置くと、仮の絵と入れ替わる（components/ActionIcon.js）
@@ -41,3 +42,25 @@ export const ICONS = {
   message: 'メッセージだけ',
   mining_bonus_drop: '収集支援',
 };
+
+// 「できること」の妨害の写真（ゲーム画面のスクショ）。public/shots/<名前>.webp を置くと出る。決まりは site/README.md の「妨害の写真」
+// マイクラの絵（テクスチャ）は使わず、妨害が起きた瞬間のゲーム画面をそのまま使う（Minecraft のガイドラインでスクショは使ってよい）
+const SHOT_SPECS = {
+  tnt: 'TNT が枠に落ちて、埋めたブロックが崩れている瞬間',
+  mob: 'ゾンビ・クリーパーなどが何体か、枠のまわりに出ている',
+  lightning: '雷が枠に落ちた瞬間（光っているところ）',
+  jail: '牢屋の中にいるプレイヤー（F5 で後ろから）',
+  freeze: '動けなくなった瞬間。画面下に金色の「操作禁止」の文字が出ている',
+  levitate: '体が浮き上がっているプレイヤー（F5 で後ろから）',
+  night: '夜になった枠のまわり',
+  fill_expand: '広がった枠（少し上から見下ろす）',
+  fill_raise: '高くなった枠（少し離れて横から）',
+  fill_clear: '全部消えて空っぽになった枠',
+  fill_help: '下から埋まった枠',
+  fill_layer: 'いちばん下の段がまるごと埋まった枠',
+  fill_shrink: '小さくなった枠（少し上から見下ろす）',
+  message: '画面下に金色のメッセージが出ている',
+  mining_bonus_drop: 'プレイヤーの近くに、対象のアイテムが落ちている',
+};
+
+export const shotItem = (name) => ({ file: `/shots/${name}.webp`, ratio: '16 / 9', label: 'ゲーム画面の写真', spec: SHOT_SPECS[name] ?? '' });

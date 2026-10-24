@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { breadcrumbLd } from '../seo.js';
 import { CtaBand } from './CtaBand.js';
 import { JsonLd } from './JsonLd.js';
+import { TocNav } from './TocNav.js';
 
 // 文章のページ（ガイド・規約など）の上の帯。パンくず（トップ › このページ）と見出し
 export function PageHead({ title, lead, path }) {
@@ -30,10 +31,7 @@ export function DocPage({ title, lead, path, toc, cta = false, children }) {
       <PageHead title={title} lead={lead} path={path} />
       <div className="doc">
         <div className="container doc-layout">
-          <nav className="toc" aria-label="目次">
-            <p>目次</p>
-            {toc.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
-          </nav>
+          <TocNav toc={toc} />
           <article className="doc-body">{children}</article>
         </div>
       </div>

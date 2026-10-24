@@ -8,7 +8,7 @@ export const SITE = {
   /** 問い合わせのメールアドレス（Minecraft のガイドライン上、必ず載せる） */
   contactEmail: '',
   /** Discord の招待リンク（期限なしで作ったもの）。空のあいだは「未定」の印が出る */
-  discordUrl: '',
+  discordUrl: 'https://discord.gg/j5R8dKkXy',
   /** exe のダウンロード先（誰でも取れる場所）。空のあいだは、ボタンが「準備中」になる */
   downloadUrl: '',
   /** 利用規約・プライバシーポリシーの施行日（例: 2026年11月1日） */

@@ -28,6 +28,13 @@ npm run build    # out/ に公開用のファイルができる（見るとき�
 | `src/app/sitemap.js` `robots.js` | 検索エンジン向け（`sitemap.xml`・`robots.txt` になる） |
 | `src/seo.js` | ページごとの説明文・正しい住所（canonical）・リンクを貼ったときの表示・パンくず。ページを足したら `pageMeta` を使い、`sitemap.js` にも足す |
 | `src/components/Icon.js` | 線のアイコン（lucide-react）。名前は https://lucide.dev で探す |
+| `src/components/CopyText.js` | フォルダの場所など、コピーして使う文字（横に「コピー」ボタン） |
+| `src/components/PcHandoff.js` | スマホで見に来た人に「PC に送る・リンクをコピー」を出すカード（トップのダウンロード） |
+| `src/components/HeroFx.js` | いちばん上の「ギフトの通知 → TNT が落ちる」の動き。画面に入ってから1回だけ動く |
+| `src/components/Ticker.js` | 横に流れ続ける帯（きっかけ → 妨害の例）。例を変えるときはここの `ITEMS` |
+| `src/components/MotionToggle.js` | ずっと動くもの（雲・流れる帯）を止めるボタン。ずっと動くものを足したら、これで止まるようにする（WCAG 2.2.2） |
+| `src/components/TocNav.js` | 目次。今読んでいる節に印を付ける |
+| `src/components/ExternalLink.js` | ほかのサイトへのリンク。新しいタブで開くことを、アイコンと読み上げの文で伝える。外へのリンクは必ずこれを使う |
 | `src/components/CtaBand.js` | ページのいちばん下の「ダウンロード・Discord」の帯（`DocPage` に `cta` を付けると出る） |
 | `src/app/not-found.js` | 住所が違うときのページ |
 | `src/app/globals.css` | 見た目 |
@@ -43,12 +50,34 @@ npm run build    # out/ に公開用のファイルができる（見るとき�
 | `public/media/how-1.webp` 〜 `how-3.webp` | しくみの3コマのイラスト（4:3） |
 | `public/media/mode-fill.mp4` `mode-mining.mp4`（＋ `.jpg`） | ゲームモードの録画（16:9・音なし） |
 | `public/media/step-1.webp` 〜 `step-3.webp` | はじめ方の画面（16:10・押すところに印） |
+| `public/media/smartscreen.webp` | 初めて開いたときの青い警告画面（16:10。「詳細情報」と「実行」に印）。ガイドの「はじめの準備」で使う |
 | `public/icons/<名前>.svg` | 妨害のアイコン。名前は `src/media.js` の `ICONS`（`tnt`・`mob` など）。置くまでは仮の積み木の絵 |
 | `public/og.png` | リンクを貼ったときに出る絵（1200×630）。置くまでは出さない |
+| `public/shots/<名前>.webp` | 「できること」の妨害ごとのゲーム画面の写真。名前と中身は `src/media.js` の `SHOT_SPECS`。決まりは下の「妨害の写真」 |
 
 - 録画の元のファイルは大きいので Git に入れない。MP4（H.264・音なし）に軽くしてから置く
 - アイコン・イラストは「ブロックっぽさ」までにして、マイクラの絵（テクスチャ）・画面（持ち物画面の灰色など）・字体には似せない。Minecraft のガイドラインで、これらも Mojang の「ブランド」に入るため（録画・スクショはそのまま使ってよい）
 - 置き場所や大きさを変えるときは `src/media.js` を直す
+
+## 妨害の写真
+
+「できること」の妨害の一覧には、その妨害が起きた瞬間のゲーム画面の写真を出す。マイクラの絵（テクスチャ）を切り出したアイコンは使わない（Minecraft のガイドラインで、プレイのスクショは使ってよいが、テクスチャは Mojang のブランドのため）。トップのマス目やボタンには、オリジナルのアイコン（`public/icons/`）を使う。
+
+**撮り方**
+
+- マイクラの画面の大きさは 1920×1080（横長 16:9）。F2 で撮る（`%APPDATA%\.minecraft\screenshots` に PNG で保存される）
+- MOD は STATIC ARC だけ、リソースパックなし（ふつうのマイクラの見た目のまま）
+- 妨害は、アプリの各ルールの「▶ 試す」で出す（本物の視聴者の名前が出ないように。画面下に金色で「テストさん: TNT ×3」のように出る）
+- 画面下の持ち物の列と金色の文字は消さない（何が起きたかわかる）。F3 の情報画面・チャット・プレイヤーの一覧は出さない
+- 同じワールド・同じスキン・明るい昼（「夜にする」以外）でそろえる
+- 絵の一部だけ（アイテムの絵だけなど）を切り抜かない。画面全体か、16:9 のまま少し寄せるくらいにする
+- 写真の上に、文字やロゴを書き足さない
+
+**置き方**
+
+- 撮った PNG を渡してもらえれば、WebP（1280×720・品質 85）に軽くして `public/shots/<名前>.webp` に置く
+- 自分で置くとき：`magick 元.png -resize 1280x720 -quality 85 public/shots/tnt.webp`
+- 名前（`tnt`・`mob`・`lightning`・`jail`・`freeze`・`levitate`・`night`・`fill_expand`・`fill_raise`・`fill_clear`・`fill_help`・`fill_layer`・`fill_shrink`・`message`・`mining_bonus_drop`）と、何を写すかは `src/media.js` の `SHOT_SPECS`。まだ無い写真は、ページに斜線の枠で「何を写すか」が出る
 
 ## 公開前に
 

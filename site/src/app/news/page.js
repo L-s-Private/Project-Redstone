@@ -14,7 +14,7 @@ export default function News() {
       <PageHead
         title="お知らせ・更新履歴"
         path="/news/"
-        lead={<p className="lead">STATIC ARC は自動では新しくなりません。新しい版が出たら、ここからダウンロードし直してください。設定はそのまま引き継がれ、マイクラの MOD も自動で入れ替わります。</p>}
+        lead={<p className="lead">新しい版は自動では入れ替わらないので、お知らせが出たらこのページからダウンロードしてください。設定はそのまま引き継がれ、マイクラの MOD も自動で入れ替わります。</p>}
       />
       <div className="doc">
         <div className="container stack">

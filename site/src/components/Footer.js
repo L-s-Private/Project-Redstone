@@ -8,10 +8,10 @@ export function Footer() {
   return (
     <footer className="site-footer">
       <div className="container">
-        <nav className="footer-nav" aria-label="サイトのページ">
+        <nav className="footer-nav" aria-label="サイト内のページ一覧">
           {FOOTER_NAV.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
         </nav>
-        <p>お問い合わせ：<Contact /> ／ <Discord>Discord</Discord></p>
+        <p>お問い合わせ：{SITE.contactEmail && <><Contact /> ／ </>}<Discord>Discord</Discord></p>
         <p className="disclaimer">
           NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
           <br />

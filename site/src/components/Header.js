@@ -11,14 +11,14 @@ export function Header() {
       <header className="site-header">
         <div className="container header-inner">
           <Link href="/" className="header-logo" aria-label="STATIC ARC トップ"><Logo label="" /></Link>
-          <nav className="header-nav" aria-label="サイトのページ">
+          <nav className="header-nav" aria-label="メインメニュー">
             <NavLinks />
             <Link href="/#download" className="button button-small header-download"><Icon name="Download" size={16} />ダウンロード（無料）</Link>
           </nav>
         </div>
       </header>
       <div className="mobile-bar">
-        <Link href="/#download" className="button"><Icon name="Download" size={18} />無料でダウンロード</Link>
+        <Link href="/#download" className="button"><Icon name="Download" size={18} />無料でダウンロード（PC 用）</Link>
       </div>
     </>
   );

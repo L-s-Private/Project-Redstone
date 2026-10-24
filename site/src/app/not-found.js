@@ -10,7 +10,7 @@ export default function NotFound() {
       <div className="container">
         <p className="depth-note">深さ ？ ／ 掘りすぎたようです</p>
         <h1>ページが見つかりません</h1>
-        <p className="lead">住所が変わったか、なくなったページです。次のページから探してください。</p>
+        <p className="lead">ページが移動したか、削除された可能性があります。次のページから探してください。</p>
         <div className="hero-actions">
           <Link href="/" className="button"><Icon name="House" size={18} />トップへ</Link>
           <Link href="/guide/" className="text-link">使い方ガイド</Link>

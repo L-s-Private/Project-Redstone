@@ -66,6 +66,10 @@ class ActionRequestTest {
         assertEquals(64, custom.reach());
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"wall\":\"obsidian\"}"));
         assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"block\":\"tnt\"}"));
+        // 0.20 で足したブロックとモブ
+        assertEquals("black_concrete", ActionRequest.parse("{\"type\":\"fill_start\",\"block\":\"black_concrete\"}").block());
+        assertEquals("netherite_block", ActionRequest.parse("{\"type\":\"fill_start\",\"block\":\"netherite_block\"}").block());
+        assertTrue(ActionRequest.ALLOWED_MOBS.containsAll(java.util.List.of("husk", "wither_skeleton", "breeze", "phantom", "chicken")));
         assertEquals(5, ActionRequest.parse("{\"type\":\"fill_expand\",\"count\":99}").count());
         assertEquals(ActionRequest.Type.FILL_SHRINK, ActionRequest.parse("{\"type\":\"fill_shrink\"}").type());
         assertEquals(ActionRequest.Type.FILL_STOP, ActionRequest.parse("{\"type\":\"fill_stop\"}").type());
@@ -182,5 +186,23 @@ class ActionRequestTest {
         // 地形を壊さない TNT（既定は今までどおり壊す）
         assertTrue(ActionRequest.parse("{\"type\":\"tnt\"}").terrain());
         assertFalse(ActionRequest.parse("{\"type\":\"tnt\",\"terrain\":false}").terrain());
+    }
+
+    @Test
+    void parsesFillLayersFromTheBottom() throws Exception {
+        ActionRequest request = ActionRequest.parse("{\"type\":\"fill_start\",\"layers\":[{\"block\":\"iron_block\",\"rows\":3},{\"block\":\"diamond_block\",\"rows\":99}]}");
+        assertEquals(2, request.layers().size());
+        assertEquals("iron_block", request.layers().get(0).block());
+        assertEquals(3, request.layers().get(0).rows());
+        assertEquals(30, request.layers().get(1).rows(), "段数は枠の高さの上限に丸める");
+        assertTrue(ActionRequest.parse("{\"type\":\"fill_start\"}").layers().isEmpty(), "無ければ地層なし");
+    }
+
+    @Test
+    void rejectsBadFillLayers() {
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"layers\":[{\"block\":\"dirt\",\"rows\":3}]}"));
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"layers\":\"iron_block\"}"));
+        String seven = "{\"block\":\"iron_block\",\"rows\":1},".repeat(7);
+        assertThrows(InvalidRequestException.class, () -> ActionRequest.parse("{\"type\":\"fill_start\",\"layers\":[" + seven.substring(0, seven.length() - 1) + "]}"));
     }
 }

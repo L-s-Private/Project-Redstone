@@ -239,7 +239,7 @@ test('埋め立ての開始・終了を伝え、断られたら理由を返す',
     assert.deepEqual(calls, [{
       width: 15, height: undefined, countdown: undefined, rounds: undefined, wall: undefined, block: 'diamond_block', handBlock: undefined,
       skyY: undefined, reach: undefined, placeSpeed: undefined, breakSpeed: undefined, mobsAttack: undefined,
-      mobLifetime: undefined,
+      mobLifetime: undefined, layered: undefined, layers: undefined,
     }]);
     assert.equal(saved.length, 1, '始めたら設定を保存する');
     const stop = await json(port, '/api/fill/stop', {});

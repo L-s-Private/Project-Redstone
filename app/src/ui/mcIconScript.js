@@ -33,6 +33,11 @@ export const MC_ICON_JS = `
     // シルバーフィッシュは顔が小さすぎて目しか見えないので、スポーンエッグ
     silverfish: { item: 'silverfish_spawn_egg' },
     pig: { face: ['entity_pig', 64, 64, 8, 8, 8, 8, [[17, 17, 4, 3, 2, 4]]] },
+    husk: { face: ['entity_husk', 64, 64, 8, 8, 8, 8] },
+    stray: { face: ['entity_stray', 64, 32, 8, 8, 8, 8] },
+    wither_skeleton: { face: ['entity_wither_skeleton', 64, 32, 8, 8, 8, 8] },
+    pillager: { face: ['entity_pillager', 64, 64, 8, 8, 8, 10, [[26, 2, 2, 4, 3, 6]]] },
+    blaze: { face: ['entity_blaze', 64, 32, 8, 8, 8, 8] },
     spawn_egg: { face: ['entity_zombie', 64, 64, 8, 8, 8, 8] },
     // 透明なガラスは空っぽの箱に見えるので、枠が動く＝ピストン
     fill_expand: { cube: ['piston_top', 'piston_side'] },
@@ -58,6 +63,8 @@ export const MC_ICON_JS = `
   for (const name of ['coal', 'raw_iron', 'raw_copper', 'raw_gold', 'diamond', 'emerald', 'lapis_lazuli', 'redstone', 'quartz', 'amethyst_shard', 'flint']) {
     MC_ICONS[name] = { item: name };
   }
+  for (const name of ['drowned', 'cave_spider', 'slime', 'magma_cube', 'phantom', 'vex', 'breeze', 'endermite', 'chicken']) MC_ICONS[name] = { item: name + '_spawn_egg' };
+  for (const name of ['netherite_block', 'copper_block', 'coal_block', 'obsidian', 'crying_obsidian', 'glowstone', 'purpur_block', 'end_stone_bricks', 'bricks', 'white_concrete', 'red_concrete', 'orange_concrete', 'yellow_concrete', 'lime_concrete', 'light_blue_concrete', 'blue_concrete', 'purple_concrete', 'pink_concrete', 'black_concrete']) MC_ICONS[name] = { cube: [name, name] };
   for (const name of ['amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block',
     'glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock']) {
     MC_ICONS[name] = { cube: [name, name] };

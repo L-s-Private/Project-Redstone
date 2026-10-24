@@ -4,14 +4,15 @@
 import { DEFAULT_OVERLAY_STYLE, OVERLAY_FONTS } from '../config.js';
 import { MINING_TARGETS } from '../mining.js';
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
+import { TRIGGER_ICON_CSS, TRIGGER_ICON_JS } from './triggerIcons.js';
 
 /** 部品の一覧。size は縦画面（1080×1920）に置くときのおすすめの大きさ */
 export const OVERLAY_WIDGETS = [
   { id: 'alerts', name: 'ギフト通知', description: 'ギフトが届いて妨害が出たら、ギフトの絵・送った人・出た妨害を大きく出します。', size: [1080, 560] },
-  { id: 'gifts', name: 'ギフト表', description: 'どのギフトで何が起きるかの一覧表。「妨害の設定」のルールがそのまま出ます。', size: [1080, 608] },
+  { id: 'gifts', name: 'ギフト表', description: 'どのギフトで何が起きるかの一覧表。「妨害の設定」のルールがそのまま出ます。横4列×3行まで。入りきらないときは、8秒ごとにページが切り替わります。', size: [1080, 750] },
   { id: 'round', name: 'ゲーム状況', description: 'ラウンドや集めた数・残り時間と、クリアの演出。ゲーム中だけ出ます。', size: [1080, 360] },
   { id: 'goal', name: 'いいねの目標', description: '「いいね あと 320 回で TNT ×5」のような、いいねの目標のバー（近い3つまで）。', size: [1080, 420] },
-  { id: 'ranking', name: 'ギフトランキング', description: 'この配信でギフトを多く送ってくれた上位5人（コインの合計）。テスト送信は数えません。', size: [540, 600] },
+  { id: 'ranking', name: 'ギフトランキング', description: 'この配信でギフトを多く送ってくれた上位5人（コインの合計）。テスト送信は数えません。', size: [540, 450] },
 ];
 
 const widgetSize = (id) => OVERLAY_WIDGETS.find((w) => w.id === id).size;
@@ -56,11 +57,11 @@ const BASE_JS = String.raw`
     node.append(...children);
     return node;
   }
-  /** ギフトの絵。読めなければ代わりの印 */
-  function giftPicture(src, fallback) {
-    if (!src) return el('span', 'badge', fallback);
+  /** ギフトの絵。読めなければ代わりの印（きっかけのアイコン。triggerIcons.js） */
+  function giftPicture(src, fallback = 'gift') {
+    if (!src) return triIcon(fallback);
     const img = Object.assign(document.createElement('img'), { className: 'gift-img', src, alt: '', referrerPolicy: 'no-referrer' });
-    img.addEventListener('error', () => img.replaceWith(el('span', 'badge', fallback)));
+    img.addEventListener('error', () => img.replaceWith(triIcon(fallback)));
     return img;
   }
   const coins = (n) => Number(n).toLocaleString('ja-JP');
@@ -129,7 +130,7 @@ function page({ id, title, size, css, body, script }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
-<style>:root { --u: min(1vw, calc(1vh * ${size[0]} / ${size[1]})); ${STYLE_VARS} }${BASE_CSS}${MC_ICON_CSS}${css}
+<style>:root { --u: min(1vw, calc(1vh * ${size[0]} / ${size[1]})); ${STYLE_VARS} }${BASE_CSS}${MC_ICON_CSS}${TRIGGER_ICON_CSS}${css}
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -140,6 +141,7 @@ const FONTS = ${JSON.stringify(OVERLAY_FONTS)};
 const WIDGET = ${JSON.stringify(id)};
 let STYLE = ${JSON.stringify(DEFAULT_OVERLAY_STYLE)};
 ${MC_ICON_JS}
+${TRIGGER_ICON_JS}
 ${BASE_JS}
 // 試し表示（#demo）でも、見た目の設定だけは操作画面から受け取って、変えたらすぐ映す
 if (DEMO) connect({ onState: () => {} });
@@ -211,7 +213,7 @@ const ALERTS = page({
   function showAlert(alert) {
     const picture = el('div', 'picture');
     // ギフトならその絵、いいね・フォローなどは妨害の絵
-    if (alert.giftImage) picture.append(giftPicture(alert.giftImage, '🎁'));
+    if (alert.giftImage) picture.append(giftPicture(alert.giftImage));
     else picture.append(mcIcon(alert.icon));
     const text = el('div', 'text', el('div', 'who muted ellipsis fit', alert.who));
     if (alert.giftName) {
@@ -287,83 +289,169 @@ const ALERTS = page({
 });
 
 // ---- ギフト表 ----
-// 16:9 の1枚に、「ギフト（コイン数・いいね…）＋妨害」の正方形のカードを並べる。
-// 基本は横5列×縦3行の大きさ。多いときは列と行を増やしてカードを小さくし、それでも PAGE_MAX を超えたらページを分ける
+// 「ギフト（コイン数・いいね…）＋妨害」の正方形のカードを、横4列で並べる（縦型配信をスマホで見ても読める大きさ）。
+// 縦は3行まで。カードは、横4列と縦3行の両方に入る大きさにする（おすすめの 1080×750 でちょうど3行）。
+// 入りきらないときは、ページを分けて順に切り替えて出す。
+// カードは上に詰める（少ないときに、上下に変な余白ができないように）
 const GIFTS = page({
   title: 'ギフト表',
   id: 'gifts',
   size: widgetSize('gifts'),
   css: String.raw`
-  #box { position: fixed; inset: calc(1.2 * var(--u)); display: flex; flex-direction: column; padding: calc(1.6 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)); box-sizing: border-box; }
+  /* 枠の飾りの角度（いちばん高いギフトの虹色の枠を回す） */
+  @property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  /* 枠や見出しはなし。カードだけを、背景が透けたまま並べる */
+  #box { position: fixed; inset: calc(.6 * var(--u)); display: flex; flex-direction: column; box-sizing: border-box; }
   #box[hidden] { display: none; }
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: calc(2 * var(--u)); margin-bottom: calc(1.4 * var(--u)); }
-  h1 { margin: 0; font-size: calc(3.4 * var(--u)); }
-  header small { font-size: calc(1.9 * var(--u)); font-weight: 600; }
+  .tile::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .55) 50%, transparent 62%);
+    transform: translateX(-130%); animation: shine 5s ease-in-out infinite;
+  }
   #pages { flex: 1; min-height: 0; position: relative; }
+  #pages { --gap: calc(1.4 * var(--u)); }
   .grid {
-    position: absolute; inset: 0; display: grid; gap: calc(1.2 * var(--u)); transition: opacity .5s;
-    grid-template-columns: repeat(var(--cols), var(--t)); grid-auto-rows: var(--t); justify-content: center; align-content: center;
+    position: absolute; inset: 0; display: grid; gap: var(--gap);
+    grid-template-columns: repeat(var(--cols), var(--t)); grid-auto-rows: var(--t); justify-content: center; align-content: start;
   }
-  .grid.off { opacity: 0; pointer-events: none; }
-  /* カード1枚 = きっかけ（上）＋妨害（下）。中の大きさはカードの大きさ --t に合わせる */
+  .grid.off { visibility: hidden; }
+  /* カード1枚 = 上にきっかけ（ギフトの絵）、下に出る妨害。
+     中の色は妨害の種類（--k）、ふちはギフトの高さ（10コインから銀、100から金、1000から虹色） */
   .tile {
-    box-sizing: border-box; width: var(--t); height: var(--t); padding: calc(var(--t) * .05);
-    display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center;
-    border-radius: calc(var(--t) * .08); background: rgba(255, 255, 255, .06); overflow: hidden;
+    --k: var(--ov-accent);
+    --frame: linear-gradient(150deg, color-mix(in srgb, var(--k) 70%, #ffffff), color-mix(in srgb, var(--k) 55%, #000000));
+    --bw: calc(var(--t) * .016);
+    position: relative; box-sizing: border-box; width: var(--t); height: var(--t); overflow: hidden;
+    display: grid; grid-template-rows: 54% 46%; text-align: center;
+    border: var(--bw) solid transparent; border-radius: calc(var(--t) * .1);
+    background:
+      radial-gradient(90% 60% at 50% 0%, rgba(255, 255, 255, .14), transparent 70%) padding-box,
+      linear-gradient(180deg, color-mix(in srgb, var(--k) 34%, #17171f), #101016 85%) padding-box,
+      var(--frame) border-box;
+    box-shadow: 0 calc(var(--t) * .03) calc(var(--t) * .08) rgba(0, 0, 0, .45);
   }
-  .tile > div { width: 100%; display: flex; flex-direction: column; align-items: center; min-width: 0; }
-  .tile .gift-img, .tile .badge { width: calc(var(--t) * .27); height: calc(var(--t) * .27); }
-  .tile .badge { font-size: calc(var(--t) * .13); }
-  /* ギフトは名前を出さないぶん、絵を大きく */
-  .tile.gift .gift-img { width: calc(var(--t) * .4); height: calc(var(--t) * .4); }
-  .tile .label { width: 100%; font-size: calc(var(--t) * .105); line-height: 1.2; margin-top: calc(var(--t) * .02); }
-  .tile .label small { font-size: .8em; margin-left: .25em; font-weight: 600; }
-  .tile .arrow { color: var(--ov-muted); font-size: calc(var(--t) * .05); line-height: 1; }
-  .tile .mc { --s: calc(var(--t) * .24); }
-  .tile .action { width: 100%; font-size: calc(var(--t) * .115); line-height: 1.15; color: var(--ov-text); margin-top: calc(var(--t) * .02); }
-  /* 条件のあるルール（カウントダウン中だけ など） */
-  #dots { display: flex; justify-content: center; gap: calc(.8 * var(--u)); margin-top: calc(1 * var(--u)); }
-  #dots:empty { display: none; }
-  #dots i { width: calc(.9 * var(--u)); height: calc(.9 * var(--u)); border-radius: 50%; background: rgba(255, 255, 255, .25); }
-  #dots i.on { background: var(--ov-text); }
+  .tile.k-attack { --k: #ff5d4f; }
+  .tile.k-move { --k: #4fb6ff; }
+  .tile.k-fill { --k: #b07cff; }
+  .tile.k-help { --k: #3fd17a; }
+  .tile.k-random { --k: #ffc23d; }
+  .tile.t-rare { --frame: linear-gradient(150deg, #ffffff, #9aa4b2 35%, #eef2f7 55%, #6b7380 80%, #dfe5ec); }
+  .tile.t-epic {
+    --frame: linear-gradient(150deg, #fff6c8, #e0a228 30%, #fff0a8 52%, #a86d08 78%, #ffe08a);
+    box-shadow: 0 calc(var(--t) * .03) calc(var(--t) * .08) rgba(0, 0, 0, .45), 0 0 calc(var(--t) * .1) rgba(255, 190, 60, .35);
+  }
+  .tile.t-legend {
+    --bw: calc(var(--t) * .022);
+    --frame: conic-gradient(from var(--spin), #ff5e7e, #ffcf4a, #6cf0a0, #4fc3ff, #b083ff, #ff5e7e);
+    box-shadow: 0 calc(var(--t) * .03) calc(var(--t) * .08) rgba(0, 0, 0, .45), 0 0 calc(var(--t) * .14) rgba(255, 210, 120, .45);
+    animation: tile-in .45s cubic-bezier(.2, .9, .3, 1.2) both, spin 4s linear infinite;
+    animation-delay: calc(var(--i) * 45ms), 0s;
+  }
+  /* 上: きっかけ。後ろに種類の色の光 */
+  .tile .trig {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0;
+    padding: calc(var(--t) * .05) calc(var(--t) * .06) calc(var(--t) * .03);
+    background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--k) 55%, transparent) 0, transparent 60%);
+  }
+  .tile .gift-img, .tile .badge { width: calc(var(--t) * .24); height: calc(var(--t) * .24); }
+  .tile .badge { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3), 0 calc(var(--t) * .015) calc(var(--t) * .03) rgba(0, 0, 0, .4); }
+  .tile.gift .gift-img {
+    width: calc(var(--t) * .38); height: calc(var(--t) * .38);
+    filter: drop-shadow(0 calc(var(--t) * .02) calc(var(--t) * .03) rgba(0, 0, 0, .5)) drop-shadow(0 0 calc(var(--t) * .04) color-mix(in srgb, var(--k) 60%, transparent));
+    animation: float 3s ease-in-out infinite; animation-delay: calc(var(--i) * -.37s);
+  }
+  .tile .label { width: 100%; font-size: calc(var(--t) * .115); line-height: 1.2; margin-top: calc(var(--t) * .02); font-weight: 800; }
+  .tile .label small { font-size: .78em; margin-left: .25em; font-weight: 700; color: var(--ov-muted); }
+  /* 左上: ギフトのコイン数 */
+  .tile .cost {
+    position: absolute; left: calc(var(--t) * .045); top: calc(var(--t) * .045); z-index: 1;
+    display: flex; align-items: center; gap: calc(var(--t) * .025);
+    padding: calc(var(--t) * .012) calc(var(--t) * .045) calc(var(--t) * .012) calc(var(--t) * .015); border-radius: 999px;
+    background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 210, 110, .45); font-size: calc(var(--t) * .085); line-height: 1.2; color: #ffd95a;
+  }
+  .tile .cost .cic { width: calc(var(--t) * .1); height: calc(var(--t) * .1); }
+  /* 下: 出る妨害。暗い帯に、アイコンと名前。数は大きく光らせる */
+  .tile .res {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0;
+    padding: calc(var(--t) * .055) calc(var(--t) * .05) calc(var(--t) * .07);
+    background: linear-gradient(180deg, rgba(0, 0, 0, .25), rgba(0, 0, 0, .5));
+  }
+  .tile .res::after {
+    content: ""; position: absolute; left: 8%; right: 8%; top: 0; height: calc(var(--t) * .012);
+    background: linear-gradient(90deg, transparent, var(--k), transparent);
+  }
+  .tile .res::before {
+    content: ""; position: absolute; left: 50%; top: 0; z-index: 1; width: calc(var(--t) * .07); height: calc(var(--t) * .07);
+    background: linear-gradient(135deg, #ffffff, var(--k)); transform: translate(-50%, -55%) rotate(45deg); border-radius: calc(var(--t) * .012);
+    box-shadow: 0 0 calc(var(--t) * .04) var(--k);
+  }
+  .tile .mc { --s: calc(var(--t) * .19); filter: drop-shadow(0 calc(var(--t) * .015) calc(var(--t) * .02) rgba(0, 0, 0, .6)); }
+  .tile .action { width: 100%; display: flex; align-items: baseline; justify-content: center; gap: .2em; margin-top: calc(var(--t) * .02); line-height: 1.25; color: var(--ov-text); white-space: nowrap; overflow-x: clip; overflow-y: visible; }
+  .tile .action .name { font-size: calc(var(--t) * .12); font-weight: 800; text-shadow: 0 1px 0 rgba(0, 0, 0, .6); }
+  .tile .action .count {
+    flex: none; font-size: calc(var(--t) * .15); font-weight: 900; color: color-mix(in srgb, var(--k) 70%, #ffffff);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .6), 0 0 calc(var(--t) * .05) var(--k);
+  }
+  /* 高いギフトのキラキラ */
+  .tile .spark { position: absolute; z-index: 1; width: calc(var(--t) * .12); height: calc(var(--t) * .12); pointer-events: none; filter: drop-shadow(0 0 calc(var(--t) * .02) #ffd76a);
+    clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+    background: #fff6c8; animation: twinkle 2.4s ease-in-out infinite; }
+  .tile .spark:nth-of-type(1) { right: 10%; top: 9%; }
+  .tile .spark:nth-of-type(2) { left: 12%; top: 34%; width: calc(var(--t) * .09); height: calc(var(--t) * .09); animation-delay: .8s; }
+  .tile .spark:nth-of-type(3) { right: 16%; top: 40%; width: calc(var(--t) * .07); height: calc(var(--t) * .07); animation-delay: 1.6s; }
+  /* 光が順にカードを横切る */
+  .tile::after { z-index: 2; animation-delay: calc(var(--i) * .18s + 1s); }
+  /* ページが出るときに、カードが順にふわっと出る */
+  .grid:not(.off) .tile:not(.t-legend) { animation: tile-in .45s cubic-bezier(.2, .9, .3, 1.2) both; animation-delay: calc(var(--i) * 45ms); }
+  @keyframes tile-in { from { opacity: 0; transform: translateY(calc(var(--t) * .08)) scale(.92); } }
+  @keyframes shine { 0% { transform: translateX(-130%); } 30%, 100% { transform: translateX(130%); } }
+  @keyframes float { 50% { transform: translateY(calc(var(--t) * -.025)); } }
+  @keyframes spin { to { --spin: 360deg; } }
+  @keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0deg); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
 `,
-  body: String.raw`<div id="box" class="panel" hidden>
-  <header><h1>ギフトで妨害</h1><small class="muted">連打すると数も増える</small></header>
+  body: String.raw`<div id="box" hidden>
   <div id="pages"></div>
-  <div id="dots"></div>
 </div>`,
   script: String.raw`
   const PAGE_MS = 8000;
-  /** 基本の並び（少ないときも、この並びのときの大きさのカードにする） */
-  const BASE_COLS = 5;
-  const BASE_ROWS = 3;
-  /** 1ページに入れる数（横8×縦4くらい）。これを超えたらページを分ける */
-  const PAGE_MAX = 32;
-  const BADGES = { coins: '🪙', likes: '❤', comment: '💬', follow: '＋', share: '↗' };
+  /** 横の列の数（少ないときも、この並びのときの大きさのカードにする）と、縦の行の数の上限 */
+  const COLS = 4;
+  const MAX_ROWS = 3;
   let lastKey = '';
   let pages = [];
   let current = 0;
-  function tile(r) {
-    const action = el('div', '', mcIcon(r.icon), el('div', 'action clamp2 fit', r.action));
-    // ギフトは絵だけ（絵がないギフトだけ名前を出す）。コイン数・いいね・フォローは印＋文字
-    if (r.trigger === 'gift' && r.image) return el('div', 'tile gift', el('div', '', giftPicture(r.image, '🎁')), el('span', 'arrow', '▼'), action);
-    const label = el('div', 'label ellipsis fit', r.label);
-    if (r.sub) label.append(el('small', 'muted', r.sub));
-    const trigger = el('div', '', el('span', 'badge', r.trigger === 'gift' ? '🎁' : BADGES[r.trigger]), label);
-    return el('div', 'tile', trigger, el('span', 'arrow', '▼'), action);
+  /** 「ゾンビ ×3」「逮捕 10秒」を、名前と数に分ける（数は大きく出す） */
+  function splitAction(text) {
+    const m = String(text).match(/^(.*?)\s*(×\s*\d+.*|\d+\s*(?:秒|マス|段|個|体|回).*)$/);
+    return m && m[1] ? [m[1], m[2]] : [String(text), ''];
   }
-  /** n 枚を入れるときの列の数とカードの大きさ（px） */
-  function layout(n, width, height, gap) {
-    const size = (cols, rows) => Math.min((width - (cols - 1) * gap) / cols, (height - (rows - 1) * gap) / rows);
-    // 少ないときは 5×3 のときと同じ大きさで、真ん中に寄せる
-    if (n <= BASE_COLS * BASE_ROWS) return { cols: Math.min(n, BASE_COLS), t: size(BASE_COLS, BASE_ROWS) };
-    // 多いときは、カードがいちばん大きくなる列の数
-    let best = { cols: BASE_COLS, t: 0 };
-    for (let cols = BASE_COLS; cols <= n; cols++) {
-      const t = size(cols, Math.ceil(n / cols));
-      if (t > best.t) best = { cols, t };
+  function tile(r, i) {
+    const [name, count] = splitAction(r.action);
+    const action = el('div', 'action fit', el('span', 'name', name));
+    if (count) action.append(el('span', 'count', count));
+    const res = el('div', 'res', mcIcon(r.icon), action);
+    // ギフトは絵だけ（絵がないギフトだけ名前を出す）。コイン数・いいね・フォローは印＋文字
+    let trig;
+    if (r.trigger === 'gift' && r.image) {
+      trig = el('div', 'trig', giftPicture(r.image));
+    } else {
+      const label = el('div', 'label ellipsis fit', r.label);
+      if (r.sub) label.append(el('small', '', r.sub));
+      trig = el('div', 'trig', triIcon(r.trigger), label);
     }
-    return best;
+    // ふちの豪華さはギフトの高さで（10コインから銀、100から金、1000から虹色。キラキラ付き）
+    const value = r.trigger === 'gift' || r.trigger === 'coins' ? Number(r.coins) || 0 : 0;
+    const tier = value >= 1000 ? ' t-legend' : value >= 100 ? ' t-epic' : value >= 10 ? ' t-rare' : '';
+    const card = el('div', 'tile k-' + (r.kind || 'other') + tier + (r.trigger === 'gift' && r.image ? ' gift' : ''), trig, res);
+    if (value >= 100) card.append(el('i', 'spark'), el('i', 'spark'), el('i', 'spark'));
+    if (r.trigger === 'gift' && r.coins != null) card.append(el('span', 'cost num', triIcon('coins', 'cic'), coins(r.coins)));
+    card.style.setProperty('--i', i);
+    return card;
+  }
+  /** カードの大きさ（px）と、1ページに入る行の数。大きさは、横4列・縦3行がどちらも入るいちばん大きいもの */
+  function layout(width, height, gap) {
+    const t = Math.min((width - (COLS - 1) * gap) / COLS, (height - (MAX_ROWS - 1) * gap) / MAX_ROWS);
+    return { t, rows: MAX_ROWS };
   }
   function render(table) {
     const key = JSON.stringify(table);
@@ -371,20 +459,23 @@ const GIFTS = page({
     lastKey = key;
     $('box').hidden = table.length === 0;
     if (!table.length) return;
-    // 多すぎるときは、同じくらいの数ずつページに分ける
-    const pageCount = Math.ceil(table.length / PAGE_MAX);
-    const perPage = Math.ceil(table.length / pageCount);
     const area = $('pages');
     area.replaceChildren();
+    // すき間の px は、空のページを置いて測る（大きさは枠の大きさで変わるため）
+    const probe = el('div', 'grid off');
+    area.append(probe);
+    const gap = parseFloat(getComputedStyle(probe).rowGap) || 0;
+    probe.remove();
+    const { t, rows } = layout(area.clientWidth, area.clientHeight, gap);
+    // 1ページに入りきらなければ、前のページから行いっぱいに詰めて分ける（4×3 のとき 15枚なら 12枚と3枚）
+    const perPage = COLS * rows;
     pages = [];
     for (let i = 0; i < table.length; i += perPage) {
-      const grid = el('div', 'grid off', ...table.slice(i, i + perPage).map(tile));
+      const grid = el('div', 'grid off', ...table.slice(i, i + perPage).map((r, n) => tile(r, n)));
       area.append(grid);
       pages.push(grid);
     }
-    const gap = parseFloat(getComputedStyle(pages[0]).rowGap) || 0;
-    const { cols, t } = layout(perPage, area.clientWidth, area.clientHeight, gap);
-    area.style.setProperty('--cols', cols);
+    area.style.setProperty('--cols', Math.min(table.length, COLS));
     area.style.setProperty('--t', Math.max(0, Math.floor(t)) + 'px');
     fitText(area);
     current = 0;
@@ -392,7 +483,6 @@ const GIFTS = page({
   }
   function showPage(i) {
     pages.forEach((p, n) => p.classList.toggle('off', n !== i));
-    $('dots').replaceChildren(...(pages.length > 1 ? pages.map((_, n) => el('i', n === i ? 'on' : '')) : []));
   }
   setInterval(() => {
     if (pages.length < 2) return;
@@ -406,17 +496,24 @@ const GIFTS = page({
     render(table);
   });
   if (DEMO) {
-    demoGiftImages().then((images) => render([
-      { trigger: 'gift', label: 'バラ', coins: 1, image: '', icon: 'zombie', action: 'ゾンビ ×1' },
-      { trigger: 'gift', label: 'GG', coins: 1, image: '', icon: 'lightning', action: '雷 ×1' },
-      { trigger: 'gift', label: '香水', coins: 20, image: '', icon: 'freeze', action: '操作禁止 5秒' },
-      { trigger: 'gift', label: 'ドーナッツ', coins: 30, image: '', icon: 'jail', action: '逮捕 10秒' },
-      { trigger: 'gift', label: 'クラッカー', coins: 100, image: '', icon: 'creeper', action: 'クリーパー ×3' },
-      { trigger: 'coins', label: '100以上', sub: 'コイン', coins: 100, icon: 'tnt', action: 'TNT ×10' },
-      { trigger: 'coins', label: '1000以上', sub: 'コイン', coins: 1000, icon: 'fill_clear', action: '全消し' },
-      { trigger: 'likes', label: '100回', sub: 'いいね', icon: 'levitate', action: '浮遊 3秒' },
-      { trigger: 'follow', label: 'フォロー', icon: 'fill_help', action: 'お助けブロック ×5' },
+    let real = false;
+    demoGiftImages().then((images) => real || render([
+      { trigger: 'gift', label: 'バラ', coins: 1, image: '', icon: 'zombie', kind: 'attack', action: 'ゾンビ ×1' },
+      { trigger: 'gift', label: 'GG', coins: 1, image: '', icon: 'lightning', kind: 'attack', action: '雷 ×1' },
+      { trigger: 'gift', label: '香水', coins: 20, image: '', icon: 'freeze', kind: 'move', action: '操作禁止 5秒' },
+      { trigger: 'gift', label: 'ドーナッツ', coins: 30, image: '', icon: 'jail', kind: 'move', action: '逮捕 10秒' },
+      { trigger: 'gift', label: 'クラッカー', coins: 100, image: '', icon: 'creeper', kind: 'attack', action: 'クリーパー ×3' },
+      { trigger: 'coins', label: '100以上', sub: 'コイン', coins: 100, icon: 'tnt', kind: 'attack', action: 'TNT ×10' },
+      { trigger: 'coins', label: '1000以上', sub: 'コイン', coins: 1000, icon: 'fill_clear', kind: 'fill', action: '全消し' },
+      { trigger: 'likes', label: '100回', sub: 'いいね', icon: 'levitate', kind: 'move', action: '浮遊 3秒' },
+      { trigger: 'follow', label: 'フォロー', icon: 'fill_help', kind: 'help', action: 'お助けブロック ×5' },
     ].map((r) => ({ ...r, image: images.get(r.label) ?? '' }))));
+    // 操作画面の試し表示: ルールがあれば、本物の並び（並び順の設定どおり）で見せる
+    connect({ onState: (state) => {
+      if (!state.giftTable?.length) return;
+      real = true;
+      render(state.giftTable);
+    } });
   } else {
     connect({ onState: (state) => render(state.giftTable ?? []) });
   }
@@ -430,55 +527,63 @@ const ROUND = page({
   id: 'round',
   size: widgetSize('round'),
   css: String.raw`
-  #box { position: fixed; inset: calc(2 * var(--u)); padding: calc(3.4 * var(--u)) calc(4.4 * var(--u)) calc(4 * var(--u)); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+  /* 落ち着いた濃い板に、大きな数字。色は配信画面の見た目の設定（アクセント）を使う */
+  #box {
+    position: fixed; inset: calc(1.2 * var(--u)); padding: calc(2.8 * var(--u)) calc(3.6 * var(--u)) calc(3.2 * var(--u)); box-sizing: border-box;
+    display: flex; flex-direction: column; justify-content: center; overflow: hidden; border-radius: calc(3 * var(--u));
+  }
+  /* 左の太い線（アクセントの色） */
+  #box::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(1 * var(--u)); background: var(--ov-accent); }
   #box[hidden] { display: none; }
   .top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: calc(4 * var(--u)); }
-  .round small { display: block; font-size: calc(3.4 * var(--u)); letter-spacing: .12em; }
-  .round b { font-size: calc(10 * var(--u)); line-height: 1; }
-  .round b span { font-size: calc(5.4 * var(--u)); color: var(--ov-muted); margin-left: calc(.6 * var(--u)); }
-  #status { font-size: calc(5 * var(--u)); padding-bottom: calc(1 * var(--u)); }
-  #percent { font-size: calc(10 * var(--u)); line-height: 1; }
-  .bar { height: calc(2.4 * var(--u)); border-radius: calc(1.2 * var(--u)); background: rgba(255, 255, 255, .14); overflow: hidden; margin-top: calc(3 * var(--u)); }
+  .round small, #mine .head { display: block; font-size: calc(3.2 * var(--u)); font-weight: 800; letter-spacing: .16em; color: var(--ov-muted); }
+  .round b { font-size: calc(11 * var(--u)); line-height: .95; font-weight: 900; }
+  .round b span { font-size: calc(5.2 * var(--u)); color: var(--ov-muted); margin-left: calc(.6 * var(--u)); font-weight: 800; }
+  #status { font-size: calc(4.8 * var(--u)); font-weight: 800; padding-bottom: calc(.8 * var(--u)); color: var(--ov-muted); }
+  #percent { font-size: calc(11 * var(--u)); line-height: .95; font-weight: 900; }
+  #percent small { font-size: .5em; margin-left: calc(.4 * var(--u)); color: var(--ov-muted); }
+  /* 進み具合: 太い線に、10% ごとの目盛り */
+  .bar { position: relative; height: calc(3.2 * var(--u)); border-radius: calc(.8 * var(--u)); background: rgba(255, 255, 255, .1); overflow: hidden; margin-top: calc(2.6 * var(--u)); }
+  .bar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(0, 0, 0, .45) calc(10% - 2px) 10%); pointer-events: none; }
   .bar div { height: 100%; width: 0; background: var(--ov-text); transition: width .5s ease-out; }
   #box.countdown .bar div, #box.cleared .bar div { background: var(--ov-accent); }
-  #box.countdown { border-color: color-mix(in srgb, var(--ov-accent) 70%, transparent); }
   /* カウントダウン: 数字を大きく */
   #count {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center; gap: calc(4 * var(--u));
-    background: rgba(var(--ov-panel-rgb), .94);
+    background: rgba(var(--ov-panel-rgb), .96);
   }
   #box.countdown #count { display: flex; }
-  #count b { font-size: calc(22 * var(--u)); line-height: 1; color: var(--ov-accent); }
+  #count b { font-size: calc(22 * var(--u)); line-height: 1; font-weight: 900; color: var(--ov-accent); }
   #count b.tick { animation: tick .6s cubic-bezier(.2, 1.5, .4, 1); }
-  #count span { font-size: calc(5.6 * var(--u)); }
+  #count span { font-size: calc(5.6 * var(--u)); font-weight: 800; }
   /* クリアの演出 */
   #clear {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
-    background: rgba(var(--ov-panel-rgb), .95); overflow: hidden;
+    background: rgba(var(--ov-panel-rgb), .97); overflow: hidden;
   }
   #clear.on { display: flex; }
-  #clear b { font-size: calc(12 * var(--u)); line-height: 1.05; letter-spacing: .02em; animation: slam .6s cubic-bezier(.2, 1.6, .4, 1) both; }
-  #clear small { font-size: calc(4.6 * var(--u)); margin-top: calc(1.4 * var(--u)); animation: fade .6s .3s both; }
-  #clear i { position: absolute; top: calc(-4 * var(--u)); width: calc(1.8 * var(--u)); height: calc(3 * var(--u)); border-radius: calc(.4 * var(--u)); animation: fall linear forwards; }
+  #clear b { font-size: calc(12 * var(--u)); line-height: 1.05; font-weight: 900; letter-spacing: .02em; color: var(--ov-accent); animation: slam .6s cubic-bezier(.2, 1.6, .4, 1) both; }
+  #clear small { font-size: calc(4.6 * var(--u)); font-weight: 800; margin-top: calc(1.4 * var(--u)); animation: fade .6s .3s both; }
+  #clear i { position: absolute; top: calc(-4 * var(--u)); width: calc(1.6 * var(--u)); height: calc(2.6 * var(--u)); border-radius: calc(.3 * var(--u)); animation: fall linear forwards; }
   /* 採掘チャレンジ: 左に資源、まん中に集めた数、右に残り時間 */
   #mine { display: none; }
   #box.mining .top, #box.mining > .bar { display: none; }
   #box.mining #mine { display: block; }
-  #mine .head { display: flex; justify-content: space-between; gap: calc(3 * var(--u)); font-size: calc(3.6 * var(--u)); white-space: nowrap; }
-  #mine .row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: calc(4 * var(--u)); margin-top: calc(1.4 * var(--u)); }
+  #mine .head { display: flex; justify-content: space-between; gap: calc(3 * var(--u)); white-space: nowrap; }
+  #mine .row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: calc(4 * var(--u)); margin-top: calc(1.2 * var(--u)); }
   #mine .what { display: flex; align-items: center; gap: calc(2 * var(--u)); min-width: 0; }
   #mine .what .mc { --s: calc(8 * var(--u)); }
-  #mineName { font-size: calc(5.6 * var(--u)); }
-  #mineCount { font-size: calc(9.5 * var(--u)); line-height: 1; white-space: nowrap; }
+  #mineName { font-size: calc(5.6 * var(--u)); font-weight: 900; }
+  #mineCount, #mineTime { font-size: calc(10 * var(--u)); line-height: 1; font-weight: 900; white-space: nowrap; }
   #mineCount span { font-size: calc(5 * var(--u)); color: var(--ov-muted); margin-left: calc(.6 * var(--u)); }
-  #mineTime { font-size: calc(9.5 * var(--u)); line-height: 1; }
-  #mineTime.warn { color: #ff6b5e; animation: pulse 1s ease-in-out infinite; }
-  #mineState { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #mineTime { padding: calc(.4 * var(--u)) calc(1.6 * var(--u)); border-radius: calc(1.4 * var(--u)); background: rgba(255, 255, 255, .08); }
+  #mineTime.warn { color: #fff; background: #d8453b; animation: pulse 1s ease-in-out infinite; }
+  #mineState { overflow: hidden; text-overflow: ellipsis; min-width: 0; letter-spacing: 0; }
   #mineState.paused { color: var(--ov-accent); }
   #mine .bar div { background: var(--ov-accent); }
   #clear.fail b { color: #ff6b5e; }
   #clear.abort b { color: var(--ov-muted); }
-  @keyframes pulse { 50% { opacity: .55; } }
+  @keyframes pulse { 50% { opacity: .6; } }
   @keyframes tick { from { transform: scale(1.8); opacity: .3; } to { transform: none; opacity: 1; } }
   @keyframes slam { from { transform: scale(2.4); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
@@ -523,7 +628,7 @@ const ROUND = page({
       $('status').textContent = status;
       fitText($('box'));
     }
-    $('percent').textContent = fill.percent + '%';
+    $('percent').replaceChildren(String(fill.percent), el('small', '', '%'));
     $('bar').style.width = (fill.total ? Math.min(100, (fill.filled / fill.total) * 100) : 0) + '%';
     if (fill.phase === 'countdown' && fill.countdownSecondsLeft !== lastCount) {
       const num = $('countNum');
@@ -677,21 +782,30 @@ const GOAL = page({
   id: 'goal',
   size: widgetSize('goal'),
   css: String.raw`
-  #goals { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: calc(1.6 * var(--u)); padding: calc(1 * var(--u)) calc(2 * var(--u)); box-sizing: border-box; }
-  .goal { display: grid; grid-template-columns: calc(8 * var(--u)) minmax(0, 1fr); align-items: center; gap: calc(2.6 * var(--u)); padding: calc(1.6 * var(--u)) calc(3 * var(--u)) calc(1.8 * var(--u)) calc(2.2 * var(--u)); flex: none; }
-  .goal .mc { --s: calc(7.4 * var(--u)); }
-  .goal .icon { display: flex; align-items: center; justify-content: center; }
-  .goal .icon .badge { width: calc(7.4 * var(--u)); height: calc(7.4 * var(--u)); font-size: calc(4.2 * var(--u)); }
-  .line { display: flex; align-items: baseline; gap: calc(1.4 * var(--u)); font-size: calc(3.6 * var(--u)); min-width: 0; white-space: nowrap; }
-  .line .left { font-size: calc(5 * var(--u)); color: var(--ov-accent); flex: none; }
-  .line .muted { flex: none; }
-  .line .what { font-size: calc(4.6 * var(--u)); color: var(--ov-text); }
-  .line .cond { margin-left: auto; font-size: calc(3 * var(--u)); flex: none; }
-  .bar { position: relative; height: calc(1.8 * var(--u)); margin-top: calc(1 * var(--u)); border-radius: 999px; background: rgba(255, 255, 255, .12); overflow: hidden; }
-  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--ov-accent); transition: width .5s cubic-bezier(.2, .8, .3, 1); }
+  /* 1つの目標 = 左にハートの札と残りの数、右に出る妨害、下に進み具合 */
+  #goals { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: calc(1.6 * var(--u)); padding: calc(1 * var(--u)) calc(1.2 * var(--u)); box-sizing: border-box; }
+  .goal {
+    position: relative; overflow: hidden; flex: none; box-sizing: border-box;
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: calc(2.6 * var(--u));
+    padding: calc(2 * var(--u)) calc(3 * var(--u)) calc(3.2 * var(--u)) calc(3.4 * var(--u)); border-radius: calc(2.6 * var(--u));
+  }
+  .goal::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(.9 * var(--u)); background: #ff5a7a; }
+  .goal .heart { width: calc(7 * var(--u)); height: calc(7 * var(--u)); border-radius: calc(1.6 * var(--u)); }
+  .goal .left { display: flex; flex-direction: column; line-height: 1; white-space: nowrap; }
+  .goal .left small { font-size: calc(2.8 * var(--u)); font-weight: 800; color: var(--ov-muted); letter-spacing: .06em; }
+  .goal .left b { font-size: calc(7.4 * var(--u)); font-weight: 900; margin-top: calc(.5 * var(--u)); }
+  .goal .left b span { font-size: .45em; margin-left: calc(.5 * var(--u)); color: var(--ov-muted); }
+  .goal .what { display: flex; align-items: center; justify-content: flex-end; gap: calc(1.6 * var(--u)); min-width: 0; }
+  .goal .what .mc { --s: calc(6.4 * var(--u)); }
+  .goal .what .badge { width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); }
+  .goal .what b { font-size: calc(5 * var(--u)); font-weight: 900; }
+  .goal .cond { font-size: calc(2.8 * var(--u)); font-weight: 700; color: var(--ov-muted); white-space: nowrap; }
+  /* 進み具合: カードの下のふちに沿った線 */
+  .bar { position: absolute; left: calc(3.4 * var(--u)); right: calc(3 * var(--u)); bottom: calc(1.4 * var(--u)); height: calc(1 * var(--u)); border-radius: 999px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: #ff5a7a; transition: width .5s cubic-bezier(.2, .8, .3, 1); }
   .goal.hit { animation: hit 1.2s ease-out; }
-  .goal.hit .left { color: var(--ov-text); }
-  @keyframes hit { 0% { transform: scale(1.04); box-shadow: 0 0 0 calc(.6 * var(--u)) var(--ov-accent); } 100% { transform: none; box-shadow: 0 0 0 0 transparent; } }
+  .goal.hit .left b { color: #ff8aa2; }
+  @keyframes hit { 0% { transform: scale(1.03); background-color: rgba(255, 90, 122, .35); } 100% { transform: none; } }
 `,
   body: '<div id="goals"></div>',
   script: String.raw`
@@ -706,12 +820,14 @@ const GOAL = page({
       // 数が減った = 目標に届いて妨害が出た。少しのあいだ「達成！」を出す
       const hit = last.has(id) && g.current < last.get(id);
       const left = g.likes - g.current;
-      const icon = g.icon === 'message' ? el('span', 'badge', '♥') : mcIcon(g.icon);
-      const line = el('div', 'line', el('span', 'left num', hit ? '達成！' : 'あと ' + left.toLocaleString('ja-JP')), el('span', 'muted', hit ? '' : 'いいねで'),
-        el('span', 'what ellipsis fit', g.action), ...(g.condition ? [el('span', 'cond muted', g.condition)] : []));
+      const icon = g.icon === 'message' ? triIcon('likes') : mcIcon(g.icon);
+      // 左: 「いいね あと」と残りの数（届いたら「達成！」）。右: 出る妨害
+      const count = hit ? el('b', '', '達成！') : el('b', 'num', left.toLocaleString('ja-JP'), el('span', '', '回'));
+      const what = el('div', 'what', icon, el('b', 'ellipsis fit', g.action));
+      const right = g.condition ? el('div', '', what, el('div', 'cond', g.condition)) : what;
       const bar = el('div', 'bar', el('i'));
       bar.firstChild.style.width = (hit ? 100 : (g.current / g.likes) * 100) + '%';
-      return el('div', 'goal panel' + (hit ? ' hit' : ''), el('span', 'icon', icon), el('div', '', line, bar));
+      return el('div', 'goal panel' + (hit ? ' hit' : ''), triIcon('likes', 'heart'), el('div', 'left', el('small', '', hit ? 'いいね' : 'いいね あと'), count), right, bar);
     }));
     fitText($('goals'));
     last = new Map(goals.map((g) => [g.likes + ':' + g.action, g.current]));
@@ -734,30 +850,52 @@ const GOAL = page({
 });
 
 // ---- ギフトランキング ----
+// 順位ごとのカードを縦に並べる（板の色は配信画面の見た目の設定）。左のふちの色で順位（1位 金・2位 銀・3位 銅）。
+// 下の線は1位と比べたコインの多さ。コインが増えた人は少し明るくなって「+500」が浮かぶ
 const RANKING = page({
   title: 'ギフトランキング',
   id: 'ranking',
   size: widgetSize('ranking'),
   css: String.raw`
-  #box { position: fixed; inset: calc(2 * var(--u)); padding: calc(4 * var(--u)) calc(4.4 * var(--u)); box-sizing: border-box; }
-  h1 { margin: 0 0 calc(3.4 * var(--u)); font-size: calc(7 * var(--u)); display: flex; align-items: baseline; justify-content: space-between; gap: calc(3 * var(--u)); }
-  h1 small { font-size: calc(3.8 * var(--u)); font-weight: 600; }
-  #rows { display: flex; flex-direction: column; gap: calc(2 * var(--u)); }
+  #box { position: fixed; inset: calc(1.2 * var(--u)); display: flex; flex-direction: column; box-sizing: border-box; }
+  /* 見出し: 小さな文字だけ */
+  .head { display: flex; align-items: center; gap: calc(1.4 * var(--u)); margin: 0 0 calc(1.8 * var(--u)) calc(.6 * var(--u)); font-size: calc(4 * var(--u)); font-weight: 900; letter-spacing: .06em; text-shadow: 0 calc(.3 * var(--u)) calc(1 * var(--u)) rgba(0, 0, 0, .8); }
+  .head::before { content: ""; width: calc(1.4 * var(--u)); height: calc(4.4 * var(--u)); border-radius: calc(.4 * var(--u)); background: var(--ov-accent); }
+  #rows { display: flex; flex-direction: column; gap: calc(1.4 * var(--u)); }
+  /* 1行 = 順位・名前・コイン。左のふちの色で順位（1位 金・2位 銀・3位 銅） */
   .row {
-    display: grid; grid-template-columns: calc(11 * var(--u)) minmax(0, 1fr) auto; align-items: center; gap: calc(3 * var(--u));
-    padding: calc(2 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)); border-radius: calc(2 * var(--u)); background: rgba(255, 255, 255, .05);
+    --c: rgba(255, 255, 255, .28);
+    --h: calc(12.4 * var(--u));
+    position: relative; overflow: hidden; box-sizing: border-box; height: var(--h);
+    display: grid; grid-template-columns: calc(9 * var(--u)) minmax(0, 1fr) auto; align-items: center; gap: calc(2.4 * var(--u));
+    padding: 0 calc(3.2 * var(--u)) 0 calc(2.6 * var(--u)); border-radius: calc(2.4 * var(--u));
   }
-  .rank { width: calc(11 * var(--u)); height: calc(11 * var(--u)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: calc(6 * var(--u)); background: rgba(255, 255, 255, .1); }
-  .row:first-child .rank { background: var(--ov-text); color: rgb(var(--ov-panel-rgb)); }
-  .row:first-child { background: rgba(255, 255, 255, .1); }
-  .name { font-size: calc(5.6 * var(--u)); }
-  .coins { font-size: calc(5.4 * var(--u)); }
-  .row.up { animation: up .9s ease-out; }
-  .empty { font-size: calc(4.4 * var(--u)); padding: calc(2 * var(--u)) 0; }
-  @keyframes up { from { background: rgba(255, 255, 255, .35); transform: scale(1.03); } }
+  .row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(1 * var(--u)); background: var(--c); }
+  .row.r1 { --c: #e8b931; --h: calc(16 * var(--u)); }
+  .row.r2 { --c: #c3cad3; --h: calc(13.6 * var(--u)); }
+  .row.r3 { --c: #c98a55; --h: calc(13.6 * var(--u)); }
+  .rank { font-size: calc(var(--h) * .5); font-weight: 900; line-height: 1; color: var(--c); text-align: center; }
+  .row:not(.r1):not(.r2):not(.r3) .rank { color: var(--ov-muted); font-size: calc(var(--h) * .42); }
+  .name { font-size: calc(var(--h) * .34); font-weight: 900; }
+  .r1 .name { font-size: calc(var(--h) * .32); }
+  .coins { display: flex; align-items: baseline; gap: calc(.8 * var(--u)); font-size: calc(var(--h) * .34); font-weight: 900; }
+  .r1 .coins { font-size: calc(var(--h) * .32); }
+  .coins { align-items: center; }
+  .coins .cic { width: .85em; height: .85em; }
+  /* 下の線: 1位と比べたコインの多さ */
+  .bar { position: absolute; left: calc(2.6 * var(--u)); right: calc(3.2 * var(--u)); bottom: calc(1.1 * var(--u)); height: calc(.6 * var(--u)); border-radius: 999px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+  .bar b { display: block; height: 100%; width: var(--p); border-radius: inherit; background: var(--c); transition: width .8s ease; }
+  /* コインが増えた人: 少し明るくなって、「+500」が浮かぶ */
+  .row.up { animation: up 1.2s ease-out; }
+  .plus { position: absolute; right: calc(3.2 * var(--u)); top: calc(.4 * var(--u)); font-size: calc(3.2 * var(--u)); font-weight: 900; color: var(--ov-accent); animation: plus 1.6s ease-out forwards; }
+  .empty { align-self: flex-start; padding: calc(2 * var(--u)) calc(3 * var(--u)); border-radius: calc(2.4 * var(--u)); font-size: calc(4 * var(--u)); font-weight: 800; }
+  .row.enter { animation: row-in .4s ease-out both; animation-delay: calc(var(--i) * 60ms); }
+  @keyframes row-in { from { opacity: 0; transform: translateY(calc(1.4 * var(--u))); } }
+  @keyframes up { 0% { background-color: rgba(255, 255, 255, .22); } }
+  @keyframes plus { 0% { opacity: 0; transform: translateY(calc(1.4 * var(--u))); } 20% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(calc(-2.4 * var(--u))); } }
 `,
-  body: String.raw`<div id="box" class="panel">
-  <h1>ギフトランキング<small class="muted">この配信</small></h1>
+  body: String.raw`<div id="box">
+  <div class="head">ギフトランキング</div>
   <div id="rows"></div>
 </div>`,
   script: String.raw`
@@ -768,14 +906,24 @@ const RANKING = page({
     if (key === lastKey) return;
     lastKey = key;
     if (!ranking.length) {
-      $('rows').replaceChildren(el('div', 'empty muted', 'ギフトを送ると、ここに名前が出ます'));
+      $('rows').replaceChildren(el('div', 'empty panel', 'ギフトを送ると、ここに名前が出ます'));
       last = new Map();
       return;
     }
+    const top = Math.max(1, ranking[0].coins);
     $('rows').replaceChildren(...ranking.map((r, i) => {
-      const line = el('div', 'row', el('span', 'rank num', String(i + 1)), el('span', 'name ellipsis fit', r.name), el('span', 'coins num', '🪙 ' + coins(r.coins)));
-      // コインが増えた人を光らせる
-      if (last.has(r.name) ? last.get(r.name) < r.coins : last.size > 0) line.classList.add('up');
+      const bar = el('span', 'bar', el('b'));
+      bar.style.setProperty('--p', Math.max(4, Math.round(r.coins / top * 100)) + '%');
+      const line = el('div', 'row panel r' + (i + 1), el('span', 'rank num', String(i + 1)), el('span', 'name ellipsis fit', r.name),
+        el('span', 'coins num', triIcon('coins', 'cic'), coins(r.coins)), bar);
+      line.style.setProperty('--i', i);
+      // コインが増えた人を光らせて、増えた分を出す
+      const before = last.get(r.name);
+      if (last.size === 0) line.classList.add('enter');
+      else if (before === undefined || before < r.coins) {
+        line.classList.add('up');
+        line.append(el('span', 'plus num', '+' + coins(r.coins - (before ?? 0))));
+      }
       return line;
     }));
     fitText($('rows'));

@@ -8,14 +8,25 @@ export const RANKING_SIZE = 5;
 
 const TRIGGER_ORDER = { gift: 0, coins: 1, likes: 2, comment: 3, follow: 4, share: 5 };
 
+/** 妨害の種類（ギフト表のカードの色分け）。アプリの「妨害の設定」のグループと同じ分け方 */
+const ACTION_KIND = {
+  tnt: 'attack', mob: 'attack', lightning: 'attack',
+  jail: 'move', freeze: 'move', levitate: 'move', night: 'move',
+  fill_expand: 'fill', fill_raise: 'fill', fill_clear: 'fill',
+  fill_help: 'help', fill_layer: 'help', fill_shrink: 'help', mining_bonus_drop: 'help',
+};
+
 /**
  * ルールから、配信画面のギフト表を作る。メッセージだけのルール（感謝など）は妨害ではないので出さない。
- * 並びは、名前のギフト（安い順）→ コイン数（少ない順）→ いいね → フォロー → シェア
+ * 並びは order で決める。cheap: 名前のギフト（安い順）→ コイン数（少ない順）→ いいね → コメント → フォロー → シェア。
+ * expensive: 同じ分け方で、それぞれ高い順。custom: custom（カードの key の並び）の順。custom に無いカードは、最後に安い順で
  * @param {object[]} rules
  * @param {(name: string) => ({nameJa: string, diamonds: number, image: string} | null)} findGift
  * @param {(action: object) => string} describe 妨害の名前と数（engine の describeAction）
+ * @param {'cheap' | 'expensive' | 'custom'} [order]
+ * @param {string[]} [custom]
  */
-export function giftTable(rules, findGift, describe) {
+export function giftTable(rules, findGift, describe, order = 'cheap', custom = []) {
   const rows = [];
   for (const rule of rules) {
     if (rule.action === 'message') continue;
@@ -31,6 +42,7 @@ export function giftTable(rules, findGift, describe) {
     const row = {
       action: random ? names.map((name) => name.replace(/ ×?\d.*$/, '')).join('・') : names[0],
       icon: first.action === 'mob' ? (first.mob ?? 'zombie') : first.action,
+      kind: random ? 'random' : (ACTION_KIND[first.action] ?? 'other'),
     };
     if (rule.gift !== undefined) {
       const gift = findGift(rule.gift);
@@ -46,12 +58,27 @@ export function giftTable(rules, findGift, describe) {
     } else {
       continue; // ギフトID だけのルールは名前がわからないので出さない
     }
+    // カードの名前（自分で並べた順を覚えるのに使う）。同じものが2つあれば2つ目に「#2」を付ける
+    const base = `${row.trigger}:${row.label}→${row.action}`;
+    const same = rows.filter((r) => r.key === base || r.key.startsWith(base + '#')).length;
+    row.key = same ? `${base}#${same + 1}` : base;
     rows.push(row);
   }
   const value = (row) => row.coins ?? row.count ?? Infinity;
+  const dir = order === 'expensive' ? -1 : 1;
+  const place = new Map(custom.map((key, i) => [key, i]));
+  const byCustom = (a, b) => {
+    const [x, y] = [place.get(a.key) ?? Infinity, place.get(b.key) ?? Infinity];
+    return x === y ? 0 : x < y ? -1 : 1;
+  };
+  const byValue = (a, b) => {
+    const [x, y] = [value(a), value(b)];
+    return x === y ? 0 : dir * (x < y ? -1 : 1);
+  };
   return rows
     .map((row, i) => ({ row, i }))
-    .sort((a, b) => TRIGGER_ORDER[a.row.trigger] - TRIGGER_ORDER[b.row.trigger] || value(a.row) - value(b.row) || a.i - b.i)
+    .sort((a, b) => (order === 'custom' ? byCustom(a.row, b.row) : 0)
+      || TRIGGER_ORDER[a.row.trigger] - TRIGGER_ORDER[b.row.trigger] || byValue(a.row, b.row) || a.i - b.i)
     .map(({ row }) => row)
     .slice(0, MAX_TABLE_ROWS);
 }

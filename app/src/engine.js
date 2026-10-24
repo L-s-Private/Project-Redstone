@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { Dispatcher } from './dispatcher.js';
 import { ModClient } from './modClient.js';
-import { DEFAULT_OVERLAY_STYLE, parseFill, parseOverlayStyle, parseWorld, parsePreset } from './config.js';
+import { DEFAULT_OVERLAY_STYLE, parseFill, parseOverlayStyle, parseWorld, parsePreset, DEFAULT_GIFT_TABLE_ORDER, GIFT_TABLE_ORDERS, parseGiftTableCustom, MOB_INFO } from './config.js';
 import { BUILTIN_PRESETS, MAX_PRESET_NAME } from './presets.js';
 import { checkFeature, checkPresetSave, checkAdvancedRules, checkRules, CURRENT_PLAN, planOf } from './plan.js';
 import { describeEvent } from './rules.js';
@@ -23,9 +23,9 @@ const FREE_HISTORY_ENTRIES = 3;
 const MAX_ACTIVITY = 100;
 
 const SKIP_MESSAGES = {
-  no_rule: '対応する妨害がないので無視しました',
+  no_rule: '合うルールがないので出しませんでした',
   paused: '一時停止中なので出しませんでした',
-  cooldown: 'クールダウン中なので出しませんでした',
+  cooldown: '待ち時間中なので出しませんでした',
   challenge_paused: '採掘チャレンジの一時停止中なので出しませんでした',
   mode_incompatible: '今のゲームモードでは出せないので出しませんでした',
   no_active_mode: '採掘チャレンジが始まっていないので出しませんでした',
@@ -66,7 +66,7 @@ export function testButtons(rules) {
     } else if (rule.likes !== undefined) {
       buttons.set(`いいね${rule.likes}`, { kind: 'like', count: rule.likes });
     } else if (rule.minDiamonds !== undefined) {
-      buttons.set(`🪙${rule.minDiamonds}`, { kind: 'gift', giftName: `${rule.minDiamonds}コインのギフト`, diamonds: rule.minDiamonds, count: 1 });
+      buttons.set(`${rule.minDiamonds}コイン`, { kind: 'gift', giftName: `${rule.minDiamonds}コインのギフト`, diamonds: rule.minDiamonds, count: 1 });
     } else if (rule.event !== undefined) {
       buttons.set(rule.event === 'follow' ? 'フォロー' : 'シェア', { kind: rule.event });
     }
@@ -95,15 +95,7 @@ function testMark(event) {
   return event.test ? '（テスト）' : '';
 }
 
-const MOB_NAMES = {
-  zombie: 'ゾンビ',
-  skeleton: 'スケルトン',
-  creeper: 'クリーパー',
-  spider: 'クモ',
-  witch: 'ウィッチ',
-  silverfish: 'シルバーフィッシュ',
-  pig: 'ブタ',
-};
+const MOB_NAMES = Object.fromEntries(MOB_INFO);
 
 export function describeAction(action) {
   if (action.type === 'fill_set') return action.percent === 0 ? 'テスト: 枠の中を空にする' : `テスト: ${action.percent}% まで埋める`;
@@ -338,8 +330,10 @@ export class Engine extends EventEmitter {
       // 配信画面（オーバーレイ）用
       // いいねの目標（あと何回で何が出るか）。いいねのたびに変わるので毎回作る（ルールの数だけ）
       likeGoals: likeGoals(this.config.rules, this.dispatcher.likeProgress, describeAction),
-      giftTable: this.cached('giftTable', [this.config.rules, this.giftCatalog?.version], () =>
-        giftTable(this.config.rules, (name) => this.giftCatalog?.find({ giftName: name }) ?? null, describeAction)),
+      giftTable: this.cached('giftTable', [this.config.rules, this.giftCatalog?.version, this.config.giftTableOrder, this.config.giftTableCustom], () =>
+        giftTable(this.config.rules, (name) => this.giftCatalog?.find({ giftName: name }) ?? null, describeAction,
+          this.config.giftTableOrder, this.config.giftTableCustom ?? [])),
+      giftTableOrder: this.config.giftTableOrder ?? DEFAULT_GIFT_TABLE_ORDER,
       ranking: this.ranking.top(),
       giftCatalogVersion: this.giftCatalog?.version ?? 0,
     };
@@ -382,6 +376,14 @@ export class Engine extends EventEmitter {
   async deactivateLicense() {
     await this.license?.deactivate();
     this.log('info', 'この PC での有料版の有効化を解除しました。設定はそのまま残っています');
+    this.emitState();
+  }
+
+  /** ギフト表の並び順を変える（安い順・高い順・自分で並べる）。custom は自分で並べた順（カードの key） */
+  setGiftTableOrder(order, custom) {
+    if (!GIFT_TABLE_ORDERS.includes(order)) throw new Error('並び順の指定が正しくありません');
+    this.config.giftTableOrder = order;
+    if (custom !== undefined) this.config.giftTableCustom = parseGiftTableCustom(custom);
     this.emitState();
   }
 
@@ -480,7 +482,7 @@ export class Engine extends EventEmitter {
     this.log('info', `マイクラ（MOD）を待っています: ${this.config.mod.host}:${this.config.mod.port}（ワールドを開くとつながります）`);
     this.client.start();
     if (mock) {
-      this.log('info', 'モックモードです。TikTokにはつながず、テスト送信でギフトを試せます');
+      this.log('info', 'テストモードです。TikTok にはつながず、テスト送信でギフトを試せます');
     } else if (this.config.tiktokUsername) {
       this.connectTikTok();
     } else {
@@ -504,7 +506,7 @@ export class Engine extends EventEmitter {
     try {
       await this.tiktok.start(this.config.tiktokUsername);
     } catch (e) {
-      this.log('error', `TikTokへの接続を始められませんでした: ${e.message}`);
+      this.log('error', `TikTok への接続を始められませんでした: ${e.message}`);
     }
   }
 
@@ -513,10 +515,12 @@ export class Engine extends EventEmitter {
     this.requireMod();
     if (miningActive(this.client.status.mining)) throw new Error('採掘チャレンジ中です。先にチャレンジを終えてください');
     const fill = parseFill({ ...this.config.fill, ...options });
-    const response = await this.client.send({ type: 'fill_start', ...fill });
+    // 地層は「する」のときだけ送る（送らなければ、MOD は全部 block で埋める）
+    const { layered, layers, ...settings } = fill;
+    const response = await this.client.send({ type: 'fill_start', ...settings, ...(layered ? { layers } : {}) });
     if (!response.ok) throw new Error(response.error);
     this.config.fill = fill;
-    this.log('ok', `埋め立てを始めました（${fill.rounds}ラウンド・幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}・置く速さ${PLACE_SPEED_NAMES[fill.placeSpeed]}・壊す速さ${BREAK_SPEED_NAMES[fill.breakSpeed]}・モブに${fill.mobsAttack ? '攻撃される' : '攻撃されない'}・モブは${fill.mobLifetime ? `${fill.mobLifetime}秒で消える` : '消えない'}）`);
+    this.log('ok', `埋め立てを始めました（${fill.rounds}ラウンド・幅${fill.width}・高さ${fill.height}・Y=${fill.skyY}・届く距離${fill.reach}・置く速さ${PLACE_SPEED_NAMES[fill.placeSpeed]}・壊す速さ${BREAK_SPEED_NAMES[fill.breakSpeed]}・モブに${fill.mobsAttack ? '攻撃される' : '攻撃されない'}・モブは${fill.mobLifetime ? `${fill.mobLifetime}秒で消える` : '消えない'}${layered ? `・地層${layers.length}層` : ''}）`);
     this.emitState();
   }
 
@@ -585,7 +589,7 @@ export class Engine extends EventEmitter {
   /** 採掘チャレンジを始める（MOD が、遊べる状態かを全部確かめてから3秒のカウントダウンを始める） */
   async startMining() {
     this.requireMod();
-    if (!this.client.status.players) throw new Error('先にMinecraftでワールドを開いてください');
+    if (!this.client.status.players) throw new Error('先にマイクラでワールドを開いてください');
     const mining = this.config.mining ?? parseMining();
     const problem = checkMining(mining);
     if (problem) throw new Error(problem);
@@ -752,7 +756,7 @@ export class Engine extends EventEmitter {
   async stopAll() {
     this.dispatcher.paused = true;
     const cleared = this.client.clear();
-    this.log('warn', `全妨害ストップ: 待ち行列の ${cleared}件を取り消し、一時停止しました`);
+    this.log('warn', `全妨害ストップ: まだ出していなかった妨害 ${cleared}件を取り消し、一時停止しました`);
     this.emitState();
     if (!this.client.status.connected || !this.client.status.players) return cleared;
     try {

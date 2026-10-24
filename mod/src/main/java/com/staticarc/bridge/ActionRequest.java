@@ -4,8 +4,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonArray;
+import com.staticarc.game.FillLayers;
 import com.staticarc.game.MiningChallenge;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,7 +21,8 @@ public record ActionRequest(String id, Type type, int count, String from, String
                             int width, int height, int countdown, String wall, String block, int skyY, int reach,
                             String placeSpeed, int percent, int rounds, String breakSpeed, String handBlock,
                             boolean mobsAttack, String time, String weather, boolean mobSpawning, boolean keepInventory,
-                            int mobLifetime, String item, int targetCount, int seconds, boolean terrain, String op) {
+                            int mobLifetime, String item, int targetCount, int seconds, boolean terrain, String op,
+                            List<FillLayers.Layer> layers) {
 
     public enum Type {
         PING, TNT, MOB, MESSAGE, FILL_START, FILL_STOP, FILL_EXPAND, FILL_SHRINK, FILL_HELP, FILL_SET, WORLD,
@@ -51,7 +56,9 @@ public record ActionRequest(String id, Type type, int count, String from, String
     /** mining_test の操作: drop（数えないテスト用の対象アイテムを1個出す）/ progress（進み具合を percent% にする）/ time（残り5秒にする） */
     public static final Set<String> MINING_TEST_OPS = Set.of("drop", "progress", "time");
 
-    public static final Set<String> ALLOWED_MOBS = Set.of("zombie", "skeleton", "creeper", "spider", "witch", "silverfish", "pig");
+    public static final Set<String> ALLOWED_MOBS = Set.of("zombie", "husk", "drowned", "skeleton", "stray", "wither_skeleton", "creeper",
+            "spider", "cave_spider", "witch", "pillager", "vex", "blaze", "breeze",
+            "phantom", "slime", "magma_cube", "silverfish", "endermite", "pig", "chicken");
 
     /** 埋め立ての枠の既定値（「/bedrock create 11 9」の例に合わせる） */
     public static final int DEFAULT_WIDTH = 11;
@@ -61,8 +68,11 @@ public record ActionRequest(String id, Type type, int count, String from, String
     /** 枠の素材。配信でよく見るのはガラス */
     public static final Set<String> ALLOWED_WALLS = Set.of("glass", "white_stained_glass", "light_blue_stained_glass", "bedrock");
     /** 埋めるブロック。音や見た目のよいものを選べるようにする */
-    public static final Set<String> ALLOWED_BLOCKS = Set.of("amethyst_block", "diamond_block", "emerald_block", "gold_block",
-            "iron_block", "lapis_block", "redstone_block", "quartz_block");
+    public static final Set<String> ALLOWED_BLOCKS = Set.of("amethyst_block", "diamond_block", "emerald_block", "gold_block", "iron_block", "lapis_block",
+            "redstone_block", "quartz_block", "netherite_block", "copper_block", "coal_block", "obsidian",
+            "crying_obsidian", "glowstone", "purpur_block", "end_stone_bricks", "bricks", "white_concrete",
+            "red_concrete", "orange_concrete", "yellow_concrete", "lime_concrete", "light_blue_concrete", "blue_concrete",
+            "purple_concrete", "pink_concrete", "black_concrete");
     public static final String DEFAULT_WALL = "glass";
     public static final String DEFAULT_BLOCK = "amethyst_block";
     /** 枠を作る高さ（天空）。ワールドの高さに収まるよう、実行側で丸める */
@@ -148,6 +158,8 @@ public record ActionRequest(String id, Type type, int count, String from, String
         if (!ALLOWED_BLOCKS.contains(handBlock)) {
             throw new InvalidRequestException("未対応の手に持つブロックです: " + handBlock);
         }
+        // layers は地層（下の層から順）。あれば block の代わりに、段ごとにその層のブロックを置く
+        List<FillLayers.Layer> layers = parseLayers(json);
         int skyY = optInt(json, "skyY", DEFAULT_SKY_Y);
         int reach = Math.max(1, Math.min(MAX_REACH, optInt(json, "reach", DEFAULT_REACH)));
 
@@ -201,7 +213,7 @@ public record ActionRequest(String id, Type type, int count, String from, String
 
         return new ActionRequest(id, type, count, from, label, mob, width, height, countdown, wall, block, skyY, reach, placeSpeed, percent,
                 rounds, breakSpeed, handBlock, mobsAttack, time, weather, mobSpawning, keepInventory,
-                mobLifetime, item, targetCount, seconds, terrain, op);
+                mobLifetime, item, targetCount, seconds, terrain, op, layers);
     }
 
     /** 押しっぱなしで次のブロックを置けるまでの tick 数 */
@@ -247,6 +259,35 @@ public record ActionRequest(String id, Type type, int count, String from, String
             case "mining_test" -> Type.MINING_TEST;
             default -> throw new InvalidRequestException("未対応の type です: " + raw);
         };
+    }
+
+    /** 地層を読む。無ければ空。ブロックは ALLOWED_BLOCKS のどれか、段数は 1〜FillLayers.MAX_ROWS に丸める */
+    private static List<FillLayers.Layer> parseLayers(JsonObject json) throws InvalidRequestException {
+        JsonElement value = json.get("layers");
+        if (value == null || value.isJsonNull()) {
+            return List.of();
+        }
+        if (!value.isJsonArray()) {
+            throw new InvalidRequestException("layers は配列にしてください");
+        }
+        JsonArray array = value.getAsJsonArray();
+        if (array.size() > FillLayers.MAX_LAYERS) {
+            throw new InvalidRequestException("地層は" + FillLayers.MAX_LAYERS + "つまでです");
+        }
+        List<FillLayers.Layer> layers = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (!element.isJsonObject()) {
+                throw new InvalidRequestException("layers の中身は {block, rows} にしてください");
+            }
+            JsonObject layer = element.getAsJsonObject();
+            String block = optString(layer, "block", DEFAULT_BLOCK);
+            if (!ALLOWED_BLOCKS.contains(block)) {
+                throw new InvalidRequestException("未対応のブロックです: " + block);
+            }
+            int rows = Math.max(1, Math.min(FillLayers.MAX_ROWS, optInt(layer, "rows", 1)));
+            layers.add(new FillLayers.Layer(block, rows));
+        }
+        return List.copyOf(layers);
     }
 
     private static String optString(JsonObject json, String key, String fallback) throws InvalidRequestException {

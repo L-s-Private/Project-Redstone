@@ -30,6 +30,28 @@ test('ギフト表: 名前のギフト（安い順）→ コイン数 → いい
   assert.equal(rows[0].coins, 1);
   assert.equal(rows[1].icon, 'zombie');
   assert.equal(rows[2].image, '', '一覧にないギフトは絵なし');
+  assert.deepEqual(rows.map((r) => r.kind), ['fill', 'attack', 'attack', 'attack', 'attack', 'help', 'move'], 'カードの色分け');
+});
+
+test('ギフト表の並び順: 高い順・自分で並べた順にもできる', () => {
+  const rules = [
+    { gift: 'バラ', action: 'tnt', count: 1 },
+    { likes: 100, action: 'fill_help', count: 5 },
+    { gift: 'クラッカー', action: 'jail', count: 10 },
+    { minDiamonds: 10, action: 'tnt', count: 2 },
+    { minDiamonds: 500, action: 'fill_clear' },
+  ];
+  const labels = (order) => giftTable(rules, find, describeAction, order).map((r) => r.label);
+  assert.deepEqual(labels('cheap'), ['バラ', 'クラッカー', '10以上', '500以上', '100回']);
+  assert.deepEqual(labels('expensive'), ['クラッカー', 'バラ', '500以上', '10以上', '100回']);
+  assert.deepEqual(labels(undefined), labels('cheap'), '前の版の設定は安い順');
+  // 自分で並べる: カードの key の順。並びに無いカード（あとで足したルール）は最後に安い順
+  const keys = giftTable(rules, find, describeAction).map((r) => r.key);
+  assert.equal(new Set(keys).size, keys.length, 'key はかぶらない');
+  const custom = [keys[3], keys[0], keys[4]];
+  const rows = giftTable(rules, find, describeAction, 'custom', custom);
+  assert.deepEqual(rows.map((r) => r.label), ['500以上', 'バラ', '100回', 'クラッカー', '10以上']);
+  assert.equal(rows[0].key, 'coins:500以上→全消し');
 });
 
 test('ランキング: コインの多い順に5人まで。名前のない人と0コインは数えない', () => {
@@ -66,6 +88,7 @@ test('ギフト表: ランダムは候補を並べ、条件は出さない', () 
   const [row] = giftTable([{ gift: 'バラ', action: 'random', choices: [{ action: 'tnt', count: 2 }, { action: 'mob', mob: 'pig' }], when: 'countdown', minRound: 2 }], find, describeAction);
   assert.equal(row.action, 'TNT・ブタ', 'カードに収まるよう名前だけ');
   assert.equal(row.icon, 'tnt');
+  assert.equal(row.kind, 'random');
   assert.equal(row.when, undefined, '小さすぎて読めないので出さない');
 });
 

@@ -128,7 +128,7 @@ test('テスト送信のボタンをルールから作る', () => {
     { giftId: '5655', action: 'tnt' },
   ]), [
     { label: 'Rose', body: { kind: 'gift', giftName: 'Rose', count: 1 } },
-    { label: '🪙100', body: { kind: 'gift', giftName: '100コインのギフト', diamonds: 100, count: 1 } },
+    { label: '100コイン', body: { kind: 'gift', giftName: '100コインのギフト', diamonds: 100, count: 1 } },
     { label: 'いいね1000', body: { kind: 'like', count: 1000 } },
     { label: 'フォロー', body: { kind: 'follow' } },
   ]);
@@ -186,6 +186,13 @@ test('画面のボタンからの操作は、マイクラにつながってい�
   assert.deepEqual(client.sent, [], '何も送らない（あとで急に出ない）');
 });
 
+test('地層を「する」にしたら、下の層から順に送る', async () => {
+  const { engine, client } = setup();
+  const layers = [{ block: 'lapis_block', rows: 2 }, { block: 'emerald_block', rows: 5 }];
+  await engine.startFill({ layered: true, layers });
+  assert.deepEqual(client.sent.at(-1).layers, layers);
+});
+
 test('埋め立ての開始・終了を MOD に送り、断られたら理由を返す', async () => {
   const { engine, client } = setup();
   await engine.startFill({ width: 15, height: 5, countdown: 30, block: 'diamond_block' });
@@ -193,9 +200,10 @@ test('埋め立ての開始・終了を MOD に送り、断られたら理由を
     width: 15, height: 5, countdown: 30, rounds: 10, wall: 'glass', block: 'diamond_block', handBlock: 'diamond_block', skyY: 150, reach: 8,
     placeSpeed: 'fast', breakSpeed: 'fast', mobsAttack: true, mobLifetime: 30,
   };
-  assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent });
-  assert.deepEqual(engine.config.fill, sent, '使った設定を覚える');
-  assert.deepEqual(engine.state.fillSettings, sent);
+  assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent }, '地層は「しない」なら送らない');
+  const layers = [{ block: 'iron_block', rows: 3 }, { block: 'gold_block', rows: 3 }, { block: 'diamond_block', rows: 3 }];
+  assert.deepEqual(engine.config.fill, { ...sent, layered: false, layers }, '使った設定を覚える（地層も）');
+  assert.deepEqual(engine.state.fillSettings, { ...sent, layered: false, layers });
   // おかしな値は既定値・上限に直して送る
   await engine.startFill({ wall: 'obsidian', reach: 999, width: 'x' });
   assert.deepEqual(client.sent.at(-1), { type: 'fill_start', ...sent, wall: 'glass', reach: 64, width: 11 });

@@ -9,7 +9,15 @@ export const DEFAULT_MOD_PORT = 25599;
 
 const TRIGGER_KEYS = ['gift', 'giftId', 'minDiamonds', 'likes', 'event', 'comment'];
 // MOD が出せるもの（docs/protocol.md）
-export const MOBS = ['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'];
+/** 出せるモブ: [ID, 名前]。MOD の ActionRequest.ALLOWED_MOBS と同じもの */
+export const MOB_INFO = [
+  ['zombie', 'ゾンビ'], ['husk', 'ハスク'], ['drowned', 'ドラウンド'], ['skeleton', 'スケルトン'], ['stray', 'ストレイ'],
+  ['wither_skeleton', 'ウィザースケルトン'], ['creeper', 'クリーパー'], ['spider', 'クモ'], ['cave_spider', '洞窟グモ'],
+  ['witch', 'ウィッチ'], ['pillager', 'ピリジャー'], ['vex', 'ヴェックス'], ['blaze', 'ブレイズ'], ['breeze', 'ブリーズ'],
+  ['phantom', 'ファントム'], ['slime', 'スライム'], ['magma_cube', 'マグマキューブ'], ['silverfish', 'シルバーフィッシュ'],
+  ['endermite', 'エンダーマイト'], ['pig', 'ブタ'], ['chicken', 'ニワトリ'],
+];
+export const MOBS = MOB_INFO.map(([id]) => id);
 const RULE_KEYS = [...TRIGGER_KEYS, 'action', 'count', 'maxCount', 'mob', 'label', 'cooldownSec', 'choices', 'noRepeat', 'when', 'minRound', 'media'];
 const CHOICE_KEYS = ['action', 'count', 'mob', 'weight'];
 /** 「何ラウンド目から」の上限（埋め立てのラウンド数の上限と同じ） */
@@ -18,7 +26,20 @@ const MAX_LABEL_LENGTH = 100;
 
 // 埋め立ての設定（MOD の docs/protocol.md と同じ値）
 export const FILL_WALLS = ['glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock'];
-export const FILL_BLOCKS = ['amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block', 'quartz_block'];
+/** 枠の中に置かれるブロック: [ID, 名前, できあがりの図の色]。MOD の ActionRequest.ALLOWED_BLOCKS と同じもの */
+export const FILL_BLOCK_INFO = [
+  ['amethyst_block', 'アメジスト', '#9a6fd6'], ['diamond_block', 'ダイヤモンド', '#5fd6d0'], ['emerald_block', 'エメラルド', '#3fbf5f'],
+  ['gold_block', '金', '#e8c23a'], ['iron_block', '鉄', '#d8d8d8'], ['lapis_block', 'ラピスラズリ', '#2f5bb7'],
+  ['redstone_block', 'レッドストーン', '#c8302a'], ['quartz_block', 'クォーツ', '#ece6dc'], ['netherite_block', 'ネザライト', '#4a4446'],
+  ['copper_block', '銅', '#c06a4b'], ['coal_block', '石炭', '#2a2a2a'], ['obsidian', '黒曜石', '#1f1636'],
+  ['crying_obsidian', '泣く黒曜石', '#4a1a86'], ['glowstone', 'グロウストーン', '#e3b35a'], ['purpur_block', 'プルパー', '#a77ea7'],
+  ['end_stone_bricks', 'エンドストーンレンガ', '#e2e3a6'], ['bricks', 'レンガ', '#9a5443'],
+  ['white_concrete', '白のコンクリート', '#e9ecec'], ['red_concrete', '赤のコンクリート', '#a02722'], ['orange_concrete', 'オレンジのコンクリート', '#e06101'],
+  ['yellow_concrete', '黄色のコンクリート', '#f1af15'], ['lime_concrete', '黄緑のコンクリート', '#5ea918'], ['light_blue_concrete', '空色のコンクリート', '#2489c7'],
+  ['blue_concrete', '青のコンクリート', '#2c2e8f'], ['purple_concrete', '紫のコンクリート', '#64209c'], ['pink_concrete', 'ピンクのコンクリート', '#d6658f'],
+  ['black_concrete', '黒のコンクリート', '#14161b'],
+];
+export const FILL_BLOCKS = FILL_BLOCK_INFO.map(([id]) => id);
 /** ブロックを置く速さ（右クリック押しっぱなし）。normal はバニラと同じ */
 export const FILL_PLACE_SPEEDS = ['normal', 'fast', 'fastest'];
 /** 手でブロックを壊す速さ（左クリック押しっぱなし）。normal はバニラと同じ。fast・fastest は置く速さと同じ */
@@ -26,7 +47,25 @@ export const FILL_BREAK_SPEEDS = ['normal', 'fast', 'fastest'];
 export const DEFAULT_FILL = {
   width: 11, height: 9, countdown: 10, rounds: 10, wall: 'glass', block: 'amethyst_block', handBlock: 'amethyst_block', skyY: 150, reach: 8,
   placeSpeed: 'fast', breakSpeed: 'fast', mobsAttack: true, mobLifetime: 30,
+  // 地層（layered のときだけ使う）。下の層から順。いちばん上の層の rows は使わず、残りの段すべて
+  layered: false, layers: [{ block: 'iron_block', rows: 3 }, { block: 'gold_block', rows: 3 }, { block: 'diamond_block', rows: 3 }],
 };
+/** 地層の数の上限・下限（MOD の FillLayers と同じ） */
+export const MAX_FILL_LAYERS = 6;
+export const MIN_FILL_LAYERS = 2;
+
+/** 地層を読む。おかしなものは捨て、足りなければ既定の地層にする */
+export function parseLayers(raw) {
+  if (!Array.isArray(raw)) return DEFAULT_FILL.layers.map((l) => ({ ...l }));
+  const layers = raw
+    .filter((l) => l && typeof l === 'object' && FILL_BLOCKS.includes(l.block))
+    .slice(0, MAX_FILL_LAYERS)
+    .map((l) => {
+      const rows = Math.floor(Number(l.rows));
+      return { block: l.block, rows: Number.isFinite(rows) ? Math.min(30, Math.max(1, rows)) : 3 };
+    });
+  return layers.length >= MIN_FILL_LAYERS ? layers : DEFAULT_FILL.layers.map((l) => ({ ...l }));
+}
 
 /** ワールドの設定。time: normal（進む）/ day・night（その時間で止める）、weather: normal（変わる）/ clear・rain（止める） */
 export const WORLD_TIMES = ['normal', 'day', 'night'];
@@ -52,6 +91,16 @@ export const OVERLAY_FONTS = {
   ud: '"BIZ UDPGothic", "Yu Gothic UI", system-ui, sans-serif',
   mincho: '"Yu Mincho", "Hiragino Mincho ProN", serif',
 };
+/** ギフト表の並び順: 安い順（既定）・高い順・自分で並べる（giftTableCustom の順） */
+export const GIFT_TABLE_ORDERS = ['cheap', 'expensive', 'custom'];
+export const DEFAULT_GIFT_TABLE_ORDER = 'cheap';
+
+/** 自分で並べた順（カードの名前 = overlayData の row.key）。おかしなものは捨てる */
+export function parseGiftTableCustom(raw) {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.filter((k) => typeof k === 'string' && k.length > 0 && k.length <= 200))].slice(0, 200);
+}
+
 /** 配信画面の部品の見た目（有料版で変えられる）。既定は操作画面と同じグレー */
 export const DEFAULT_OVERLAY_STYLE = {
   textColor: '#ededed', accentColor: '#6fbf8e', panelColor: '#141416', panelOpacity: 88, font: 'gothic', alertSeconds: 5.5, alertMax: 3,
@@ -102,6 +151,9 @@ export function parseFill(raw = {}) {
     mobLifetime: int(fill.mobLifetime, DEFAULT_FILL.mobLifetime, 0, 600),
     // モブに攻撃される（クリエイティブでも埋め立て中だけサバイバル・飛べる）
     mobsAttack: typeof fill.mobsAttack === 'boolean' ? fill.mobsAttack : DEFAULT_FILL.mobsAttack,
+    // 地層にするか。しないときも、作った地層は覚えておく（また「する」にしたときのため）
+    layered: typeof fill.layered === 'boolean' ? fill.layered : DEFAULT_FILL.layered,
+    layers: parseLayers(fill.layers),
   };
 }
 
@@ -145,6 +197,8 @@ export function parseConfig(raw) {
 
   return { tiktokUsername, mod: { host: mod.host ?? '127.0.0.1', port }, rules, fill: parseFill(raw.fill), world: parseWorld(raw.world),
     presets: parsePresets(raw.presets), overlay: parseOverlayStyle(raw.overlay),
+    giftTableOrder: GIFT_TABLE_ORDERS.includes(raw.giftTableOrder) ? raw.giftTableOrder : DEFAULT_GIFT_TABLE_ORDER,
+    giftTableCustom: parseGiftTableCustom(raw.giftTableCustom),
     // ゲームモード（前の版の設定には無いので埋め立て）と、採掘チャレンジの設定（埋め立ての設定 fill とは別に持つ）
     gameMode: GAME_MODES.includes(raw.gameMode) ? raw.gameMode : DEFAULT_GAME_MODE, mining: parseMining(raw.mining) };
 }
@@ -200,7 +254,7 @@ function validateRule(rule, number) {
     throw new ConfigError(`${where}: いいねの回数は1以上の整数にしてください`);
   }
   if (rule.minDiamonds !== undefined && !(Number.isFinite(rule.minDiamonds) && rule.minDiamonds >= 0)) {
-    throw new ConfigError(`${where}: minDiamonds は0以上の数にしてください`);
+    throw new ConfigError(`${where}: コイン数は0以上の数にしてください`);
   }
   if (rule.action === RANDOM_ACTION) {
     if (!Array.isArray(rule.choices) || rule.choices.length < 2 || rule.choices.length > MAX_CHOICES) {
@@ -213,7 +267,7 @@ function validateRule(rule, number) {
     rule = (({ choices, noRepeat, ...rest }) => rest)(rule);
   }
   if (rule.noRepeat !== undefined && typeof rule.noRepeat !== 'boolean') {
-    throw new ConfigError(`${where}: noRepeat は true か false にしてください`);
+    throw new ConfigError(`${where}: 「同じ妨害を2回続けて出さない」の指定が正しくありません`);
   }
   if (rule.when !== undefined && !WHEN_PHASES.includes(rule.when)) {
     throw new ConfigError(`${where}: when は ${WHEN_PHASES.join(' / ')} のどれかにしてください`);
@@ -229,11 +283,11 @@ function validateRule(rule, number) {
   }
   for (const key of ['count', 'maxCount']) {
     if (rule[key] !== undefined && !(Number.isInteger(rule[key]) && rule[key] >= 1)) {
-      throw new ConfigError(`${where}: ${key} は1以上の整数にしてください`);
+      throw new ConfigError(`${where}: ${key === 'count' ? '数' : '最大の数'}は1以上の整数にしてください`);
     }
   }
   if (rule.cooldownSec !== undefined && !(Number.isFinite(rule.cooldownSec) && rule.cooldownSec >= 0)) {
-    throw new ConfigError(`${where}: cooldownSec は0以上の数にしてください`);
+    throw new ConfigError(`${where}: 待ち時間は0以上の秒数にしてください`);
   }
   if (rule.media !== undefined) {
     const media = parseMedia(rule.media);
@@ -281,7 +335,7 @@ function validateChoice(choice, where) {
     throw new ConfigError(`${where}: mob は ${MOBS.join(' / ')} のどれかにしてください`);
   }
   if (choice.count !== undefined && !(Number.isInteger(choice.count) && choice.count >= 1)) {
-    throw new ConfigError(`${where}: count は1以上の整数にしてください`);
+    throw new ConfigError(`${where}: 数は1以上の整数にしてください`);
   }
   if (choice.weight !== undefined && !(Number.isInteger(choice.weight) && choice.weight >= 1 && choice.weight <= MAX_WEIGHT)) {
     throw new ConfigError(`${where}: 出やすさ（weight）は1〜${MAX_WEIGHT}の整数にしてください`);

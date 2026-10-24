@@ -40,7 +40,18 @@ test('初回は設定例から作り、保存した内容を次回読める', as
   const second = await loadUserConfig(dir);
   assert.equal(second.created, false);
   assert.equal(second.config.tiktokUsername, 'taro');
-  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'gameMode', 'fill', 'mining', 'world', 'rules', 'presets', 'overlay']);
+  assert.deepEqual(Object.keys(JSON.parse(await readFile(first.path, 'utf8'))), ['tiktokUsername', 'mod', 'gameMode', 'fill', 'mining', 'world', 'rules', 'presets', 'overlay', 'giftTableOrder', 'giftTableCustom']);
+});
+
+test('ギフト表の並び順も保存して、次回読める', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'redstone-')), 'StaticArc');
+  const first = await loadUserConfig(dir);
+  first.config.giftTableOrder = 'custom';
+  first.config.giftTableCustom = ['gift:バラ→TNT ×1', 'likes:100回→浮遊 3秒'];
+  await saveUserConfig(first.path, first.config);
+  const second = await loadUserConfig(dir);
+  assert.equal(second.config.giftTableOrder, 'custom');
+  assert.deepEqual(second.config.giftTableCustom, first.config.giftTableCustom);
 });
 
 test('ワールドの設定と自分のプリセットも保存して、次回読める', async () => {

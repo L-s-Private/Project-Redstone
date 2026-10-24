@@ -38,8 +38,8 @@ test('間違った設定は日本語で理由を返す', () => {
   assert.throws(bad([{ gift: 'Rose', action: 'bury' }]), /action は/);
   assert.throws(bad([{ likes: 0, action: 'tnt' }]), /いいねの回数/);
   assert.throws(bad([{ likes: 100, gift: 'Rose', action: 'tnt' }]), /どれか1つだけ/);
-  assert.throws(bad([{ gift: 'Rose', action: 'tnt', count: 0 }]), /count/);
-  assert.throws(bad([{ gift: 'Rose', action: 'tnt', cooldownSec: -1 }]), /cooldownSec/);
+  assert.throws(bad([{ gift: 'Rose', action: 'tnt', count: 0 }]), /数は1以上/);
+  assert.throws(bad([{ gift: 'Rose', action: 'tnt', cooldownSec: -1 }]), /待ち時間は0以上/);
   assert.throws(bad(valid.rules, { mod: { port: 70000 } }), /mod.port/);
   assert.throws(() => parseConfig([]), ConfigError);
 });
@@ -62,6 +62,7 @@ test('埋め立ての設定は、なければ既定値、おかしな値も既�
   assert.deepEqual(DEFAULT_FILL, {
     width: 11, height: 9, countdown: 10, rounds: 10, wall: 'glass', block: 'amethyst_block', handBlock: 'amethyst_block', skyY: 150, reach: 8,
     placeSpeed: 'fast', breakSpeed: 'fast', mobsAttack: true, mobLifetime: 30,
+    layered: false, layers: [{ block: 'iron_block', rows: 3 }, { block: 'gold_block', rows: 3 }, { block: 'diamond_block', rows: 3 }],
   });
   assert.deepEqual(parseFill({ wall: 'bedrock', block: 'emerald_block', skyY: 999, reach: 0, width: 2 }), {
     ...DEFAULT_FILL, wall: 'bedrock', block: 'emerald_block', handBlock: 'emerald_block', skyY: 300, reach: 1, width: 3,
@@ -81,6 +82,24 @@ test('埋め立ての設定は、なければ既定値、おかしな値も既�
   assert.equal(parseFill({ mobsAttack: 'no' }).mobsAttack, true);
   assert.equal(parseFill({ rounds: 0 }).rounds, 1);
   assert.equal(parseFill({ rounds: 500 }).rounds, 99);
+});
+
+test('地層: 既定は「しない」。おかしな層は捨て、2つ未満なら既定の地層、6つまで', () => {
+  assert.equal(parseFill({}).layered, false);
+  assert.deepEqual(parseFill({}).layers.map((l) => l.block), ['iron_block', 'gold_block', 'diamond_block']);
+  const two = [{ block: 'lapis_block', rows: 2 }, { block: 'emerald_block', rows: 99 }];
+  assert.deepEqual(parseFill({ layered: true, layers: two }).layers, [{ block: 'lapis_block', rows: 2 }, { block: 'emerald_block', rows: 30 }]);
+  assert.deepEqual(parseFill({ layers: [{ block: 'dirt', rows: 3 }, { block: 'gold_block', rows: 3 }] }).layers, DEFAULT_FILL.layers, '1つしか残らなければ既定');
+  assert.equal(parseFill({ layers: Array.from({ length: 9 }, () => ({ block: 'iron_block', rows: 1 })) }).layers.length, 6);
+  assert.equal(parseFill({ layered: 'yes' }).layered, false);
+});
+
+test('ギフト表の並び順: なければ安い順、知らない値も安い順', () => {
+  assert.equal(parseConfig(valid).giftTableOrder, 'cheap');
+  assert.equal(parseConfig({ ...valid, giftTableOrder: 'custom' }).giftTableOrder, 'custom');
+  assert.equal(parseConfig({ ...valid, giftTableOrder: 'random' }).giftTableOrder, 'cheap');
+  assert.deepEqual(parseConfig({ ...valid, giftTableCustom: ['a', 'a', 3, '', 'b'] }).giftTableCustom, ['a', 'b'], '同じもの・文字でないものは捨てる');
+  assert.deepEqual(parseConfig(valid).giftTableCustom, []);
 });
 
 test('ワールドの設定は、なければバニラと同じ、おかしな値も既定値にする', () => {

@@ -13,6 +13,11 @@ export const ICON_TEXTURES = Object.fromEntries([
   ...['tnt_top', 'tnt_side', 'amethyst_block', 'diamond_block', 'emerald_block', 'gold_block', 'iron_block', 'lapis_block', 'redstone_block',
     'quartz_block_top', 'quartz_block_side', 'glass', 'white_stained_glass', 'light_blue_stained_glass', 'bedrock'].map((n) => [n, `block/${n}`]),
   ...['zombie', 'skeleton', 'creeper', 'spider', 'witch', 'silverfish', 'pig'].map((m) => [`${m}_spawn_egg`, `item/${m}_spawn_egg`]),
+  // v0.48 で足したブロックとモブ（顔を切り出しにくいモブはスポーンエッグ）
+  ...['netherite_block', 'copper_block', 'coal_block', 'obsidian', 'crying_obsidian', 'glowstone', 'purpur_block', 'end_stone_bricks', 'bricks', 'white_concrete', 'red_concrete', 'orange_concrete', 'yellow_concrete', 'lime_concrete', 'light_blue_concrete', 'blue_concrete', 'purple_concrete', 'pink_concrete', 'black_concrete'].map((n) => [n, `block/${n}`]),
+  ...['drowned', 'cave_spider', 'slime', 'magma_cube', 'phantom', 'vex', 'breeze', 'endermite', 'chicken'].map((m) => [`${m}_spawn_egg`, `item/${m}_spawn_egg`]),
+  ...[['husk', 'zombie/husk'], ['stray', 'skeleton/stray'], ['wither_skeleton', 'skeleton/wither_skeleton'], ['pillager', 'illager/pillager'],
+    ['blaze', 'blaze/blaze']].map(([m, t]) => [`entity_${m}`, `entity/${t}`]),
   ['oak_sign', 'item/oak_sign'],
   // モブは体のテクスチャから顔を切り出して出す（ui/mcIconScript.js）
   ...[['zombie', 'zombie/zombie'], ['skeleton', 'skeleton/skeleton'], ['creeper', 'creeper/creeper'], ['spider', 'spider/spider'],

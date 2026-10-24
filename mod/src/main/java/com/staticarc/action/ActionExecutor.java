@@ -25,23 +25,51 @@ import java.util.Map;
 public final class ActionExecutor {
 
     // 26.2 以降、バニラのエンティティ種別は EntityType ではなく EntityTypes にある
-    private static final Map<String, EntityType<?>> MOBS = Map.of(
-            "zombie", EntityTypes.ZOMBIE,
-            "skeleton", EntityTypes.SKELETON,
-            "creeper", EntityTypes.CREEPER,
-            "spider", EntityTypes.SPIDER,
-            "witch", EntityTypes.WITCH,
-            "silverfish", EntityTypes.SILVERFISH,
-            "pig", EntityTypes.PIG);
+    private static final Map<String, EntityType<?>> MOBS = Map.ofEntries(
+            Map.entry("zombie", EntityTypes.ZOMBIE),
+            Map.entry("husk", EntityTypes.HUSK),
+            Map.entry("drowned", EntityTypes.DROWNED),
+            Map.entry("skeleton", EntityTypes.SKELETON),
+            Map.entry("stray", EntityTypes.STRAY),
+            Map.entry("wither_skeleton", EntityTypes.WITHER_SKELETON),
+            Map.entry("creeper", EntityTypes.CREEPER),
+            Map.entry("spider", EntityTypes.SPIDER),
+            Map.entry("cave_spider", EntityTypes.CAVE_SPIDER),
+            Map.entry("witch", EntityTypes.WITCH),
+            Map.entry("pillager", EntityTypes.PILLAGER),
+            Map.entry("vex", EntityTypes.VEX),
+            Map.entry("blaze", EntityTypes.BLAZE),
+            Map.entry("breeze", EntityTypes.BREEZE),
+            Map.entry("phantom", EntityTypes.PHANTOM),
+            Map.entry("slime", EntityTypes.SLIME),
+            Map.entry("magma_cube", EntityTypes.MAGMA_CUBE),
+            Map.entry("silverfish", EntityTypes.SILVERFISH),
+            Map.entry("endermite", EntityTypes.ENDERMITE),
+            Map.entry("pig", EntityTypes.PIG),
+            Map.entry("chicken", EntityTypes.CHICKEN));
 
-    private static final Map<String, String> MOB_NAMES = Map.of(
-            "zombie", "ゾンビ",
-            "skeleton", "スケルトン",
-            "creeper", "クリーパー",
-            "spider", "クモ",
-            "witch", "ウィッチ",
-            "silverfish", "シルバーフィッシュ",
-            "pig", "ブタ");
+    private static final Map<String, String> MOB_NAMES = Map.ofEntries(
+            Map.entry("zombie", "ゾンビ"),
+            Map.entry("husk", "ハスク"),
+            Map.entry("drowned", "ドラウンド"),
+            Map.entry("skeleton", "スケルトン"),
+            Map.entry("stray", "ストレイ"),
+            Map.entry("wither_skeleton", "ウィザースケルトン"),
+            Map.entry("creeper", "クリーパー"),
+            Map.entry("spider", "クモ"),
+            Map.entry("cave_spider", "洞窟グモ"),
+            Map.entry("witch", "ウィッチ"),
+            Map.entry("pillager", "ピリジャー"),
+            Map.entry("vex", "ヴェックス"),
+            Map.entry("blaze", "ブレイズ"),
+            Map.entry("breeze", "ブリーズ"),
+            Map.entry("phantom", "ファントム"),
+            Map.entry("slime", "スライム"),
+            Map.entry("magma_cube", "マグマキューブ"),
+            Map.entry("silverfish", "シルバーフィッシュ"),
+            Map.entry("endermite", "エンダーマイト"),
+            Map.entry("pig", "ブタ"),
+            Map.entry("chicken", "ニワトリ"));
 
     /** 点火から爆発までの時間（tick）。配信で見せる間を取るため、既定の80より少し短くする。 */
     private static final int TNT_FUSE_TICKS = 60;

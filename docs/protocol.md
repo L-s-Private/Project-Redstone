@@ -15,11 +15,12 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 | `count` | 数値 | 回数。種類ごとの上限で丸める（`tnt` 20、`mob` 10、`fill_expand`・`fill_shrink` 5マス、`fill_help` 64個、`jail` 60秒、`freeze` 30秒、`fill_layer` 5段、`fill_clear` 1、`lightning` 10回、`levitate` 15秒、`night` 300秒、`fill_raise` 5段、`mining_bonus_drop` 16個） |
 | `from` | 文字列 | ギフトを送った人の表示名（画面表示用、最大32文字） |
 | `label` | 文字列 | 画面に出す文言（最大100文字）。`message` では本文 |
-| `mob` | 文字列 | `type: mob` のときのモブ。`zombie` `skeleton` `creeper` `spider` `witch` `silverfish` `pig` |
+| `mob` | 文字列 | `type: mob` のときのモブ。`zombie` `husk` `drowned` `skeleton` `stray` `wither_skeleton` `creeper` `spider` `cave_spider` `witch` `pillager` `vex` `blaze` `breeze` `phantom` `slime` `magma_cube` `silverfish` `endermite` `pig` `chicken` |
 | `width` / `height` | 数値 | `fill_start` の枠の幅（奇数、3〜41。既定11）と高さ（1〜30。既定9） |
 | `countdown` | 数値 | `fill_start` の、埋めきってからクリアまでの秒数（0〜600。既定10） |
 | `wall` | 文字列 | `fill_start` の枠の素材。`glass`（既定）`white_stained_glass` `light_blue_stained_glass` `bedrock` |
-| `block` | 文字列 | `fill_start` で枠の中に置かれるブロック（お助けもこれ）。`amethyst_block`（既定）`diamond_block` `emerald_block` `gold_block` `iron_block` `lapis_block` `redstone_block` `quartz_block` |
+| `block` | 文字列 | `fill_start` で枠の中に置かれるブロック（お助けもこれ）。`amethyst_block`（既定）`diamond_block` `emerald_block` `gold_block` `iron_block` `lapis_block` `redstone_block` `quartz_block` `netherite_block` `copper_block` `coal_block` `obsidian` `crying_obsidian` `glowstone` `purpur_block` `end_stone_bricks` `bricks` と、コンクリート10色（`white` `red` `orange` `yellow` `lime` `light_blue` `blue` `purple` `pink` `black` に `_concrete`） |
+| `layers` | 配列 | `fill_start` の地層（0.19.0 から）。下の層から順に `{"block": ブロック, "rows": 段数}`（`block` は `block` と同じ中から、`rows` は 1〜30、6つまで）。あれば、置いたブロック・お助けのブロックは、その段の層のブロックになる。いちばん上の層の `rows` は使わず、残りの段すべて（`fill_raise` で増えた段も）。無ければ全部 `block` |
 | `handBlock` | 文字列 | `fill_start` で手に持たせるブロック（`block` と同じ中から。既定は `block` と同じ）。置くとすぐ `block` に変わる |
 | `skyY` | 数値 | `fill_start` の枠の床の高さ（既定150。ワールドの高さに収まるよう丸める） |
 | `reach` | 数値 | `fill_start` で設定するブロックを置ける距離（1〜64。既定8。バニラは4.5） |
@@ -53,13 +54,13 @@ PCアプリ（`app/`）と Fabric MOD（`mod/`）は、同じPC内の TCP で通
 
 空中（天空）に作った枠の中を、ブロックで埋めきるゲーム。埋めきるとカウントダウンが始まり、崩されずに 0 になればそのラウンドはクリア。`rounds` に届くまでは、枠を最初の大きさに戻して中を空にし、残っている TNT と枠に出したモブを消し、プレイヤーを枠の上に戻して次のラウンドを始める。`rounds` 回クリアしたら終わり（`cleared`）。埋めきってカウントダウン中なら、それが終わるまで待つ）。枠を縮めたとき・ラウンドが変わるときは、外に出た壁と床を消す（前のラウンドの広げた枠は残らない）。進み具合とラウンドはボスバーに出る。枠（壁と床）は手で壊せず、枠に出したクリーパーの爆発も TNT と同じく中のブロックだけを消す（それでも壊れた枠は自動で直る）。枠から落ちたプレイヤーは枠の上に戻される。枠に出したモブは、その列の地上（いちばん上に積まれたブロックの上）に出し、枠の外に出た・落ちた・ブロックに埋まったら、枠の中の地上に戻す（0.5秒ごとに確かめる）。埋め立て中は、枠と同じワールドでは枠の中（壁と床の内側、いちばん上の段まで）にしかブロックを置けない（枠の外・枠より上は断る）。カウントダウンの数字・逮捕／操作禁止の残り秒数は、ボスバーではなく画面の真ん中（タイトル）に出す。
 
-- `fill_start`: プレイヤーの真上、高さ `skyY` に枠（`wall`）を作り、プレイヤーを中へ移す。`handBlock` を渡し、置いても減らないようにする（手に持っている分をいつも64個に戻す）。置いたブロックは同じ tick のうちに `block` へ差し替える。届く距離を `reach`、置く速さを `placeSpeed`、壊す速さを `breakSpeed` にする（前のゲームは終わる）。埋め立て中に落とした TNT は枠と床を壊さず、爆心から半径3マス以内の中のブロックだけを消す（アイテムは落ちない）。枠のまわりに落ちたアイテムは消す。
+- `fill_start`: プレイヤーの真上、高さ `skyY` に枠（`wall`）を作り、プレイヤーを中へ移す。`handBlock` を渡し、置いても減らないようにする（手に持っている分をいつも64個に戻す）。置いたブロックは同じ tick のうちに `block`（`layers` があれば、その段の層のブロック）へ差し替える。届く距離を `reach`、置く速さを `placeSpeed`、壊す速さを `breakSpeed` にする（前のゲームは終わる）。埋め立て中に落とした TNT は枠と床を壊さず、爆心から半径3マス以内の中のブロックだけを消す（アイテムは落ちない）。枠のまわりに落ちたアイテムは消す。
 - `fill_stop`: ゲームを終える（置いたブロックはそのまま。届く距離と壊す速さは元に戻す）。
 - `fill_expand` / `fill_shrink`: 枠を `count` マス広げる / 縮める。縮めて枠の外に出たブロックは消える。
-- `fill_help`: 空いているマスを下の段から `count` 個、`block` で埋める（お助け）。
+- `fill_help`: 空いているマスを下の段から `count` 個、`block`（`layers` があれば、その段の層のブロック）で埋める（お助け）。
 - `world`: ワールドの設定（`time` `weather` `mobSpawning` `keepInventory`）を入れる。アプリは、変えたときと、ワールドに入ってつながったときに送る。
 - `jail`（逮捕）: 枠の真上（いちばん上の段から8マス上。TNT が落ちてくる所より上）に1マスの牢屋（床はガラスで下の枠が見える・天井は石レンガ・まわりは鉄格子）を作ってプレイヤーを入れ、`count` 秒たったら枠の上に戻す。その間はブロックに手が届かない。続けて来たら時間を延ばす。牢屋は誰もいなくなったら・ゲームを終えたら消す。逮捕中に枠を高くしたら、牢屋も上へ作り直す。
-- `fill_layer`（一段埋め）: 空いているマスがあるいちばん下の段から、`count` 段をまるごと `block` で埋める（お助け）。
+- `fill_layer`（一段埋め）: 空いているマスがあるいちばん下の段から、`count` 段をまるごと `block`（`layers` があれば、その段の層のブロック）で埋める（お助け）。
 - `fill_clear`（全消し）: 枠の中を全部空にする。
 - `fill_raise`: 枠を `count` 段高くする（30段まで）。次のラウンドでは元の高さに戻し、高くした分の壁と中を消す。カウントダウン中に高くしたら埋め立て中に戻る。
 - `stop_all`（全妨害ストップ）: 起きている妨害をすべて止める。ギフトで出した TNT とモブ（印 `static_arc` が付いたもの）をすべてのワールドから消し、逮捕・操作禁止・浮遊を解き、夜を元の時刻に戻し、予約した効果音を消す。逮捕していたプレイヤーは枠の上に戻す。埋め立ては続ける。アプリは「全妨害ストップ」を押したとき、一時停止中でも送る。

@@ -79,6 +79,14 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       }
       await saveConfig(engine.config);
     },
+    'POST /api/overlay/gift-order': async (body) => {
+      try {
+        engine.setGiftTableOrder(body.order, body.custom);
+      } catch (e) {
+        return { status: 400, error: e.message };
+      }
+      await saveConfig(engine.config);
+    },
     'POST /api/overlay/style': async (body) => {
       try {
         engine.setOverlayStyle(body.style ?? {}, { reset: body.reset === true });
@@ -110,9 +118,9 @@ export function createUiServer({ engine, saveConfig = async () => {}, setup, ico
       await saveConfig(engine.config);
     },
     'POST /api/fill/start': async (body) => {
-      const { width, height, countdown, rounds, wall, block, handBlock, skyY, reach, placeSpeed, breakSpeed, mobsAttack, mobLifetime } = body;
+      const { width, height, countdown, rounds, wall, block, handBlock, skyY, reach, placeSpeed, breakSpeed, mobsAttack, mobLifetime, layered, layers } = body;
       try {
-        await engine.startFill({ width, height, countdown, rounds, wall, block, handBlock, skyY, reach, placeSpeed, breakSpeed, mobsAttack, mobLifetime });
+        await engine.startFill({ width, height, countdown, rounds, wall, block, handBlock, skyY, reach, placeSpeed, breakSpeed, mobsAttack, mobLifetime, layered, layers });
       } catch (e) {
         return { status: 400, error: e.message };
       }

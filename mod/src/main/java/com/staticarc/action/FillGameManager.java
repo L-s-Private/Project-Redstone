@@ -2,6 +2,7 @@ package com.staticarc.action;
 
 import com.staticarc.bridge.ActionRequest;
 import com.staticarc.game.FillGame;
+import com.staticarc.game.FillLayers;
 import com.staticarc.game.SoundCue;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -171,11 +172,12 @@ public final class FillGameManager {
         ServerLevel level = (ServerLevel) player.level();
         Block filler = blockById(request.block(), Blocks.AMETHYST_BLOCK);
         handBlock = blockById(request.handBlock(), filler);
-        world = new LevelWorld(level, blockById(request.wall(), Blocks.GLASS), filler);
 
         // 枠（床の下の1段と、高さぶん）がワールドの高さに収まるようにする
         int height = Math.max(FillGame.MIN_HEIGHT, Math.min(FillGame.MAX_HEIGHT, request.height()));
         int floorY = Math.max(level.getMinY() + 1, Math.min(level.getMaxY() - height - 1, request.skyY()));
+        List<Block> layerBlocks = request.layers().stream().map((layer) -> blockById(layer.block(), filler)).toList();
+        world = new LevelWorld(level, blockById(request.wall(), Blocks.GLASS), filler, request.layers(), layerBlocks, floorY);
         BlockPos feet = player.blockPosition();
         game = FillGame.create(world, feet.getX(), floorY, feet.getZ(), request.width(), height, request.countdown(), request.rounds());
 
@@ -379,7 +381,7 @@ public final class FillGameManager {
      * 置かれるのはクリックした場所（草などの置き換えられるもの）か、その隣のどちらか
      */
     public static void rememberPlacement(Level level, BlockHitResult hit) {
-        if (game == null || level.isClientSide() || level != world.level() || handBlock == world.filler()) {
+        if (game == null || level.isClientSide() || level != world.level() || !world.replacesHandBlock(handBlock)) {
             return;
         }
         placedPositions.add(hit.getBlockPos());
@@ -783,14 +785,15 @@ public final class FillGameManager {
         player.getFoodData().setSaturation(5f);
     }
 
-    /** 置いた手に持つブロックを、置かれるブロックに差し替える（同じ tick のうちなので、ほとんど見えない） */
+    /** 置いた手に持つブロックを、置かれるブロック（地層なら、その段の層のブロック）に差し替える（同じ tick のうちなので、ほとんど見えない） */
     private static void replacePlacedBlocks() {
         if (placedPositions.isEmpty()) {
             return;
         }
         for (BlockPos pos : placedPositions) {
-            if (world.level().getBlockState(pos).is(handBlock)) {
-                world.level().setBlockAndUpdate(pos, world.filler().defaultBlockState());
+            Block target = world.fillerAt(pos.getY());
+            if (target != handBlock && world.level().getBlockState(pos).is(handBlock)) {
+                world.level().setBlockAndUpdate(pos, target.defaultBlockState());
             }
         }
         placedPositions.clear();
@@ -954,9 +957,20 @@ public final class FillGameManager {
      * 枠の中は 0.5 秒ごとに全部（最大 41×41×30 マス）調べ直すので、調べるときは位置を使い回す（毎回作らない）。
      * 書き換えるときは、マイクラが位置を覚えておけるよう新しく作る。サーバースレッドからだけ使う
      */
-    private record LevelWorld(ServerLevel level, Block wall, Block filler, BlockPos.MutableBlockPos cursor) implements FillGame.World {
-        LevelWorld(ServerLevel level, Block wall, Block filler) {
-            this(level, wall, filler, new BlockPos.MutableBlockPos());
+    private record LevelWorld(ServerLevel level, Block wall, Block filler, List<FillLayers.Layer> layers, List<Block> layerBlocks, int floorY,
+                              BlockPos.MutableBlockPos cursor) implements FillGame.World {
+        LevelWorld(ServerLevel level, Block wall, Block filler, List<FillLayers.Layer> layers, List<Block> layerBlocks, int floorY) {
+            this(level, wall, filler, layers, layerBlocks, floorY, new BlockPos.MutableBlockPos());
+        }
+
+        /** 高さ y の段に置かれるブロック。地層が無ければ filler */
+        Block fillerAt(int y) {
+            return layerBlocks.isEmpty() ? filler : layerBlocks.get(FillLayers.layerAt(layers, y - floorY));
+        }
+
+        /** 置いた手に持つブロックを差し替えることがあるか */
+        boolean replacesHandBlock(Block hand) {
+            return hand != filler || layerBlocks.stream().anyMatch((block) -> block != hand);
         }
 
         private BlockState stateAt(int x, int y, int z) {
@@ -985,7 +999,7 @@ public final class FillGameManager {
 
         @Override
         public void setFiller(int x, int y, int z) {
-            level.setBlockAndUpdate(new BlockPos(x, y, z), filler.defaultBlockState());
+            level.setBlockAndUpdate(new BlockPos(x, y, z), fillerAt(y).defaultBlockState());
         }
     }
 }

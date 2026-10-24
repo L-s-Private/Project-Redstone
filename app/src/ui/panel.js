@@ -1,8 +1,10 @@
 // 操作画面。exe に入れるため、HTML ごと文字列で持つ。
 import { MC_ICON_CSS, MC_ICON_JS } from './mcIconScript.js';
+import { TRIGGER_ICON_CSS, TRIGGER_ICON_JS } from './triggerIcons.js';
 import { CONTROLS_CSS, CONTROLS_JS } from './controls.js';
 import { COMMENT_VIEWER_COOLDOWN_SEC, MAX_CHOICES, MAX_COMMENT_WORD, MAX_COUNT_BY_TYPE, MAX_WEIGHT } from '../rules.js';
 import { PLANS } from '../plan.js';
+import { FILL_BLOCK_INFO, MOB_INFO } from '../config.js';
 import { OVERLAY_WIDGETS } from './overlays.js';
 import { BRAND, GUIDE, KEY_ART } from '../assets.js';
 import { FILL_ONLY_ACTIONS, MINING_LIMITS, MINING_ONLY_ACTIONS, MINING_PRESETS, MINING_REASONS, MINING_TARGETS } from '../mining.js';
@@ -149,7 +151,49 @@ export const PANEL_HTML = String.raw`<!doctype html>
   /* 埋め立ての枠の図 */
   .frame-figure svg { display: block; width: 100%; height: auto; }
   .frame-size { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+  /* ギフト表の並び順: 上に3つの切り替え、下に実際の並び（つかんで動かせる） */
+  /* ギフト表のカードは並びの一覧があって縦に長いので、横いっぱいに（隣のカードが間延びしないように） */
+  .widget-list .widget[data-id="gifts"] { grid-column: 1 / -1; }
+  .gift-order { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; cursor: default; }
+  .gift-order-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .gift-order-head > b { font-size: 13px; }
+  .gift-order .seg button { padding: 5px 12px; }
+  .gift-order-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-width: 760px; }
+  .gift-order-list li[data-key] {
+    display: grid; grid-template-columns: 16px 22px 28px minmax(0, 1fr) 14px 22px minmax(0, 1fr) auto; align-items: center; gap: 8px;
+    padding: 5px 6px 5px 8px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); font-size: 13px;
+    cursor: grab; user-select: none;
+  }
+  .gift-order-list li[data-key]:hover { border-color: var(--line); background: var(--raised); }
+  .gift-order-list li.dragging { opacity: .45; border-style: dashed; }
+  .gift-order-list .grip { color: var(--faint); font-size: 14px; letter-spacing: -2px; text-align: center; }
+  .gift-order-list .pos { color: var(--faint); font-variant-numeric: tabular-nums; text-align: right; }
+  .gift-order-list .pic { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+  .gift-order-list .pic img { width: 26px; height: 26px; object-fit: contain; }
+  .gift-order-list .pic .badge { width: 24px; height: 24px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; }
+  .gift-order-list .name, .gift-order-list .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gift-order-list .name small { color: var(--faint); margin-left: 4px; }
+  .gift-order-list .arrow { color: var(--faint); }
+  .gift-order-list .moves { display: flex; }
+  .gift-order-list .moves button { padding: 2px 6px; background: transparent; border-color: transparent; color: var(--muted); font-size: 11px; }
+  .gift-order-list .moves button:hover { background: var(--surface); color: var(--text); }
+  .gift-order-list .moves button:disabled { opacity: .2; }
+  /* 12枚ごと（1ページ）の区切り */
+  .gift-order-list .page-break { font-size: 12px; color: var(--faint); display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+  .gift-order-list .page-break::before, .gift-order-list .page-break::after { content: ""; flex: 1; border-top: 1px dashed var(--line-soft); }
+  .gift-order-empty { font-size: 13px; color: var(--faint); }
   .frame-size b { color: var(--text); font-variant-numeric: tabular-nums; }
+  /* よく使う大きさ（押すと幅と高さが入る） */
+  .size-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0 0 12px; }
+  .size-presets button {
+    flex-direction: column; gap: 2px; padding: 8px 4px; font-size: 13px; font-weight: 700;
+    color: var(--muted); background: var(--bg); border-color: var(--line-soft);
+  }
+  .size-presets button small { font-size: 11px; font-weight: 400; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .size-presets button:hover { background: var(--raised); color: var(--text); }
+  .size-presets button.selected { border-color: var(--text); color: var(--text); background: var(--raised); }
+  .frame-effort { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .frame-effort b { color: var(--text); }
   .card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 18px 20px; }
   .card h2 { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
   .card .lead { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
@@ -314,7 +358,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .fill-phase.aborted { color: var(--muted); }
   /* モードの見出し（キーアートの帯）。絵は KEY_ART（src/assets.js）。左から暗くして文字を読みやすく */
   .mode-hero {
-    position: relative; height: clamp(150px, 19vw, 230px); border-radius: var(--radius); overflow: hidden;
+    position: relative; height: clamp(120px, 14vw, 180px); border-radius: var(--radius); overflow: hidden;
     border: 1px solid var(--line-soft); background: var(--surface);
   }
   .mode-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -362,13 +406,34 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .setting-control select { width: 100%; }
   .setting-control .tiles { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   /* 埋め立ての見た目: ブロックは横長の小さいタイルにして、横いっぱいに並べる（縦に長くならないように） */
-  #fillLook .setting { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  #fillLook .setting-control .tiles { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
-  #fillLook .tiles button { flex-direction: row; justify-content: flex-start; gap: 8px; padding: 6px 10px; }
-  #fillLook .tiles .mc { --s: 24px !important; }
+  /* 名前の下に、横いっぱいの入力を置く行（ブロックのタイルなど） */
+  .setting.full { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .setting.full .setting-control .tiles { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+  .setting.full .tiles button { flex-direction: row; justify-content: flex-start; gap: 8px; padding: 6px 10px; }
+  .setting.full .tiles .mc { --s: 24px !important; }
+  .setting-inner { margin-top: 10px; }
+  /* 2つから選ぶ切り替え（1種類 / 地層） */
+  .seg { display: inline-grid; grid-auto-flow: column; gap: 0; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); padding: 2px; background: var(--bg); }
+  .seg button { border: 0; background: transparent; color: var(--muted); padding: 6px 14px; font-size: 13px; font-weight: 600; }
+  .seg button[aria-checked="true"] { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+  /* 幅と高さを横に並べる */
+  .size-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; }
+  .size-input { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+  .size-input small { display: block; font-size: 12px; font-weight: 400; color: var(--faint); }
+  .layer-help { margin: 0 0 8px; font-size: 13px; color: var(--faint); }
+  .frame-figure { color: var(--muted); }
+  .frame-note { margin: 2px 0 0; font-size: 12px; color: var(--faint); text-align: center; }
+  /* 地層: 上の層から順に1行ずつ（ブロック・段数・消す） */
+  .layer-list { display: grid; gap: 6px; max-width: 560px; }
+  .layer-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 112px 30px; gap: 8px; align-items: center; }
+  .layer-row .mc { --s: 24px !important; }
+  .layer-rest { font-size: 13px; color: var(--faint); padding-left: 4px; }
+  .layer-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 4px; }
+  .layer-summary { font-size: 13px; color: var(--faint); }
+  .layer-summary.warn { color: var(--warn); }
   /* 右側に「ワールド」も置くので、ついてこさせない（下が見切れないように） */
-  #fillSide { position: static; }
-  #fillSide .setting { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 0; }
+  /* 右の「できあがりの図」は、スクロールしてもついてくる（設定を変えながら見られるように） */
+  #fillSide { top: 72px; }
   /* 埋め立て中は左の設定が消えるので、残る「ワールド」を横いっぱいに */
   #modeFill .split:has(#fillIdle[hidden]) { grid-template-columns: minmax(0, 1fr); }
   @media (max-width: 720px) {
@@ -414,6 +479,10 @@ export const PANEL_HTML = String.raw`<!doctype html>
   .ready-steps li.is-next { border-color: var(--text); }
   .ready-steps li.is-next .num { border-color: var(--text); color: var(--text); }
   #tabLive:has(#readyCard:not([hidden])) .alert.setup { display: none; }
+  /* 「マイクラにつながっていない」などの準備の知らせは、設定を作る画面では出さない（左下の状態で分かる。赤い帯がずっと出ていると落ち着かない） */
+  :is(#tabRules, #tabOverlay, #tabStats, #tabPlan, #tabSetup) .alert.setup { display: none; }
+  :is(#tabRules, #tabOverlay, #tabStats, #tabPlan, #tabSetup) .alert-bar:not(:has(.alert:not(.setup))) { display: none; }
+  #tabLive:not(:has(#readyCard[hidden])) .alert-bar:not(:has(.alert:not(.setup))) { display: none; }
   /* 配信の画面のゲームのカード（始まっていないとき） */
   .live-idle { flex-direction: column; align-items: stretch !important; gap: 12px !important; }
   .live-idle-head { display: flex; align-items: center; gap: 12px; }
@@ -568,7 +637,8 @@ export const PANEL_HTML = String.raw`<!doctype html>
     flex-direction: column; gap: 4px; height: auto; padding: 10px 6px 9px; font-size: 13px; font-weight: 600;
     background: var(--bg); border-color: var(--line-soft); color: var(--muted);
   }
-  .ed-triggers button .ti { font-size: 18px; line-height: 1; height: 20px; }
+  .ed-triggers button .ti { width: 26px; height: 26px; border-radius: 7px; }
+  .ed-node .ni .ic { width: 100%; height: 100%; border-radius: 6px; }
   .ed-triggers button:hover { background: var(--raised); color: var(--text); }
   .ed-triggers button[aria-checked="true"] { border-color: var(--text); background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
   .trigger-value { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 40px; color: var(--muted); font-size: 14px; }
@@ -580,7 +650,9 @@ export const PANEL_HTML = String.raw`<!doctype html>
   }
   .gift-field:hover { background: var(--raised); border-color: #3a3a3a; }
   .gift-field .gift-img, .gift-field .gf-empty { width: 32px; height: 32px; flex: none; }
-  .gift-field .gf-empty { border-radius: 6px; border: 1px dashed var(--line); display: inline-flex; align-items: center; justify-content: center; color: var(--faint); font-size: 16px; }
+  .gift-field .gf-empty { border-radius: 6px; }
+  /* 数字の前の小さなコインの印 */
+  .cic { width: 1.15em; height: 1.15em; border-radius: 50%; vertical-align: -0.2em; margin-right: 3px; }
   .gift-field .gf-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
   .gift-field .gf-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
   .gift-field .gf-text small { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -718,7 +790,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   /* ---- 配信画面（オーバーレイ） ---- */
   /* 部品の一覧（押すと右の試し表示が切り替わる） */
-  .widget-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+  .widget-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; grid-auto-flow: dense; }
   /* 2列だとリンクの最後（どの部品か）が切れるので、広い画面だけ2列 */
   @media (max-width: 1440px) { .widget-list { grid-template-columns: minmax(0, 1fr); } }
   .widget { display: flex; flex-direction: column; gap: 10px; cursor: pointer; }
@@ -782,6 +854,38 @@ export const PANEL_HTML = String.raw`<!doctype html>
   #liveStudioGuide .guide-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   @media (max-width: 760px) { #liveStudioGuide .guide-steps { grid-template-columns: minmax(0, 1fr); } }
   .wizard-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 24px; }
+  /* はじめの準備: 広めにして、上に進み具合の線 */
+  #wizard { width: min(680px, calc(100vw - 32px)); }
+  #wizard .steps { display: none; }
+  .wiz-progress { list-style: none; margin: 0 0 20px; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .wiz-progress li { font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wiz-progress li::before { content: ""; display: block; height: 4px; border-radius: 2px; background: var(--line); margin-bottom: 6px; }
+  .wiz-progress li.done::before { background: var(--muted); }
+  .wiz-progress li.now { color: var(--text); font-weight: 700; }
+  .wiz-progress li.now::before { background: var(--text); }
+  .wiz-flow { list-style: none; margin: 16px 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .wiz-flow li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 16px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); }
+  .wiz-flow li + li::before { content: "→"; position: absolute; left: -10px; top: 50%; transform: translate(-50%, -50%); color: var(--faint); }
+  .wiz-flow small { color: var(--faint); font-size: 12px; }
+  .wiz-flow-ic { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+  .wiz-flow-ic .ic { width: 36px; height: 36px; }
+  .wiz-presets { display: grid; gap: 8px; margin-top: 12px; }
+  .wiz-presets button { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; text-align: left; padding: 12px 14px; }
+  .wiz-presets button small { grid-column: 1; color: var(--muted); font-weight: 400; }
+  .wiz-presets button .count { grid-row: 1 / 3; grid-column: 2; align-self: center; color: var(--faint); font-size: 12px; font-weight: 400; }
+  .wiz-presets button[aria-checked="true"] { border-color: var(--text); background: var(--raised); }
+  .wiz-widgets { display: grid; gap: 8px; margin: 12px 0; }
+  .wiz-widgets .url { display: flex; align-items: center; gap: 8px; }
+  .wiz-widgets .url b { flex: none; width: 6.5em; font-size: 13px; }
+  .wiz-widgets .url code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--bg); font-size: 12px; }
+  .wiz-todo { margin: 12px 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .wiz-todo li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); font-size: 14px; }
+  .wiz-todo li .mark { width: 20px; height: 20px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; border: 1px solid var(--line); color: var(--faint); }
+  .wiz-todo li.ok .mark { background: var(--invert-bg); border-color: var(--invert-bg); color: var(--invert-text); }
+  .wiz-todo li small { display: block; color: var(--faint); font-size: 12px; }
+  .wiz-todo li .guide-img { margin: 6px 0 0; }
+  .wiz-try { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .wiz-try small { color: var(--faint); }
   #offline {
     position: fixed; inset: auto 0 0 0; padding: 10px; text-align: center;
     background: var(--stop); color: #fff; font-weight: 600; display: none; z-index: 20;
@@ -816,6 +920,7 @@ export const PANEL_HTML = String.raw`<!doctype html>
 
   /* マイクラのアイコン（mcIconScript.js）と TikTok 公式のギフトの絵 */
   ${MC_ICON_CSS}
+  ${TRIGGER_ICON_CSS}
   .gift-img { width: 24px; height: 24px; object-fit: contain; vertical-align: middle; flex: none; }
   .gift-img.big { width: 56px; height: 56px; }
   .with-icon { display: flex; align-items: center; gap: 6px; }
@@ -1058,7 +1163,7 @@ ${CONTROLS_CSS}
   <div class="page">
     <section class="mode-cards" id="modeCards" aria-label="ゲームモード">
       <button type="button" class="mode-card" data-mode="fill" data-icon="amethyst_block"><b>埋め立て</b><small>空中の枠をブロックで埋めきればクリア。ギフトで枠が広がったり、TNT で崩されたりします</small><span class="in-use" hidden>選択中</span></button>
-      <button type="button" class="mode-card" data-mode="mining_challenge" data-icon="mining"><b>採掘・収集チャレンジ</b><small>制限時間のうちに、決めた資源を決めた数だけ掘って拾えばクリア</small><span class="in-use" hidden>選択中</span></button>
+      <button type="button" class="mode-card" data-mode="mining_challenge" data-icon="mining"><b>採掘・収集チャレンジ</b><small>制限時間のうちに、決めた資源を決めた数だけ掘って集めればクリア</small><span class="in-use" hidden>選択中</span></button>
     </section>
     <p class="hint" id="modeLocked" style="margin: -4px 0 0;" hidden>ゲーム中はモードを切り替えられません。今のゲームを終えてから切り替えてください。</p>
     <div id="modeMining" class="stack" hidden>
@@ -1075,7 +1180,7 @@ ${CONTROLS_CSS}
           </section>
           <section class="card" id="miningSettings">
             <h2>チャレンジの決まり</h2>
-            <p class="lead">制限時間のうちに、対象の資源を目標の数だけ掘って拾えばクリアです。</p>
+            <p class="lead">制限時間のうちに、対象の資源を目標の数だけ掘って集めればクリアです。</p>
             <div class="presets" id="miningPresets" style="margin-bottom: 14px;"></div>
             <div class="setting tall"><div class="setting-text"><label for="miningItem">対象アイテム</label><small id="miningNote"></small></div><div class="setting-control">
               <select id="miningItem" data-tiles aria-label="対象アイテム">${MINING_TARGETS.map((t) => '<option value="' + t.icon + '">' + t.name + '</option>').join('')}</select></div></div>
@@ -1105,18 +1210,59 @@ ${CONTROLS_CSS}
     <div class="split">
     <div class="stack">
     <div id="fillIdle" class="stack">
+      <section class="card" id="fillLook">
+        <h2>ステージ</h2>
+        <p class="lead">枠の大きさと、置かれるブロック・枠の素材を決めます。右の図にすぐ出ます。変えるとすぐ保存されます。</p>
+        <div class="setting full"><div class="setting-text"><label>大きさ</label><small>よく使う大きさから選ぶか、下で幅と高さを決めます</small></div><div class="setting-control" style="display: block;">
+          <div class="size-presets" id="sizePresets" role="group" aria-label="よく使う大きさ">
+            <button type="button" data-width="7" data-height="6">小さめ<small>7×7×6</small></button>
+            <button type="button" data-width="11" data-height="9">ふつう<small>11×11×9</small></button>
+            <button type="button" data-width="15" data-height="12">大きめ<small>15×15×12</small></button>
+            <button type="button" data-width="21" data-height="15">特大<small>21×21×15</small></button>
+          </div>
+          <div class="size-inputs">
+            <label class="size-input"><span>幅（奥行きも同じ）<small>3〜41 の奇数（まん中に立てるように）</small></span><input id="fillWidth" type="number" min="3" max="41" step="2" data-unit="マス"></label>
+            <label class="size-input"><span>高さ<small>1〜30</small></span><input id="fillHeight" type="number" min="1" max="30" data-unit="段"></label>
+          </div>
+        </div></div>
+        <div class="setting full"><div class="setting-text"><label>置かれるブロック</label><small>どのブロックを置いても、置いた瞬間にこれに変わります。お助けで埋まるのもこれです</small></div><div class="setting-control" style="display: block;">
+          <div class="seg" id="fillLayeredSeg" role="radiogroup" aria-label="置かれるブロックの決め方">
+            <button type="button" role="radio" data-layered="false">1種類</button>
+            <button type="button" role="radio" data-layered="true">地層（段ごとに変える）</button>
+          </div>
+          <select id="fillLayered" hidden aria-hidden="true" tabindex="-1">
+            <option value="false">1種類</option><option value="true">地層</option>
+          </select>
+          <div id="fillBlockSetting" class="setting-inner">
+          <select id="fillBlock" data-tiles aria-label="置かれるブロック">
+            ${FILL_BLOCK_INFO.map(([id, name]) => '<option value="' + id + '">' + name + '</option>').join('')}
+          </select></div>
+          <div id="fillLayersSetting" class="setting-inner" hidden>
+            <p class="layer-help">枠の高さを下から層に分けます。埋めるほど、下から色の層が積み上がります。上の層から順に並んでいて、いちばん上の層は残りの段すべてです（「枠を高くする」で増えた段も）。</p>
+            <div class="layer-list" id="fillLayerList"></div>
+            <div class="layer-tools"><button type="button" id="fillLayerAdd">＋ 層を足す</button><span class="layer-summary" id="fillLayerSummary"></span></div>
+          </div>
+        </div></div>
+        <div class="setting full"><div class="setting-text"><label for="fillWall">枠の素材</label></div><div class="setting-control">
+          <select id="fillWall" data-tiles aria-label="枠の素材">
+            <option value="glass">ガラス</option><option value="white_stained_glass">白色のガラス</option>
+            <option value="light_blue_stained_glass">空色のガラス</option><option value="bedrock">岩盤</option>
+          </select></div></div>
+      </section>
       <section class="card">
         <h2>ゲームの決まり</h2>
         <p class="lead">埋めきって、決めた秒数崩されなければ 1ラウンドクリアです。変えるとすぐ保存されます。</p>
         <div class="setting"><div class="setting-text"><label for="fillRounds">ラウンド数</label></div><div class="setting-control"><input id="fillRounds" type="number" min="1" max="99" data-unit="回"></div></div>
         <div class="setting"><div class="setting-text"><label for="fillCountdown">埋めきってからクリアまで</label><small>この秒数のあいだ崩されなければクリア</small></div><div class="setting-control"><input id="fillCountdown" type="number" min="0" max="600" data-unit="秒"></div></div>
-        <div class="setting"><div class="setting-text"><label for="fillWidth">枠の幅</label><small>3〜41 の奇数</small></div><div class="setting-control"><input id="fillWidth" type="number" min="3" max="41" step="2" data-unit="マス"></div></div>
-        <div class="setting"><div class="setting-text"><label for="fillHeight">枠の高さ</label></div><div class="setting-control"><input id="fillHeight" type="number" min="1" max="30" data-unit="マス"></div></div>
       </section>
       <details class="card fold-card" id="fillMore">
-        <summary><h2>細かい設定</h2><span class="fold-note">そのままで大丈夫です（枠を作る高さ・モブ・プレイヤーの速さなど）</span></summary>
+        <summary><h2>細かい設定</h2><span class="fold-note">そのままで大丈夫です（手に持つブロック・枠を作る高さ・モブ・プレイヤーの速さなど）</span></summary>
         <div class="setting"><div class="setting-text"><label for="fillSkyY">枠を作る高さ</label><small>Y 座標</small></div><div class="setting-control"><input id="fillSkyY" type="number" min="-60" max="300" data-unit=""></div></div>
         <div class="setting"><div class="setting-text"><label for="fillMobLifetime">モブが消えるまで</label><small>0 にすると消えません</small></div><div class="setting-control"><input id="fillMobLifetime" type="number" min="0" max="600" step="5" data-unit="秒"></div></div>
+        <div class="setting full"><div class="setting-text"><label for="fillHandBlock">手に持つブロック</label><small>置くとすぐ「置かれるブロック」に変わるので、ふつうは何でも大丈夫です</small></div><div class="setting-control">
+          <select id="fillHandBlock" data-tiles aria-label="手に持つブロック">
+            ${FILL_BLOCK_INFO.map(([id, name]) => '<option value="' + id + '">' + name + '</option>').join('')}
+          </select></div></div>
         <h3 class="fold-sub">プレイヤー</h3>
         <p class="lead">埋め立て中だけ変わり、終えると元に戻ります。</p>
         <div class="setting"><div class="setting-text"><label for="fillMobsAttack">モブからの攻撃</label></div><div class="setting-control"><select id="fillMobsAttack">
@@ -1130,41 +1276,7 @@ ${CONTROLS_CSS}
         </select></div></div>
         <div class="setting"><div class="setting-text"><label for="fillReach">届く距離</label></div><div class="setting-control"><input id="fillReach" type="number" min="1" max="64" data-unit="マス"></div></div>
       </details>
-      <section class="card" id="fillLook">
-        <h2>見た目</h2>
-        <p class="lead">配信に映るブロックと枠です。</p>
-        <div class="setting tall"><div class="setting-text"><label for="fillHandBlock">手に持つブロック</label></div><div class="setting-control">
-          <select id="fillHandBlock" data-tiles aria-label="手に持つブロック">
-            <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
-            <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
-            <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
-            <option value="redstone_block">レッドストーン</option><option value="quartz_block">クォーツ</option>
-          </select></div></div>
-        <div class="setting tall"><div class="setting-text"><label for="fillBlock">置かれるブロック</label><small>置いた瞬間にこれに変わります。お助けもこれ</small></div><div class="setting-control">
-          <select id="fillBlock" data-tiles aria-label="置かれるブロック">
-            <option value="amethyst_block">アメジスト</option><option value="diamond_block">ダイヤモンド</option>
-            <option value="emerald_block">エメラルド</option><option value="gold_block">金</option>
-            <option value="iron_block">鉄</option><option value="lapis_block">ラピスラズリ</option>
-            <option value="redstone_block">レッドストーン</option><option value="quartz_block">クォーツ</option>
-          </select></div></div>
-        <div class="setting tall"><div class="setting-text"><label for="fillWall">枠の素材</label></div><div class="setting-control">
-          <select id="fillWall" data-tiles aria-label="枠の素材">
-            <option value="glass">ガラス</option><option value="white_stained_glass">白色のガラス</option>
-            <option value="light_blue_stained_glass">空色のガラス</option><option value="bedrock">岩盤</option>
-          </select></div></div>
-      </section>
     </div>
-    </div>
-    <aside class="split-side" id="fillSide">
-      <section class="card" id="frameCard">
-        <h2>枠の大きさ</h2>
-        <div class="frame-figure" id="frameFigure"></div>
-        <p class="frame-size" id="frameSize"></p>
-        <details class="more-info">
-          <summary>始めるとどうなるか</summary>
-          <p class="hint" style="margin-top: 8px;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
-        </details>
-      </section>
       <section class="card">
         <h2>ワールド</h2>
         <p class="lead">コマンドの代わりです。変えるとすぐマイクラに入り、ワールドに入るたびにも入れ直します。埋め立て中でも変えられます。</p>
@@ -1180,6 +1292,19 @@ ${CONTROLS_CSS}
           <div class="setting"><div class="setting-text"><label for="worldKeepInventory">やられたときの持ち物</label></div><div class="setting-control"><select id="worldKeepInventory">
             <option value="false">落とす（ふつう）</option><option value="true">残る</option>
           </select></div></div>
+      </section>
+    </div>
+    <aside class="split-side" id="fillSide">
+      <section class="card" id="frameCard">
+        <h2>できあがりの図</h2>
+        <div class="frame-figure" id="frameFigure"></div>
+        <p class="frame-note">人の形は、プレイヤーの大きさの目安です</p>
+        <p class="frame-size" id="frameSize"></p>
+        <p class="frame-effort" id="frameEffort"></p>
+        <details class="more-info">
+          <summary>始めるとどうなるか</summary>
+          <p class="hint" style="margin-top: 8px;">プレイヤーの真上の空中に枠ができ、中へ移動します。置くブロックは減りません。枠は壊れず、枠の外と枠より上には置けません。落ちたら枠の上に戻ります。TNT とモブは枠の中に出ます。モブに攻撃される設定なら、埋め立て中はモブの攻撃でだけダメージを受けます（TNT・落下では減らず、浮いていられて、おなかも減りません）。終えると元のゲームモードに戻ります（マイクラが途中で閉じても、次に入ったときに戻ります）。カウントダウンや残り時間は画面の真ん中に出ます。</p>
+        </details>
       </section>
     </aside>
     </div>
@@ -1330,13 +1455,7 @@ ${CONTROLS_CSS}
           <button data-action="tnt" data-count="5" data-icon="tnt">TNT ×5</button>
           <button data-action="tnt" data-count="20" data-icon="tnt">TNT ×20</button>
           <button data-action="lightning" data-count="3" data-icon="lightning">雷 ×3</button>
-          <button data-action="mob" data-mob="zombie" data-icon="zombie">ゾンビ</button>
-          <button data-action="mob" data-mob="skeleton" data-icon="skeleton">スケルトン</button>
-          <button data-action="mob" data-mob="creeper" data-icon="creeper">クリーパー</button>
-          <button data-action="mob" data-mob="spider" data-icon="spider">クモ</button>
-          <button data-action="mob" data-mob="witch" data-icon="witch">ウィッチ</button>
-          <button data-action="mob" data-mob="silverfish" data-icon="silverfish">シルバーフィッシュ</button>
-          <button data-action="mob" data-mob="pig" data-icon="pig">ブタ</button>
+          ${MOB_INFO.map(([id, name]) => '<button data-action="mob" data-mob="' + id + '" data-icon="' + id + '">' + name + '</button>').join('\n          ')}
         </div>
         <p class="group-label test-group">動きをじゃまする</p>
         <div class="quick">
@@ -1572,31 +1691,52 @@ ${CONTROLS_CSS}
 
 <dialog id="wizard">
   <div class="wiz-brand"><div role="img" aria-label="STATIC ARC">${BRAND.logotype}</div><span>はじめの準備</span></div>
-  <div class="steps" id="wizSteps"></div>
+  <ol class="wiz-progress" id="wizSteps" aria-label="準備の進み具合"></ol>
   <div data-step="0">
+    <h2>ようこそ</h2>
+    <p class="hint">視聴者のギフトやいいねで、マイクラの中に妨害が飛んでくる配信ができます。準備は5分ほどです。</p>
+    <ol class="wiz-flow">
+      <li><span class="wiz-flow-ic" data-tri="gift"></span><b>ギフトが届く</b><small>TikTok LIVE で視聴者が送る</small></li>
+      <li><span class="wiz-flow-ic" data-mc="tnt"></span><b>マイクラに妨害</b><small>決めたルールで TNT やモブが出る</small></li>
+      <li><span class="wiz-flow-ic" data-mc="amethyst_block"></span><b>ゲームで遊ぶ</b><small>埋め立てや採掘チャレンジで勝負</small></li>
+    </ol>
+    <p class="hint">これから順に、マイクラの準備 → TikTok ID → 妨害のセット → 配信画面 → 試しに出す、をします。あとからいつでも「接続と準備」の「はじめの設定をやり直す」で開けます。</p>
+    <p class="notice">STATIC ARC は、Minecraft・TikTok の公式ツールではありません（Mojang・Microsoft・TikTok とは関係ありません）。</p>
+  </div>
+  <div data-step="1" hidden>
     <h2>マイクラの準備</h2>
     <p class="hint">Minecraft Java版 <span class="mcv"></span> に、必要なものをまとめて入れます。マイクラを閉じた状態で押してください。</p>
     <ul class="checks setup-checks"></ul>
     <div class="ready setup-ready" hidden>準備できています。</div>
     <div class="setup-todo" hidden><button class="primary install-btn">まとめて導入する</button></div>
-    <p class="notice">STATIC ARC は、Minecraft・TikTok の公式ツールではありません（Mojang・Microsoft・TikTok とは関係ありません）。</p>
   </div>
-  <div data-step="1" hidden>
+  <div data-step="2" hidden>
     <h2>TikTok ID</h2>
-    <p class="hint">配信するアカウントのIDを入れてください（@なし）。配信が始まると自動でつながります。プロフィールの URL の「@」のあとの部分が ID です（表示名ではありません）。</p>
+    <p class="hint">配信するアカウントのIDを入れてください（@なし）。配信が始まると自動でつながります。プロフィールの URL の「@」のあとの部分が ID です（表示名ではありません）。パスワードは使いません。</p>
     <img class="guide-img" src="${GUIDE.tiktokId.src}" alt="${GUIDE.tiktokId.alt}" width="1000" height="320">
     <input id="wizUsername" autocomplete="off" spellcheck="false" placeholder="例: my_tiktok_id">
   </div>
-  <div data-step="2" hidden>
-    <h2>準備ができました</h2>
-    <ol class="hint" style="font-size: 15px; line-height: 1.9; color: var(--text);">
-      <li>ランチャーで「fabric-loader-<span class="mcv"></span>」を選んで起動<img class="guide-img" src="${GUIDE.minecraft.src}" alt="${GUIDE.minecraft.alt}" width="1000" height="320"></li>
-      <li>ワールドを開く（左下の「マイクラ」が緑になります）</li>
-      <li>枠を作りたい場所に立って、「配信」の画面の「埋め立てを始める」</li>
-      <li>「配信」の画面の「配信前のチェック」で、全部 ✓ になっているか確かめる</li>
-      <li>TikTok LIVE を始める</li>
-    </ol>
-    <p class="hint">どのギフトで何が起きるかは「妨害の設定」で変えられます。</p>
+  <div data-step="3" hidden>
+    <h2>妨害のセットを選ぶ</h2>
+    <p class="hint">どのギフトで何が起きるかのセットです。あとから「妨害の設定」で1つずつ変えられます。</p>
+    <div class="wiz-presets" id="wizPresets" role="radiogroup" aria-label="妨害のセット"></div>
+  </div>
+  <div data-step="4" hidden>
+    <h2>配信画面に出す</h2>
+    <p class="hint">「コピー」を押して、TikTok LIVE Studio の「ソースを追加」→「リンク」に貼ります。まずはこの2つがおすすめです（ほかの部品や見た目は「配信画面」で）。</p>
+    <div class="wiz-widgets" id="wizWidgets"></div>
+    <details class="more-info"><summary>LIVE Studio での貼り方を見る</summary>
+      <div class="guide-steps">${GUIDE.liveStudio.map((g, i) => `<img class="guide-img" src="${g.src}" alt="${i + 1}. ${g.alt}" width="1280" height="720">`).join('')}</div>
+    </details>
+  </div>
+  <div data-step="5" hidden>
+    <h2>試しに出してみる</h2>
+    <ol class="wiz-todo" id="wizTodo"></ol>
+    <div class="wiz-try">
+      <button class="primary" id="wizTry" type="button">試しにギフトを送る</button>
+      <small id="wizTryNote"></small>
+    </div>
+    <p class="hint">本番では「配信」の画面の「配信前のチェック」で、全部 ✓ になっているか確かめてから TikTok LIVE を始めます。</p>
   </div>
   <div class="wizard-actions">
     <button id="wizBack">戻る</button>
@@ -1705,6 +1845,7 @@ ${CONTROLS_JS}
 
   // ---- 絵 ----
   ${MC_ICON_JS}
+  ${TRIGGER_ICON_JS}
   /** TikTok 公式のギフトの絵（url か、ギフト名から探す）。わからないギフトには絵を出さない（空の要素） */
   function giftIcon(nameOrUrl, big) {
     const url = /^https:/.test(nameOrUrl ?? '') ? nameOrUrl : giftFor(nameOrUrl)?.image;
@@ -1817,6 +1958,7 @@ ${CONTROLS_JS}
     renderLicense();
     renderStyle();
     renderRecent();
+    if ($('wizard').open && wizardStep === STEP_TRY) renderWizardTry();
     if (!wizardChecked) {
       wizardChecked = true;
       if (!state.tiktokUsername && !storage('redstone.wizardDone')) openWizard();
@@ -2104,10 +2246,10 @@ ${CONTROLS_JS}
     const who = a.who ? a.who + 'さん' : '誰か';
     const src = el('div', 'feed-src');
     if (a.kind === 'gift') src.append(giftIcon(a.giftImage || a.gift), el('b', '', who), el('span', 'muted', a.gift + ' ×' + a.count));
-    else if (a.kind === 'like') src.append(el('span', 'trigger-icon', '❤'), el('span', '', 'いいね ' + a.likes + '回'));
-    else if (a.kind === 'follow') src.append(el('span', 'trigger-icon', '＋'), el('b', '', who), el('span', 'muted', 'がフォロー'));
-    else if (a.kind === 'share') src.append(el('span', 'trigger-icon', '↗'), el('b', '', who), el('span', 'muted', 'がシェア'));
-    else if (a.kind === 'comment') src.append(el('span', 'trigger-icon', '💬'), el('b', '', who), el('span', 'muted', '「' + a.comment + '」'));
+    else if (a.kind === 'like') src.append(triIcon('likes', 'trigger-icon'), el('span', '', 'いいね ' + a.likes + '回'));
+    else if (a.kind === 'follow') src.append(triIcon('follow', 'trigger-icon'), el('b', '', who), el('span', 'muted', 'がフォロー'));
+    else if (a.kind === 'share') src.append(triIcon('share', 'trigger-icon'), el('b', '', who), el('span', 'muted', 'がシェア'));
+    else if (a.kind === 'comment') src.append(triIcon('comment', 'trigger-icon'), el('b', '', who), el('span', 'muted', '「' + a.comment + '」'));
     else src.append(el('span', 'trigger-icon', '●'), el('span', '', '配信者のボタン'));
     if (a.test) src.append(el('span', 'rule-tag', 'テスト'));
     src.title = src.textContent;
@@ -2263,7 +2405,10 @@ ${CONTROLS_JS}
     // 全部そろっていれば中身はしまう。足りないときは開いて見せる（そろったかどうかが変わったときだけ）
     if (setupReady !== setup.ready) $('setupChecks').open = !setup.ready;
     setupReady = setup.ready;
-    if ($('wizard').open) renderWizardNext();
+    if ($('wizard').open) {
+      renderWizardNext();
+      if (wizardStep === STEP_TRY) renderWizardTry();
+    }
     renderReady();
   }
   let setupReady = null;
@@ -2324,6 +2469,7 @@ ${CONTROLS_JS}
       head.append(reset);
     }
     const card = el('section', 'card widget', head, el('p', 'lead', w.description), el('div', 'url', el('code', '', url), copy));
+    if (w.id === 'gifts') card.append(giftOrderBox());
     card.dataset.id = w.id;
     card.tabIndex = 0;
     card.addEventListener('click', (e) => {
@@ -2334,6 +2480,110 @@ ${CONTROLS_JS}
     });
     return card;
   }));
+
+  // ---- ギフト表の並び順 ----
+  // 上の切り替え（安い順・高い順・自分で並べる）と、下の実際の並び。並びはつかんで動かすか ▲▼ で変えられ、
+  // 動かすと「自分で並べる」になる。配信画面には 12枚（4×3）ごとのページで出る
+  const GIFT_PAGE_SIZE = 12;
+  let giftOrderKey = '';
+  let giftDragging = null;
+  function giftOrderBox() {
+    const seg = el('div', 'seg');
+    seg.setAttribute('role', 'radiogroup');
+    seg.setAttribute('aria-label', 'ギフト表の並び順');
+    for (const [order, text] of [['cheap', '安い順'], ['expensive', '高い順'], ['custom', '自分で並べる']]) {
+      const b = Object.assign(el('button', '', text), { type: 'button' });
+      b.dataset.order = order;
+      b.setAttribute('role', 'radio');
+      b.addEventListener('click', () => {
+        if (state.giftTableOrder === order) return;
+        // 「自分で並べる」にしたときは、今の並びから始める
+        const body = order === 'custom' ? { order, custom: (state.giftTable ?? []).map((r) => r.key) } : { order };
+        post('/api/overlay/gift-order', body);
+      });
+      seg.append(b);
+    }
+    const list = el('ol', 'gift-order-list');
+    list.id = 'giftOrderList';
+    list.setAttribute('aria-label', 'ギフト表の今の並び');
+    list.addEventListener('dragover', (e) => {
+      if (!giftDragging) return;
+      e.preventDefault();
+      // つかんでいるカードを、マウスのいる場所へその場で動かす
+      const over = e.target.closest('li[data-key]');
+      if (!over || over === giftDragging) return;
+      const box = over.getBoundingClientRect();
+      over[e.clientY > box.top + box.height / 2 ? 'after' : 'before'](giftDragging);
+    });
+    const box = el('div', 'gift-order', el('div', 'gift-order-head', el('b', '', '並び順'), seg), list,
+      el('p', 'hint', 'カードをつかんで動かすか ▲▼ を押すと、「自分で並べる」になります。'));
+    box.addEventListener('click', (e) => e.stopPropagation()); // 右の試し表示は切り替えない
+    return box;
+  }
+  function saveGiftCustom(keys) {
+    post('/api/overlay/gift-order', { order: 'custom', custom: keys });
+  }
+  function renderGiftOrder() {
+    const list = $('giftOrderList');
+    if (!list || giftDragging) return;
+    const order = state.giftTableOrder ?? 'cheap';
+    document.querySelectorAll('.gift-order .seg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.order === order)));
+    const rows = state.giftTable ?? [];
+    const key = JSON.stringify(rows.map((r) => [r.key, r.image]));
+    if (key === giftOrderKey) return;
+    giftOrderKey = key;
+    if (!rows.length) {
+      list.replaceChildren(el('li', 'gift-order-empty', '「妨害の設定」にギフトなどのルールを作ると、ここに並びます'));
+      return;
+    }
+    const keys = rows.map((r) => r.key);
+    const move = (from, to) => {
+      const next = [...keys];
+      next.splice(to, 0, ...next.splice(from, 1));
+      saveGiftCustom(next);
+    };
+    const items = [];
+    rows.forEach((r, i) => {
+      if (i > 0 && i % GIFT_PAGE_SIZE === 0) items.push(el('li', 'page-break', 'ここから ' + (i / GIFT_PAGE_SIZE + 1) + 'ページ目'));
+      let pic;
+      if (r.trigger === 'gift' && r.image) {
+        pic = Object.assign(document.createElement('img'), { src: r.image, alt: '', referrerPolicy: 'no-referrer' });
+        pic.addEventListener('error', () => pic.replaceWith(triIcon('gift')));
+      } else {
+        pic = triIcon(r.trigger);
+      }
+      // 一覧では、きっかけを文で（「1以上 コイン」ではなく「1コイン以上のギフト」）
+      const text = r.trigger === 'coins' ? r.coins + ' コイン以上のギフト' : r.trigger === 'likes' ? 'いいね ' + r.count + '回ごと' : r.label;
+      const name = el('span', 'name', text);
+      if (r.trigger === 'gift' && r.coins != null) name.append(el('small', '', triIcon('coins', 'cic'), String(r.coins)));
+      const up = Object.assign(el('button', '', '▲'), { type: 'button', title: '1つ前へ', disabled: i === 0 });
+      const down = Object.assign(el('button', '', '▼'), { type: 'button', title: '1つ後ろへ', disabled: i === rows.length - 1 });
+      up.setAttribute('aria-label', r.label + 'を1つ前へ');
+      down.setAttribute('aria-label', r.label + 'を1つ後ろへ');
+      up.addEventListener('click', () => move(i, i - 1));
+      down.addEventListener('click', () => move(i, i + 1));
+      const li = el('li', '', el('span', 'grip', '⋮⋮'), el('span', 'pos', String(i + 1)), el('span', 'pic', pic), name,
+        el('span', 'arrow', '→'), mcIcon(r.icon, 22), el('span', 'what', r.action), el('span', 'moves', up, down));
+      li.dataset.key = r.key;
+      li.draggable = true;
+      li.addEventListener('dragstart', (e) => {
+        giftDragging = li;
+        li.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', r.key);
+      });
+      li.addEventListener('dragend', () => {
+        li.classList.remove('dragging');
+        giftDragging = null;
+        const next = [...list.querySelectorAll('li[data-key]')].map((x) => x.dataset.key);
+        giftOrderKey = '';
+        if (JSON.stringify(next) !== JSON.stringify(keys)) saveGiftCustom(next);
+        else renderGiftOrder();
+      });
+      items.push(li);
+    });
+    list.replaceChildren(...items);
+  }
 
   function storage(key, value) {
     try {
@@ -2379,8 +2629,7 @@ ${CONTROLS_JS}
   const ACTION_GROUPS = [
     ['敵・爆発', [
       ['tnt', 'TNT', '個', 1, '枠の中に TNT が落ちて、埋めたブロックを壊す（採掘チャレンジでは地形を壊さない）'],
-      ['mob:zombie', 'ゾンビ', '体', 1], ['mob:skeleton', 'スケルトン', '体', 1], ['mob:creeper', 'クリーパー', '体', 1],
-      ['mob:spider', 'クモ', '体', 1], ['mob:witch', 'ウィッチ', '体', 1], ['mob:silverfish', 'シルバーフィッシュ', '体', 1], ['mob:pig', 'ブタ', '体', 1],
+      ...${JSON.stringify(MOB_INFO)}.map(([id, name]) => ['mob:' + id, name, '体', 1]),
       ['lightning', '雷', '回', 1, '枠の中に雷が落ちて、まわりのブロックを少し壊す（火事にはならない）'],
     ]],
     ['動きをじゃまする', [
@@ -2536,9 +2785,9 @@ ${CONTROLS_JS}
     const b = el('button', 'gift-field' + (!name ? ' unset' : gift ? '' : ' unknown'));
     b.type = 'button';
     const icon = name ? giftIcon(row.value) : null;
-    b.append(icon?.nodeType === 1 ? icon : el('span', 'gf-empty', '🎁'),
+    b.append(icon?.nodeType === 1 ? icon : triIcon('gift', 'gf-empty'),
       el('span', 'gf-text', el('b', '', !name ? 'ギフトを選ぶ' : gift?.nameJa ?? row.value),
-        el('small', '', !name ? '一覧から絵で選べます' : gift ? '🪙 ' + gift.diamonds + ' コイン' : 'ギフトの一覧にない名前です')),
+        el('small', '', !name ? '一覧から絵で選べます' : gift ? el('span', '', triIcon('coins', 'cic'), String(gift.diamonds)) : 'ギフトの一覧にない名前です')),
       el('span', 'gf-change', name ? '変更' : '選ぶ'));
     b.addEventListener('click', onClick);
     return b;
@@ -2555,28 +2804,28 @@ ${CONTROLS_JS}
   /** 一覧の左側: きっかけ（ギフトの絵・名前、コイン数など） */
   function triggerSummary(row) {
     const box = el('div', 'rule-when');
-    const badge = (text) => el('span', 'trigger-icon', text);
+    const badge = (name) => triIcon(name, 'trigger-icon');
     if (row.trigger === 'gift') {
       const gift = giftFor(row.value);
       const icon = giftIcon(row.value);
-      box.append(icon.nodeType === 1 ? icon : badge('🎁'), el('span', gift ? '' : 'unknown', gift?.nameJa ?? row.value));
+      box.append(icon.nodeType === 1 ? icon : badge('gift'), el('span', gift ? '' : 'unknown', gift?.nameJa ?? row.value));
       if (gift) {
-        box.append(el('small', 'coin', '🪙' + gift.diamonds));
+        box.append(el('small', 'coin', triIcon('coins', 'cic'), String(gift.diamonds)));
         box.title = gift.nameJa + '（' + gift.diamonds + 'コイン）';
       } else {
         box.title = '「' + row.value + '」はギフトの一覧にない名前です';
       }
     } else if (row.trigger === 'giftId') {
-      box.append(badge('🎁'), el('span', '', 'ギフトID ' + row.value));
+      box.append(badge('gift'), el('span', '', 'ギフトID ' + row.value));
     } else if (row.trigger === 'minDiamonds') {
-      box.append(badge('🪙'), el('span', '', row.value + ' コイン以上'));
+      box.append(badge('coins'), el('span', '', row.value + ' コイン以上'));
     } else if (row.trigger === 'likes') {
-      box.append(badge('❤'), el('span', '', 'いいね ' + row.value + '回ごと'));
+      box.append(badge('likes'), el('span', '', 'いいね ' + row.value + '回ごと'));
     } else if (row.trigger === 'comment') {
-      box.append(badge('💬'), el('span', '', '「' + row.value + '」'));
+      box.append(badge('comment'), el('span', '', '「' + row.value + '」'));
       box.title = '「' + row.value + '」とコメントしたら';
     } else {
-      box.append(badge(row.trigger === 'follow' ? '＋' : '↗'), el('span', '', row.trigger === 'follow' ? 'フォロー' : 'シェア'));
+      box.append(badge(row.trigger === 'follow' ? 'follow' : 'share'), el('span', '', row.trigger === 'follow' ? 'フォロー' : 'シェア'));
     }
     return box;
   }
@@ -2732,7 +2981,8 @@ ${CONTROLS_JS}
   }
 
   /** きっかけの絵（一覧と同じ） */
-  const TRIGGER_ICONS = { gift: '🎁', minDiamonds: '🪙', likes: '❤', comment: '💬', follow: '＋', share: '↗', giftId: '🎁' };
+  // きっかけのアイコン（triggerIcons.js の絵の名前）
+  const TRIGGER_ICON_OF = { gift: 'gift', minDiamonds: 'coins', likes: 'likes', comment: 'comment', follow: 'follow', share: 'share', giftId: 'gift' };
   const ARROW_DOWN = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v11M4 9l4 4 4-4"/></svg>';
   /** この妨害が、今選んでいるゲームモードで出ないなら、その短い説明 */
   function offModeNote(key) {
@@ -2778,7 +3028,7 @@ ${CONTROLS_JS}
       if (query) list.sort((a, b) => head(a) - head(b));
       grid.replaceChildren(...list.slice(0, SHOWN).map((g) => {
         const b = Object.assign(el('button', g.nameJa.toLowerCase() === current ? 'selected' : '', giftIcon(g.image),
-          el('span', 'gn', el('b', '', g.nameJa), el('small', '', '🪙 ' + g.diamonds))), { type: 'button', title: g.nameJa + '（' + g.diamonds + 'コイン）' });
+          el('span', 'gn', el('b', '', g.nameJa), el('small', '', triIcon('coins', 'cic'), String(g.diamonds)))), { type: 'button', title: g.nameJa + '（' + g.diamonds + 'コイン）' });
         if (used.has(g.nameJa.toLowerCase())) {
           b.append(el('em', '', 'ルールあり'));
           b.title += '。このギフトのルールはもうあります';
@@ -2830,7 +3080,7 @@ ${CONTROLS_JS}
     // ① きっかけ
     const triggers = row.trigger === 'giftId' ? [...TRIGGERS, ['giftId', 'ギフトID']] : TRIGGERS;
     $('editorTriggers').replaceChildren(...triggers.map(([value, text]) => {
-      const b = Object.assign(el('button', '', el('span', 'ti', TRIGGER_ICONS[value]), text), { type: 'button' });
+      const b = Object.assign(el('button', '', triIcon(TRIGGER_ICON_OF[value], 'ti'), text), { type: 'button' });
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(row.trigger === value));
       b.addEventListener('click', () => {
@@ -2871,7 +3121,7 @@ ${CONTROLS_JS}
         }), 'が届いたら');
       }
     } else if (row.trigger === 'minDiamonds') {
-      value.replaceChildren(numberField(row.value, live('value'), { min: 1, before: '🪙', after: 'コイン以上のギフトが届いたら', width: 80, label: 'コイン数' }));
+      value.replaceChildren(numberField(row.value, live('value'), { min: 1, after: 'コイン以上のギフトが届いたら', width: 80, label: 'コイン数' }));
     } else if (row.trigger === 'likes') {
       value.replaceChildren(numberField(row.value, live('value'), { min: 1, before: 'いいねが', after: '回たまるたびに', width: 80, label: 'いいねの回数' }));
     } else if (row.trigger === 'giftId') {
@@ -3165,8 +3415,8 @@ ${CONTROLS_JS}
       : row.trigger === 'follow' ? 'フォローされたら' : 'シェアされたら';
     const node = (cls, icon, small, text) => el('div', 'ed-node' + cls, el('span', 'ni', icon), el('div', '', el('small', '', small), el('b', '', text)));
     const trigger = triggerText
-      ? node('', giftImg?.nodeType === 1 ? giftImg : TRIGGER_ICONS[row.trigger], 'きっかけ', triggerText)
-      : node(' is-empty', TRIGGER_ICONS[row.trigger], 'きっかけ', row.trigger === 'gift' ? 'ギフトを選んでください' : row.trigger === 'comment' ? 'コメントの言葉を入れてください' : 'ギフトID を入れてください');
+      ? node('', giftImg?.nodeType === 1 ? giftImg : triIcon(TRIGGER_ICON_OF[row.trigger], ''), 'きっかけ', triggerText)
+      : node(' is-empty', triIcon(TRIGGER_ICON_OF[row.trigger], ''), 'きっかけ', row.trigger === 'gift' ? 'ギフトを選んでください' : row.trigger === 'comment' ? 'コメントの言葉を入れてください' : 'ギフトID を入れてください');
     let action;
     let desc = '';
     let warn = '';
@@ -3352,7 +3602,7 @@ ${CONTROLS_JS}
     const rows = streams.map((st) => {
       const tr = el('tr', st.id === selectedStream ? 'selected' : '',
         el('td', '', fmtDate(st.startedAt)), el('td', '', fmtDuration(st.endedAt - st.startedAt)),
-        el('td', '', '🪙' + fmtNum(st.coins)), el('td', failClass(st.failureRate), st.failureRate + '%'));
+        el('td', '', fmtNum(st.coins)), el('td', failClass(st.failureRate), st.failureRate + '%'));
       if (full) {
         tr.tabIndex = 0;
         const open = () => showStream(st.id);
@@ -3399,15 +3649,15 @@ ${CONTROLS_JS}
     const at = new Map(d.timeline.map((b) => [b.m, b]));
     const series = (key) => Array.from({ length: minutes }, (_, m) => at.get(m)?.[key] ?? (key === 'fill' ? null : 0));
     const label = (m) => fmtClock(d.startedAt + m * 60000);
-    barChart($('chartCoins'), series('coins'), label, (v) => '🪙' + fmtNum(v));
+    barChart($('chartCoins'), series('coins'), label, (v) => fmtNum(v) + 'コイン');
     barChart($('chartActions'), series('actions'), label, (v) => fmtNum(v) + '回');
     lineChart($('chartFill'), series('fill'), label);
     const item = (icon, name, value) => el('li', '', ...(icon ? [icon] : []), el('span', 'name', name), el('span', 'value', value));
     const none = (text) => el('li', '', el('span', 'name hint', text));
-    $('detailGifts').replaceChildren(...(d.topGifts.length ? d.topGifts.map((g) => item(giftIcon(g.name), g.name, '×' + fmtNum(g.count) + '・🪙' + fmtNum(g.coins))) : [none('ギフトは届いていません')]));
-    $('detailSupporters').replaceChildren(...(d.supporters.length ? d.supporters.map((x, i) => item(null, (i + 1) + '. ' + x.name, '🪙' + fmtNum(x.coins))) : [none('まだいません')]));
+    $('detailGifts').replaceChildren(...(d.topGifts.length ? d.topGifts.map((g) => item(giftIcon(g.name), g.name, el('span', '', fmtNum(g.count) + '回・', triIcon('coins', 'cic'), fmtNum(g.coins)))) : [none('ギフトは届いていません')]));
+    $('detailSupporters').replaceChildren(...(d.supporters.length ? d.supporters.map((x, i) => item(null, (i + 1) + '. ' + x.name, el('span', '', triIcon('coins', 'cic'), fmtNum(x.coins)))) : [none('まだいません')]));
     $('detailActions').replaceChildren(...(d.byAction.length ? d.byAction.map((a) => item(mcIcon(iconOf(a.key), 20), ACTION_INFO[a.key]?.name ?? a.key, fmtNum(a.count) + '回')) : [none('出していません')]));
-    const skipped = [['cooldown', '待ち時間（クールダウン）中'], ['paused', '一時停止中'], ['no_rule', '合うルールがない'],
+    const skipped = [['cooldown', '待ち時間中'], ['paused', '一時停止中'], ['no_rule', '合うルールがない'],
       ['challenge_paused', '採掘チャレンジの一時停止中'], ['mode_incompatible', '今のゲームモードでは出せない'], ['no_active_mode', 'チャレンジが始まっていない']]
       .filter(([key]) => d.actions[key] > 0).map(([key, text]) => item(null, text, fmtNum(d.actions[key]) + '回'));
     const failures = d.failures.map((f) => item(null, '失敗: ' + f.reason, fmtNum(f.count) + '回'));
@@ -3670,6 +3920,7 @@ ${CONTROLS_JS}
 
   // ---- 配信画面の見た目（有料版の機能） ----
   function renderStyle() {
+    renderGiftOrder();
     $('styleCard').hidden = !state.plan?.overlayStyle;
     const saved = state.savedOverlayStyle;
     if (!saved) return;
@@ -4026,7 +4277,7 @@ ${CONTROLS_JS}
   document.querySelectorAll('[data-mining-op]').forEach((b) => b.addEventListener('click', async () => {
     const op = b.dataset.miningOp;
     if (op === 'abort') {
-      const ok = await askConfirm({ title: 'チャレンジを中止しますか？', text: '現在の進捗は結果として保存されます。掘ったブロックや取得済みアイテムは元に戻りません。', ok: '中止する', cancel: '続ける' });
+      const ok = await askConfirm({ title: 'チャレンジを中止しますか？', text: 'ここまでの結果は記録に残ります。掘ったブロックや拾ったアイテムは元に戻りません。', ok: '中止する', cancel: '続ける' });
       if (!ok) return;
     }
     const done = { pause: 'チャレンジを一時停止しました', resume: 'チャレンジを再開しました', abort: 'チャレンジを中止しました' };
@@ -4039,8 +4290,79 @@ ${CONTROLS_JS}
   const FILL_FIELDS = {
     fillWidth: 'width', fillHeight: 'height', fillCountdown: 'countdown', fillRounds: 'rounds', fillWall: 'wall', fillBlock: 'block', fillHandBlock: 'handBlock',
     fillSkyY: 'skyY', fillReach: 'reach', fillPlaceSpeed: 'placeSpeed', fillBreakSpeed: 'breakSpeed',
-    fillMobsAttack: 'mobsAttack', fillMobLifetime: 'mobLifetime',
+    fillMobsAttack: 'mobsAttack', fillMobLifetime: 'mobLifetime', fillLayered: 'layered',
   };
+  // ---- 地層（下の層から順に持つ。画面には上の層から並べる） ----
+  const BLOCK_NAMES = Object.fromEntries([...$('fillBlock').options].map((o) => [o.value, o.textContent]));
+  const LAYER_ORDER = ['iron_block', 'gold_block', 'diamond_block', 'emerald_block', 'amethyst_block', 'lapis_block', 'redstone_block', 'quartz_block'];
+  let fillLayers = [];
+  function markFillDirty() {
+    fillFormDirty = true;
+    clearTimeout(fillSaveTimer);
+    fillSaveTimer = setTimeout(saveFill, 600);
+  }
+  function renderLayers() {
+    const layered = $('fillLayered').value === 'true';
+    $('fillLayersSetting').hidden = !layered;
+    // 地層のときは「置かれるブロック」は使わない（層のブロックになる）
+    $('fillBlockSetting').hidden = layered;
+    document.querySelectorAll('#fillLayeredSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.layered === String(layered))));
+    const top = fillLayers.length - 1;
+    $('fillLayerList').replaceChildren(...fillLayers.map((layer, i) => ({ layer, i })).reverse().map(({ layer, i }) => {
+      const select = el('select');
+      select.setAttribute('aria-label', '下から' + (i + 1) + '番目の層のブロック');
+      select.append(...Object.entries(BLOCK_NAMES).map(([value, name]) => Object.assign(document.createElement('option'), { value, textContent: name })));
+      select.value = layer.block;
+      select.addEventListener('change', () => { layer.block = select.value; renderLayers(); markFillDirty(); });
+      let rows;
+      if (i === top) {
+        rows = el('span', 'layer-rest', '残りの段すべて');
+      } else {
+        rows = Object.assign(document.createElement('input'), { type: 'number', min: 1, max: 30, value: layer.rows });
+        rows.dataset.unit = '段';
+        rows.setAttribute('aria-label', '下から' + (i + 1) + '番目の層の段数');
+        rows.addEventListener('input', () => {
+          const n = Math.floor(Number(rows.value));
+          if (Number.isFinite(n) && n >= 1) { layer.rows = Math.min(30, n); renderLayerSummary(); renderFrameFigure(); markFillDirty(); }
+        });
+      }
+      const remove = Object.assign(el('button', 'icon-only', '×'), { type: 'button', title: 'この層を消す', disabled: fillLayers.length <= 2 });
+      remove.setAttribute('aria-label', '下から' + (i + 1) + '番目の層を消す');
+      remove.addEventListener('click', () => { fillLayers.splice(i, 1); renderLayers(); markFillDirty(); });
+      return el('div', 'layer-row', mcIcon(layer.block, 24), select, rows, remove);
+    }));
+    $('fillLayerAdd').disabled = fillLayers.length >= 6;
+    renderLayerSummary();
+    renderFrameFigure();
+  }
+  /** 「高さ9段：下から 鉄3段・金3段・ダイヤ3段」。下の層だけで高さを超えたら知らせる */
+  function renderLayerSummary() {
+    const height = Math.max(1, Number($('fillHeight').value) || 1);
+    const parts = [];
+    let used = 0;
+    fillLayers.forEach((layer, i) => {
+      const rows = i === fillLayers.length - 1 ? Math.max(0, height - used) : Math.min(layer.rows, Math.max(0, height - used));
+      used += rows;
+      if (rows > 0) parts.push(BLOCK_NAMES[layer.block] + rows + '段');
+    });
+    const hidden = fillLayers.length - parts.length;
+    $('fillLayerSummary').textContent = '高さ' + height + '段：下から ' + parts.join('・') + (hidden > 0 ? '（上の' + hidden + '層は高さが足りず出ません）' : '');
+    $('fillLayerSummary').classList.toggle('warn', hidden > 0);
+  }
+  $('fillLayerAdd').addEventListener('click', () => {
+    const used = new Set(fillLayers.map((l) => l.block));
+    const block = LAYER_ORDER.find((b) => !used.has(b)) ?? LAYER_ORDER[0];
+    fillLayers.push({ block, rows: 3 });
+    renderLayers();
+    markFillDirty();
+  });
+  $('fillLayered').addEventListener('change', renderLayers);
+  document.querySelectorAll('#fillLayeredSeg button').forEach((b) => b.addEventListener('click', () => {
+    if ($('fillLayered').value === b.dataset.layered) return;
+    $('fillLayered').value = b.dataset.layered;
+    $('fillLayered').dispatchEvent(new Event('change'));
+  }));
+  $('fillHeight').addEventListener('input', renderLayerSummary);
   let fillFormDirty = false;
   // 変えたらすぐ保存する（続けて押したときは、止まってからまとめて）
   let fillSaveTimer = null;
@@ -4050,6 +4372,7 @@ ${CONTROLS_JS}
       const value = $(id).value;
       body[key] = $(id).tagName !== 'SELECT' ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
     }
+    body.layers = fillLayers.map((l) => ({ ...l }));
     return body;
   }
   async function saveFill() {
@@ -4065,44 +4388,97 @@ ${CONTROLS_JS}
   })));
   let fillSettingsKey = '';
   /** 右の枠の図（幅×幅×高さの箱。置かれるブロックの色で下から3分の1を塗る） */
-  const BLOCK_COLORS = {
-    amethyst_block: '#9a6fd6', diamond_block: '#5fd6d0', emerald_block: '#3fbf5f', gold_block: '#e8c23a',
-    iron_block: '#d8d8d8', lapis_block: '#2f5bb7', redstone_block: '#c8302a', quartz_block: '#ece6dc',
-  };
+  const BLOCK_COLORS = Object.fromEntries(${JSON.stringify(FILL_BLOCK_INFO.map(([id, , color]) => [id, color]))});
   const WALL_COLORS = { glass: '#cfe3ea', white_stained_glass: '#f0f0f0', light_blue_stained_glass: '#7fbfe6', bedrock: '#7a7a7a' };
   function renderFrameFigure() {
     const w = Math.max(1, Number($('fillWidth').value) || 1);
     const h = Math.max(1, Number($('fillHeight').value) || 1);
-    // 斜め上から見た箱。いちばん大きい辺が図に収まるように縮める
+    // 斜め上から見た箱。いちばん大きい辺が図に収まるように縮める（まわりに寸法の文字を書く余白を空ける）
     const unit = 120 / Math.max(w, h * 0.9);
     const dx = w * unit * 0.87, dy = w * unit * 0.5, hh = h * unit;
-    const W = 2 * dx + 20, H = 2 * dy + hh + 20;
-    const cx = W / 2, top = 10;
+    const W = 2 * dx + 96, H = 2 * dy + hh + 44;
+    const cx = W / 2, top = 14;
     const pt = (x, y) => x.toFixed(1) + ',' + y.toFixed(1);
     // 上の面の4つの角（奥・右・手前・左）
     const back = [cx, top], right = [cx + dx, top + dy], front = [cx, top + 2 * dy], left = [cx - dx, top + dy];
     const down = (p, k) => [p[0], p[1] + k];
-    const fillH = hh / 3;
-    const block = BLOCK_COLORS[$('fillBlock').value] ?? '#9a6fd6';
-    const wall = WALL_COLORS[$('fillWall').value] ?? '#cfe3ea';
+    const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
     const poly = (pts, attrs) => '<polygon points="' + pts.map((q) => pt(...q)).join(' ') + '" ' + attrs + '/>';
-    const filledTop = [down(back, hh - fillH), down(right, hh - fillH), down(front, hh - fillH), down(left, hh - fillH)];
-    $('frameFigure').innerHTML = '<svg viewBox="0 0 ' + W.toFixed(0) + ' ' + H.toFixed(0) + '" role="img" aria-label="枠の図">'
-      // 埋まった部分（下から3分の1）
-      + poly([down(left, hh - fillH), down(front, hh - fillH), down(front, hh), down(left, hh)], 'fill="' + block + '" opacity=".75"')
-      + poly([down(front, hh - fillH), down(right, hh - fillH), down(right, hh), down(front, hh)], 'fill="' + block + '" opacity=".55"')
-      + poly(filledTop, 'fill="' + block + '" opacity=".9"')
-      // 枠（ガラスなど）
-      + poly([left, front, down(front, hh), down(left, hh)], 'fill="' + wall + '" fill-opacity=".08" stroke="' + wall + '" stroke-opacity=".7"')
+    const wall = WALL_COLORS[$('fillWall').value] ?? '#cfe3ea';
+    // 埋まった部分: 1種類なら下から3分の1、地層なら全部の高さを層の色で（下から）
+    const layered = $('fillLayered').value === 'true' && fillLayers.length > 1;
+    const bands = [];
+    if (layered) {
+      let from = 0;
+      fillLayers.forEach((layer, i) => {
+        const rows = i === fillLayers.length - 1 ? h - from : Math.min(layer.rows, h - from);
+        if (rows <= 0) return;
+        bands.push({ from, rows, color: BLOCK_COLORS[layer.block] ?? '#9a6fd6' });
+        from += rows;
+      });
+    } else {
+      bands.push({ from: 0, rows: Math.max(1, Math.round(h / 3)), color: BLOCK_COLORS[$('fillBlock').value] ?? '#9a6fd6' });
+    }
+    let svg = '';
+    for (const band of bands) {
+      const y0 = hh - band.from * unit, y1 = hh - (band.from + band.rows) * unit;
+      svg += poly([down(left, y1), down(front, y1), down(front, y0), down(left, y0)], 'fill="' + band.color + '" opacity=".75"')
+        + poly([down(front, y1), down(right, y1), down(right, y0), down(front, y0)], 'fill="' + band.color + '" opacity=".55"');
+    }
+    // 埋まった所のいちばん上の面と、1マスずつの線（細かすぎないときだけ）
+    const last = bands[bands.length - 1];
+    const k = hh - (last.from + last.rows) * unit;
+    const face = [down(back, k), down(right, k), down(front, k), down(left, k)];
+    svg += poly(face, 'fill="' + last.color + '" opacity=".9"');
+    if (w <= 25) {
+      let lines = '';
+      for (let i = 1; i < w; i++) {
+        const t = i / w;
+        const a1 = mix(face[3], face[2], t), a2 = mix(face[0], face[1], t);
+        const b1 = mix(face[3], face[0], t), b2 = mix(face[2], face[1], t);
+        lines += 'M' + pt(...a1) + 'L' + pt(...a2) + 'M' + pt(...b1) + 'L' + pt(...b2);
+      }
+      svg += '<path d="' + lines + '" stroke="#000" stroke-opacity=".18" stroke-width=".6" fill="none"/>';
+    }
+    // 大きさの目安: 埋まった面のまん中に立つ人（高さ2マス）
+    const foot = mix(face[0], face[2], 0.5);
+    const pw = Math.max(1.2, unit * 0.7), ph = unit * 2;
+    svg += '<g fill="#f2f2f2" stroke="#111" stroke-width=".6">'
+      + '<rect x="' + (foot[0] - pw / 2).toFixed(1) + '" y="' + (foot[1] - ph * 0.72).toFixed(1) + '" width="' + pw.toFixed(1) + '" height="' + (ph * 0.72).toFixed(1) + '" rx="' + (pw * 0.25).toFixed(1) + '"/>'
+      + '<circle cx="' + foot[0].toFixed(1) + '" cy="' + (foot[1] - ph * 0.86).toFixed(1) + '" r="' + (ph * 0.14).toFixed(1) + '"/></g>';
+    // 枠（ガラスなど）
+    svg += poly([left, front, down(front, hh), down(left, hh)], 'fill="' + wall + '" fill-opacity=".08" stroke="' + wall + '" stroke-opacity=".7"')
       + poly([front, right, down(right, hh), down(front, hh)], 'fill="' + wall + '" fill-opacity=".05" stroke="' + wall + '" stroke-opacity=".7"')
-      + poly([back, right, front, left], 'fill="none" stroke="' + wall + '" stroke-opacity=".7" stroke-dasharray="3 3"')
-      + '</svg>';
+      + poly([back, right, front, left], 'fill="none" stroke="' + wall + '" stroke-opacity=".7" stroke-dasharray="3 3"');
+    // 寸法: 左下の辺に幅、右の辺に高さ
+    const widthAt = mix(down(left, hh), down(front, hh), 0.5);
+    const heightAt = mix(right, down(right, hh), 0.5);
+    svg += '<g fill="currentColor" font-size="11" font-weight="600">'
+      + '<text x="' + (widthAt[0] - 8).toFixed(1) + '" y="' + (widthAt[1] + 18).toFixed(1) + '" text-anchor="end">幅 ' + w + '</text>'
+      + '<text x="' + (heightAt[0] + 8).toFixed(1) + '" y="' + (heightAt[1] + 4).toFixed(1) + '">高さ ' + h + '</text></g>';
+    $('frameFigure').innerHTML = '<svg viewBox="0 0 ' + W.toFixed(0) + ' ' + H.toFixed(0) + '" role="img" aria-label="枠の図: 幅' + w + '・高さ' + h + '">' + svg + '</svg>';
+    // 埋めるのにかかる時間の目安（置く速さで、休まず置き続けたとき）
+    const cells = w * w * h;
+    const perSecond = { normal: 5, fast: 10, fastest: 20 }[$('fillPlaceSpeed').value] ?? 10;
+    const seconds = Math.ceil(cells / perSecond);
+    const time = seconds < 60 ? '約' + seconds + '秒' : '約' + Math.round(seconds / 60) + '分';
+    $('frameEffort').replaceChildren('1ラウンド埋めきるまで、休まず置き続けて ', el('b', '', time), '（置く速さ「' + $('fillPlaceSpeed').selectedOptions[0]?.textContent.replace(/（.*）/, '') + '」のとき）');
+    document.querySelectorAll('#sizePresets button').forEach((b) => b.classList.toggle('selected', Number(b.dataset.width) === w && Number(b.dataset.height) === h));
     const rounds = Number($('fillRounds').value) || 1;
     $('frameSize').innerHTML = '';
     $('frameSize').append('幅 ', el('b', '', String(w)), ' × 奥行き ', el('b', '', String(w)), ' × 高さ ', el('b', '', String(h)),
       ' ＝ ', el('b', '', (w * w * h).toLocaleString('ja-JP')), ' マス。全 ', el('b', '', String(rounds)), ' ラウンド');
   }
-  ['fillWidth', 'fillHeight', 'fillRounds', 'fillBlock', 'fillWall'].forEach((id) => $(id).addEventListener('input', renderFrameFigure));
+  ['fillWidth', 'fillHeight', 'fillRounds', 'fillBlock', 'fillWall', 'fillPlaceSpeed'].forEach((id) => $(id).addEventListener('input', renderFrameFigure));
+  ['fillWidth', 'fillHeight'].forEach((id) => $(id).addEventListener('change', renderFrameFigure));
+  $('fillPlaceSpeed').addEventListener('change', renderFrameFigure);
+  // よく使う大きさ: 押すと幅と高さを入れる（入れたら保存と図の描き直しは、ふつうに変えたときと同じ）
+  document.querySelectorAll('#sizePresets button').forEach((b) => b.addEventListener('click', () => {
+    for (const [id, value] of [['fillWidth', b.dataset.width], ['fillHeight', b.dataset.height]]) {
+      $(id).value = value;
+      $(id).dispatchEvent(new Event('input'));
+    }
+  }));
 
   function renderFillSettings(settings) {
     if (fillFormDirty || !settings) return;
@@ -4113,7 +4489,8 @@ ${CONTROLS_JS}
       $(id).value = String(settings[key]);
       $(id).dispatchEvent(new Event('sync'));
     }
-    renderFrameFigure();
+    fillLayers = (settings.layers ?? []).map((l) => ({ ...l }));
+    renderLayers();
   }
 
   // ---- ワールドの設定（変えたらすぐ入れる） ----
@@ -4203,7 +4580,7 @@ ${CONTROLS_JS}
     $('recent').replaceChildren(...recent.map((gift) => {
       const b = document.createElement('button');
       b.className = 'icon-btn';
-      b.append(giftIcon(gift.image || gift.giftName), gift.giftName + '（🪙' + gift.diamonds + '）');
+      b.append(giftIcon(gift.image || gift.giftName), gift.giftName + '（' + gift.diamonds + 'コイン）');
       const index = rows.findIndex((r) => r.trigger === 'gift' && giftKey(r.value) === giftKey(gift.giftName));
       // 名前のルールがなくても、コイン数のルールで出るなら、そのことを見せる
       const byCoins = index === -1 && rows.find((r) => r.trigger === 'minDiamonds' && Number(r.value) <= gift.diamonds);
@@ -4240,7 +4617,7 @@ ${CONTROLS_JS}
     $('giftGrid').replaceChildren(...shown.map((g) => {
       const b = document.createElement('button');
       b.type = 'button';
-      const small = Object.assign(document.createElement('small'), { textContent: '🪙' + g.diamonds });
+      const small = el('small', '', triIcon('coins', 'cic'), String(g.diamonds));
       b.append(giftIcon(g.image, true), g.nameJa, small);
       b.addEventListener('click', () => {
         $('giftPicker').close();
@@ -4263,28 +4640,108 @@ ${CONTROLS_JS}
   $('giftPickerClose').addEventListener('click', () => $('giftPicker').close());
 
   // ---- 初回ウィザード ----
-  const STEP_NAMES = ['マイクラの準備', 'TikTok ID', '完了'];
+  // ようこそ → マイクラの準備 → TikTok ID → 妨害のセット → 配信画面に出す → 試しに出す
+  const STEP_NAMES = ['ようこそ', 'マイクラ', 'TikTok ID', '妨害のセット', '配信画面', '試す'];
+  const STEP_SETUP = 1;
+  const STEP_ID = 2;
+  const STEP_PRESET = 3;
+  const STEP_WIDGETS = 4;
+  const STEP_TRY = 5;
   let wizardStep = 0;
   let wizardChecked = false;
+  /** 妨害のセットで選んだもの（'keep' = 今のまま / プリセットの id） */
+  let wizardPreset = 'keep';
 
   function showWizardStep(step) {
     wizardStep = step;
     document.querySelectorAll('#wizard [data-step]').forEach((el) => (el.hidden = Number(el.dataset.step) !== step));
-    $('wizSteps').textContent = STEP_NAMES.map((name, i) => (i === step ? '● ' : '○ ') + name).join('　');
+    $('wizSteps').replaceChildren(...STEP_NAMES.map((name, i) => el('li', i < step ? 'done' : i === step ? 'now' : '', name)));
     $('wizBack').style.visibility = step === 0 ? 'hidden' : 'visible';
     renderWizardNext();
-    if (step === 0) loadSetup();
-    if (step === 1) $('wizUsername').value = state?.tiktokUsername ?? '';
+    if (step === 0) renderWizardWelcome();
+    if (step === STEP_SETUP) loadSetup();
+    if (step === STEP_ID) $('wizUsername').value = state?.tiktokUsername ?? '';
+    if (step === STEP_PRESET) renderWizardPresets();
+    if (step === STEP_WIDGETS) renderWizardWidgets();
+    if (step === STEP_TRY) renderWizardTry();
   }
 
   /** マイクラの準備が足りないうちは、「次へ」を控えめにして「まとめて導入する」を先に押してもらう */
   function renderWizardNext() {
-    const later = wizardStep === 0 && setupReady === false;
+    const later = wizardStep === STEP_SETUP && setupReady === false;
     $('wizNext').classList.toggle('next', !later);
-    $('wizNext').textContent = later ? 'あとで入れる' : wizardStep === STEP_NAMES.length - 1 ? 'はじめる' : '次へ';
+    $('wizNext').textContent = later ? 'あとで入れる' : wizardStep === 0 ? 'はじめる' : wizardStep === STEP_NAMES.length - 1 ? '完了' : '次へ';
   }
 
+  function renderWizardWelcome() {
+    document.querySelectorAll('#wizard [data-tri]').forEach((box) => box.replaceChildren(triIcon(box.dataset.tri, '')));
+    document.querySelectorAll('#wizard [data-mc]').forEach((box) => box.replaceChildren(mcIcon(box.dataset.mc, 36)));
+  }
+
+  /** 妨害のセット: 用意したプリセット（＋ルールがあれば「今のまま」）から1つ選ぶ */
+  function renderWizardPresets() {
+    const builtin = state?.presets?.builtin ?? [];
+    const current = rulesKey(state?.rules ?? []);
+    const same = builtin.find((p) => rulesKey(p.rules) === current);
+    const options = [];
+    if ((state?.rules ?? []).length > 0 && !same) options.push({ id: 'keep', name: '今のまま', description: '今の妨害の設定をそのまま使う', count: state.rules.length });
+    options.push(...builtin.map((p) => ({ id: p.id, name: p.name, description: p.description, count: p.rules.length })));
+    if (!options.some((o) => o.id === wizardPreset)) wizardPreset = same?.id ?? options[0]?.id ?? 'keep';
+    $('wizPresets').replaceChildren(...options.map((o) => {
+      const b = Object.assign(el('button', '', el('b', '', o.name), el('small', '', o.description), el('span', 'count', 'ルール ' + o.count + '件')), { type: 'button' });
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(o.id === wizardPreset));
+      b.addEventListener('click', () => {
+        wizardPreset = o.id;
+        renderWizardPresets();
+      });
+      return b;
+    }));
+  }
+
+  /** 配信画面に出す: まずはギフト通知とギフト表の URL */
+  function renderWizardWidgets() {
+    $('wizWidgets').replaceChildren(...OVERLAY_WIDGETS.filter((w) => ['alerts', 'gifts'].includes(w.id)).map((w) => {
+      const url = location.origin + '/overlay/' + w.id + '.html';
+      const copy = Object.assign(el('button', '', 'コピー'), { type: 'button' });
+      copy.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(url);
+        copy.textContent = 'コピーしました';
+        setTimeout(() => (copy.textContent = 'コピー'), 1500);
+      });
+      return el('div', 'url', el('b', '', w.name), el('code', '', url), copy);
+    }));
+  }
+
+  /** 試しに出す: マイクラが開いているかを見て、ギフトを1つ送ったことにする */
+  function wizardTryGift() {
+    const rule = (state?.rules ?? []).find((r) => r.gift && r.action !== 'message');
+    return rule?.gift ?? null;
+  }
+  function renderWizardTry() {
+    const connected = !!state?.mod?.connected;
+    const items = [
+      [!!state?.tiktokUsername || !!state?.mock, 'TikTok ID を入れた', state?.tiktokUsername ? '@' + state.tiktokUsername + '（LIVE を始めると自動でつながります）' : state?.mock ? 'テストモードなので TikTok にはつながりません' : 'あとで「接続と準備」でも入れられます'],
+      [connected, 'マイクラでワールドを開く', connected ? 'つながっています' : 'ランチャーで「fabric-loader」を選んで起動し、ワールドに入ってください（左下の「マイクラ」が緑になります）'],
+    ];
+    $('wizTodo').replaceChildren(...items.map(([ok, title, sub]) => {
+      const li = el('li', ok ? 'ok' : '', el('span', 'mark', ok ? '✓' : ''), el('div', '', title, el('small', '', sub)));
+      if (!ok && title.startsWith('マイクラ')) li.querySelector('div').append(Object.assign(document.createElement('img'), { className: 'guide-img', src: '${GUIDE.minecraft.src}', alt: '${GUIDE.minecraft.alt}' }));
+      return li;
+    }));
+    const gift = wizardTryGift();
+    $('wizTry').disabled = !connected || !gift;
+    $('wizTry').textContent = gift ? '試しに「' + gift + '」を送る' : '試しにギフトを送る';
+    $('wizTryNote').textContent = !gift ? '「妨害の設定」にギフトのルールがありません'
+      : connected ? 'マイクラに妨害が出れば準備OKです' : 'マイクラでワールドを開くと押せます';
+  }
+  $('wizTry').addEventListener('click', () => {
+    const gift = wizardTryGift();
+    if (gift) post('/api/test', { kind: 'gift', giftName: gift, count: 1 }, { button: $('wizTry'), done: '「' + gift + '」が届いたことにしました。マイクラを見てください' });
+  });
+
   function openWizard() {
+    wizardPreset = 'keep';
     showWizardStep(0);
     $('wizard').showModal();
   }
@@ -4292,7 +4749,7 @@ ${CONTROLS_JS}
   $('openWizard').addEventListener('click', openWizard);
   $('wizBack').addEventListener('click', () => showWizardStep(Math.max(0, wizardStep - 1)));
   $('wizNext').addEventListener('click', async () => {
-    if (wizardStep === 1) {
+    if (wizardStep === STEP_ID) {
       const username = $('wizUsername').value.trim();
       if (tiktokIdProblem(username)) {
         toast(tiktokIdProblem(username), 'error');
@@ -4302,6 +4759,17 @@ ${CONTROLS_JS}
       if (username && username !== state?.tiktokUsername) {
         const data = await post('/api/tiktok', { username });
         if (!data?.ok) return;
+      }
+    }
+    if (wizardStep === STEP_PRESET && wizardPreset !== 'keep') {
+      // 選んだセットに入れ替えて保存する（「妨害の設定」の画面に変更が残っていても、ここで選んだものにする）
+      const preset = (state?.presets?.builtin ?? []).find((p) => p.id === wizardPreset);
+      if (preset && rulesKey(preset.rules) !== rulesKey(state.rules ?? [])) {
+        const data = await post('/api/rules', { rules: preset.rules, reason: 'preset' }, { button: $('wizNext'), done: '妨害のセットを「' + preset.name + '」にしました' });
+        if (!data?.ok) return;
+        savedRulesKey = '';
+        setDirty(false);
+        loadRules(data.state.rules);
       }
     }
     if (wizardStep === STEP_NAMES.length - 1) {

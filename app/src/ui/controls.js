@@ -281,7 +281,7 @@ export const CONTROLS_JS = String.raw`
 
   // ---- プルダウン ----
   function enhanceSelect(sel) {
-    if (sel.dataset.enhanced || sel.hasAttribute('data-tiles') || sel.multiple) return;
+    if (sel.dataset.enhanced || sel.hasAttribute('data-tiles') || sel.hidden || sel.multiple) return;
     sel.dataset.enhanced = '1';
     const wrap = document.createElement('span');
     wrap.className = 'dd';
